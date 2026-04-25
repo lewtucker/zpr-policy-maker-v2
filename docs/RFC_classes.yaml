@@ -1,0 +1,273 @@
+# ZPL RFC-15.5 Class Hierarchy
+# Four predefined root classes (users, endpoints, services) plus the predefined
+# servers subclass, followed by user-defined subclasses drawn from the RFC.
+#
+# Design principle: subclasses are used when a class introduces structurally
+# different attributes or restricts an inherited attribute to a fixed value.
+# Categorical variation (department, role, clearance) is expressed as enumerated
+# attribute values on the parent class, not as separate subclasses.
+#
+# Tags (RFC-15.5 section 3.4): any attribute whose meaning is its presence or
+# absence rather than a specific value goes in the `tags` multi-valued attribute
+# that all three root classes inherit.  Examples: managed, compliant, internal.
+#
+#   Entity:  tags: [managed]          # device is managed
+#   Entity:  (no tags key)            # device is unmanaged
+#   Rule:    attrs: {tags: managed}   # requires managed tag (set-overlap match)
+#
+# Do NOT add a separate per-tag attribute to a class definition. Use tags:.
+#
+# Attribute types:
+#   single  — a single string value; optional values: list of allowed strings
+#   multi   — a set of string values
+#
+# Fields:
+#   id          — unique system identifier; filled in for instances with a UUID
+#   class       — ZPL class name used in policy statements (singular by convention)
+#   parent      — parent class name (references class:); null for the three built-in roots
+#   builtin     — true: ships with ZPL, cannot be deleted or re-parented
+#   aka         — optional single alias (non-standard plural or synonym)
+#   description
+#   attributes:
+#     <name>:
+#       type: single | multi
+#       values: [...]         # enumerated allowed values (single or multi)
+#       value: <string>       # restricts this attribute to a fixed value (subclass constraint)
+
+classes:
+
+  # ── Built-in root classes ──────────────────────────────────────────────────
+  # These three are intrinsic to ZPL. No Define statement is needed or permitted.
+  # All root classes carry:
+  #   name — identity used to reference the entity in rules
+  #   tags — multi-valued tag list (managed, compliant, internal, etc.)
+
+  - id:
+    class: users
+    parent: null
+    builtin: true
+    aka: user
+    description: An individual or authority that can be associated with a communication flow
+    attributes:
+      name:
+        type: single
+      tags:
+        type: multi
+        values: [managed, unmanaged, customer, sales, compliant, internal, public]
+
+  - id:
+    class: endpoints
+    parent: null
+    builtin: true
+    aka: endpoint
+    description: A device that connects to the ZPRnet
+    attributes:
+      name:
+        type: single
+      tags:
+        type: multi
+        values: [managed, unmanaged, customer, sales, compliant, internal, public]
+
+  - id:
+    class: services
+    parent: null
+    builtin: true
+    aka: service
+    description: An application that listens for communications and responds to them
+    attributes:
+      name:
+        type: single
+      tags:
+        type: multi
+        values: [managed, unmanaged, customer, sales, compliant, internal, public]
+
+  # ── Predefined subclass ────────────────────────────────────────────────────
+  # servers is the one predefined subclass specified in RFC-15.5 section 3.5.
+  # Define server AKA servers as an endpoint with multiple services.
+
+  - id:
+    class: servers
+    parent: endpoints
+    builtin: true
+    aka: server
+    description: >
+      A server endpoint. Has a multi-valued services attribute listing
+      the services running on it.
+    attributes:
+      services:
+        type: multi
+
+  # ── User subclasses ────────────────────────────────────────────────────────
+
+  # From RFC-15.5 section 4.2 (adapted):
+  # Define employee as a user with an Employee_ID, roles, department,
+  #   employment-type and clearance.
+  #
+  # Categorical variation (department, employment-type, clearance) is expressed
+  # as enumerated attribute values — not as separate subclasses — so rules can
+  # filter with e.g. department:sales employees or employment-type:intern employees.
+  - id:
+    class: employee
+    parent: users
+    aka: employees
+    description: A person employed by or contracted to the organisation
+    attributes:
+      Employee_ID:
+        type: single
+      roles:
+        type: multi
+        values: [engineer, developer, manager, analyst, designer, support, admin]
+      department:
+        type: single
+        values: [sales, marketing, engineering, finance, hr, legal, operations, admin]
+      employment-type:
+        type: single
+        values: [full-time, part-time, contract, intern]
+      clearance:
+        type: single
+        values: [none, confidential, secret, top-secret]
+
+  # Partners are structurally distinct from employees — different attribute set.
+  - id:
+    class: partner
+    parent: users
+    aka: partners
+    description: A user from an external partner organisation
+    attributes:
+      organisation:
+        type: single
+      clearance:
+        type: single
+        values: [none, confidential, secret, top-secret]
+
+  # ── Endpoint subclasses ────────────────────────────────────────────────────
+
+  # From RFC-15.5 section 3.5:
+  # Define mobile-device AKA mobile-devices as an endpoint with device-type.
+  - id:
+    class: mobile-device
+    parent: endpoints
+    aka: mobile-devices
+    description: A mobile device; device-type distinguishes phones, tablets, etc.
+    attributes:
+      device-type:
+        type: single
+        values: [phone, tablet, wearable]
+      owner:
+        type: single
+        values: [corporate, personal]
+
+  # From RFC-15.5 section 3.5 — adds phone-number and fixes device-type to phone.
+  # Define mobile-phone AKA mobile-phones as a mobile-device with
+  #   phone-number and device-type:phone.
+  - id:
+    class: mobile-phone
+    parent: mobile-device
+    aka: mobile-phones
+    description: A mobile phone; device-type is fixed to phone
+    attributes:
+      phone-number:
+        type: single
+      device-type:
+        type: single
+        value: phone
+
+  # Define laptop AKA laptops as an endpoint with device-type:laptop.
+  - id:
+    class: laptop
+    parent: endpoints
+    aka: laptops
+    description: A laptop device
+    attributes:
+      device-type:
+        type: single
+        value: laptop
+      os:
+        type: single
+        values: [macos, windows, linux]
+
+  # From RFC-15.5 section 4.2:
+  # Define gateway AKA gateways as an endpoint with external-network-connection.
+  - id:
+    class: gateway
+    parent: endpoints
+    aka: gateways
+    description: An endpoint that bridges the ZPRnet to an external network
+    attributes:
+      external-network-connection:
+        type: single
+
+  # From RFC-15.5 section 4.2:
+  # Define internet-gateway as a gateway with
+  #   external-network-connection:public-internet.
+  - id:
+    class: internet-gateway
+    parent: gateway
+    aka: internet-gateways
+    description: An internet-facing gateway; external-network-connection fixed to public-internet
+    attributes:
+      external-network-connection:
+        type: single
+        value: public-internet
+
+  # Define load-balancer AKA load-balancers as a server with multiple services.
+  - id:
+    class: load-balancer
+    parent: servers
+    aka: load-balancers
+    description: A server that distributes traffic across multiple backend services
+    attributes:
+      services:
+        type: multi
+
+  # ── Service subclasses ─────────────────────────────────────────────────────
+
+  # Database adds data and classification attributes.
+  - id:
+    class: database
+    parent: services
+    aka: databases
+    description: A database service
+    attributes:
+      data:
+        type: single
+        values: [customer, hr, finance, legal, engineering, operations]
+      classification:
+        type: single
+        values: [public, internal, confidential, secret, top-secret]
+      env:
+        type: single
+        values: [development, staging, production]
+
+  # internal-service and external-api are structurally distinct — fixed access value.
+  - id:
+    class: internal-service
+    parent: services
+    aka: internal-services
+    description: A service accessible only within the organisation
+    attributes:
+      access:
+        type: single
+        value: internal
+      classification:
+        type: single
+        values: [public, internal, confidential, secret, top-secret]
+      env:
+        type: single
+        values: [development, staging, production]
+
+  - id:
+    class: external-api
+    parent: services
+    aka: external-apis
+    description: An API exposed to external callers
+    attributes:
+      access:
+        type: single
+        value: external
+      classification:
+        type: single
+        values: [public, internal, confidential]
+      env:
+        type: single
+        values: [development, staging, production]

@@ -1,0 +1,288 @@
+# OCI ZPL Rules — RFC-15.5 YAML
+# Importable via Rules YAML ▾ → Upload on the ZPL Rules page.
+#
+# Prerequisites: import OCI_ZPL_classes.yaml first so oci-workload and
+# internet-host classes are defined.
+#
+# Key translation decisions:
+#   resource: → object:          (ZPL RFC-15.5 slot name)
+#   newcorp.tier/network/etc → tier/network/etc  (namespace prefix removed)
+#   verb: "connect to" → connect-to
+#   Protocol constraints are noted in descriptions only.
+#
+# The OCI "Default Deny All" rule is omitted — ZPL has implicit default-deny.
+
+rules:
+
+  # ── Admin / DB Direct Access ────────────────────────────────────────────────
+
+  - id: oci-admin-to-db
+    name: Admin to DB
+    description: Admin tier to DB tier. Protocol tcp/3306 (MySQL).
+    result: allow
+    priority: 900
+    verb: connect-to
+    subject:
+      class: oci-workload
+      attrs:
+        tier: admin
+        network: zpr-test
+    object:
+      class: oci-workload
+      attrs:
+        tier: db
+        network: zpr-test
+
+  - id: oci-db-to-admin
+    name: DB to Admin
+    description: DB tier to Admin tier. Protocol tcp/3306 (MySQL).
+    result: allow
+    priority: 890
+    verb: connect-to
+    subject:
+      class: oci-workload
+      attrs:
+        tier: db
+        network: zpr-test
+    object:
+      class: oci-workload
+      attrs:
+        tier: admin
+        network: zpr-test
+
+  # ── Employee Outbound ────────────────────────────────────────────────────────
+
+  - id: oci-employee-outbound
+    name: Employee Outbound to Internet
+    description: Employee tier workloads may connect to any internet address (0.0.0.0/0). No protocol restriction.
+    result: allow
+    priority: 880
+    verb: connect-to
+    subject:
+      class: oci-workload
+      attrs:
+        tier: employee
+        network: zpr-test
+    object:
+      class: internet-host
+
+  # ── Internet / Load Balancer Ingress ─────────────────────────────────────────
+
+  - id: oci-internet-to-web
+    name: Internet to Web Tier
+    description: Public HTTPS ingress to web tier. Protocol tcp/443.
+    result: allow
+    priority: 870
+    verb: connect-to
+    subject:
+      class: internet-host
+    object:
+      class: oci-workload
+      attrs:
+        tier: web
+        network: zpr-test
+
+  - id: oci-internet-to-lb
+    name: Internet to Load Balancer
+    description: Public HTTPS ingress to load balancer tier. Protocol tcp/443.
+    result: allow
+    priority: 860
+    verb: connect-to
+    subject:
+      class: internet-host
+    object:
+      class: oci-workload
+      attrs:
+        tier: lb
+        network: zpr-test
+
+  # ── Proxy / Load Balancer → Tier Routing ────────────────────────────────────
+
+  - id: oci-proxy-to-web
+    name: Proxy to Web Tier
+    description: Proxy tier forwards HTTP traffic to web tier. Protocol tcp/8080.
+    result: allow
+    priority: 850
+    verb: connect-to
+    subject:
+      class: oci-workload
+      attrs:
+        tier: proxy
+        network: zpr-test
+    object:
+      class: oci-workload
+      attrs:
+        tier: web
+        network: zpr-test
+
+  - id: oci-lb-to-web
+    name: Load Balancer to Web Tier
+    description: Load balancer forwards HTTP traffic to web tier. Protocol tcp/8080.
+    result: allow
+    priority: 840
+    verb: connect-to
+    subject:
+      class: oci-workload
+      attrs:
+        tier: lb
+        network: zpr-test
+    object:
+      class: oci-workload
+      attrs:
+        tier: web
+        network: zpr-test
+
+  - id: oci-web-to-app
+    name: Web Tier to App Tier
+    description: Web tier calls app tier over HTTP. Protocol tcp/8080.
+    result: allow
+    priority: 830
+    verb: connect-to
+    subject:
+      class: oci-workload
+      attrs:
+        tier: web
+        network: zpr-test
+    object:
+      class: oci-workload
+      attrs:
+        tier: app
+        network: zpr-test
+
+  - id: oci-app-to-db
+    name: App Tier to DB Tier
+    description: App tier connects to database. Protocol tcp/3306 (MySQL).
+    result: allow
+    priority: 820
+    verb: connect-to
+    subject:
+      class: oci-workload
+      attrs:
+        tier: app
+        network: zpr-test
+    object:
+      class: oci-workload
+      attrs:
+        tier: db
+        network: zpr-test
+
+  # ── DB Replication ───────────────────────────────────────────────────────────
+
+  - id: oci-db-replication
+    name: DB to DB Replication
+    description: Database replication between DB tier nodes. Protocol tcp/3306 (MySQL).
+    result: allow
+    priority: 810
+    verb: connect-to
+    subject:
+      class: oci-workload
+      attrs:
+        tier: db
+        network: zpr-test
+    object:
+      class: oci-workload
+      attrs:
+        tier: db
+        network: zpr-test
+
+  # ── Bootstrap Operations ─────────────────────────────────────────────────────
+
+  - id: oci-bootstrap-outbound
+    name: Bootstrap Workload Outbound
+    description: Bootstrap workloads fetch packages and config during initialization. Protocol tcp/443 (HTTPS).
+    result: allow
+    priority: 800
+    verb: connect-to
+    subject:
+      class: oci-workload
+      attrs:
+        bootstrap: "true"
+        network: zpr-test
+    object:
+      class: internet-host
+
+  - id: oci-internet-to-bootstrap
+    name: Internet to Bootstrap Workload
+    description: SSH access to bootstrap workloads during initialization. Protocol tcp/22.
+    result: allow
+    priority: 790
+    verb: connect-to
+    subject:
+      class: internet-host
+    object:
+      class: oci-workload
+      attrs:
+        bootstrap: "true"
+        network: zpr-test
+
+  # ── Dev/Test Operations ──────────────────────────────────────────────────────
+
+  - id: oci-devtest-outbound
+    name: Dev/Test Workload Outbound
+    description: Dev/test workloads may reach the internet over HTTPS. Protocol tcp/443.
+    result: allow
+    priority: 780
+    verb: connect-to
+    subject:
+      class: oci-workload
+      attrs:
+        devtest: "true"
+        network: zpr-test
+    object:
+      class: internet-host
+
+  - id: oci-internet-to-devtest
+    name: Internet to Dev/Test Workload
+    description: SSH access to dev/test workloads. Protocol tcp/22.
+    result: allow
+    priority: 770
+    verb: connect-to
+    subject:
+      class: internet-host
+    object:
+      class: oci-workload
+      attrs:
+        devtest: "true"
+        network: zpr-test
+
+  - id: oci-devtest-to-db
+    name: Dev/Test to DB Tier
+    description: Dev/test workloads may query the database. Protocol tcp/3306 (MySQL).
+    result: allow
+    priority: 760
+    verb: connect-to
+    subject:
+      class: oci-workload
+      attrs:
+        devtest: "true"
+        network: zpr-test
+    object:
+      class: oci-workload
+      attrs:
+        tier: db
+        network: zpr-test
+
+  # ── App Monitoring ───────────────────────────────────────────────────────────
+
+  - id: oci-app-to-monitoring
+    name: App Tier to Monitoring
+    description: App tier sends metrics and telemetry to monitoring tier. Protocol tcp/443 (HTTPS).
+    result: allow
+    priority: 750
+    verb: connect-to
+    subject:
+      class: oci-workload
+      attrs:
+        tier: app
+        network: zpr-test
+    object:
+      class: oci-workload
+      attrs:
+        tier: monitoring
+        network: zpr-test
+
+  # ── Default Deny ──────────────────────────────────────────────────────────────
+  # The OCI "Default Deny All" rule (priority 1, no subject/resource) is omitted.
+  # ZPL already has implicit default-deny: any request not matched by an allow
+  # rule receives verdict=deny. An unconstrained Never rule would fire before all
+  # Allow rules and block everything.

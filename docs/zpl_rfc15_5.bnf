@@ -1,0 +1,150 @@
+// ZPL — Zero-trust Policy Language
+// BNF Grammar — RFC-15.5
+// Not included: circumstantial constraints (time, data-volume limits)
+// Reserved for future use: 'link', 'links', 'over', 'from', 'without'
+//
+// Changes from RFC-15.4:
+//   - Added built-in server/servers class (predefined subclass of endpoints)
+//   - Expanded verb set: access, use, call, read, write, connect to
+//   - Added name:value form to <define-attr-spec> for inherited attribute restriction
+//   - Added <attr-set> (name:{v1,v2,...}) to <attribute-expr>
+//   - Fixed <with-attributes-clause>: removed broken additional-attributes-clause reference
+//   - Fixed comment on <service-class-name> (was incorrectly labelled as endpoint)
+
+// ── Top-level structure ───────────────────────────────────────────────────────
+
+<zpl-policy> ::= <statement>*
+
+<statement> ::= <permission-statement>
+              | <denial-statement>
+              | <define-statement>
+
+<permission-statement> ::= "allow" <p-statement>
+
+<denial-statement> ::= "never" <permission-statement>
+
+<define-statement> ::= "define" <name> <aka-clause>? "as" <article> <class-name>
+                       <with-attributes-clause>? "." <eol>
+
+// ── Permission / denial body ──────────────────────────────────────────────────
+
+<p-statement> ::= <subject-clause> "to" <verb> <object-clause>
+                  (","? "and" <signal-clause>)? "." <eol>
+
+<subject-clause> ::= <user-spec>
+                   | <service-spec>
+                   | <endpoint-spec>
+                   | <user-spec> "on" <endpoint-spec>
+                   | <service-spec> "on" <endpoint-spec>
+
+<object-clause> ::= <service-spec>
+                  | <service-spec> "on" <endpoint-spec>
+
+<verb> ::= "access"
+         | "use"
+         | "call"
+         | "read"
+         | "write"
+         | "connect" "to"
+
+<signal-clause> ::= "signal" <string> "to" <name>
+
+// ── Define statement ──────────────────────────────────────────────────────────
+
+<aka-clause> ::= "aka" <name>
+
+<article> ::= "a" | "an"
+
+<with-attributes-clause> ::= "with" <define-attr-list>
+
+<define-attr-list> ::= <define-attr-spec> (<and-token> <define-attr-spec>)*
+
+// Three forms of attribute spec in a Define statement:
+//   1. "multiple"? <name>        — single or multi-valued attribute declaration
+//   2. "optional"? tag/tags ...  — one or more tag declarations
+//   3. <name> ":" <value>        — attribute declaration with a fixed inherited value
+<define-attr-spec> ::= "multiple"? <name>
+                     | "optional"? ("tag" | "tags") <name> (<and-token> <name>)*
+                     | <name> ":" <value>
+
+<and-token> ::= "and" | ","
+
+// ── Entity specs (used in permission and denial statements) ───────────────────
+
+# A <user-class-name> must be or descend from the built-in "users" class.
+<user-spec> ::= <attribute-expr>* <user-class-name>
+<user-class-name> ::= <built-in-user-class-name> | <name>
+
+# An <endpoint-class-name> must be or descend from the built-in "endpoints" class.
+<endpoint-spec> ::= <attribute-expr>* <endpoint-class-name>
+<endpoint-class-name> ::= <built-in-endpoint-class-name> | <name>
+
+# A <service-class-name> must be or descend from the built-in "services" class.
+<service-spec> ::= <attribute-expr>* <service-class-name>
+<service-class-name> ::= <built-in-service-class-name> | <name>
+
+// ── Attribute expressions (used in entity specs) ──────────────────────────────
+
+<attribute-expr> ::= <attr-tag>
+                   | <attr-kv-pair>
+                   | <attr-key-presence>
+                   | <attr-set>
+
+<attr-tag>          ::= <name>
+
+# No spaces around ':' in <attr-kv-pair>
+<attr-kv-pair>      ::= <name> ":" <value>
+
+# No space may precede ':' in <attr-key-presence>
+<attr-key-presence> ::= <name> ":"
+
+# Multi-value set match: name:{val1,val2,...}
+<attr-set>          ::= <name> ":" "{" <value> ("," <value>)* "}"
+
+// ── Class names ───────────────────────────────────────────────────────────────
+
+<class-name> ::= <built-in-class-name> | <name>
+
+<built-in-class-name> ::= <built-in-user-class-name>
+                        | <built-in-endpoint-class-name>
+                        | <built-in-service-class-name>
+
+<built-in-user-class-name>     ::= "user"     | "users"
+<built-in-service-class-name>  ::= "service"  | "services"
+
+# endpoints and servers are both built-in endpoint classes (RFC-15.5 section 3.5).
+# servers is a predefined subclass of endpoints with a multi-valued services attribute.
+<built-in-endpoint-class-name> ::= "endpoint" | "endpoints"
+                                 | "server"   | "servers"
+
+// ── Names ─────────────────────────────────────────────────────────────────────
+
+<name>           ::= <identifier> | <string> | <namespace-name>
+<namespace-name> ::= <name> "." <name>
+<identifier>     ::= <letter> (<letter> | <digit> | "-" | "_")*
+
+// ── Values ────────────────────────────────────────────────────────────────────
+
+<value>     ::= <string> | <value-set>
+<value-set> ::= "{" <value> ("," <value>)* "}"
+
+<string>         ::= <quoted-string> | <numeric-string>
+<quoted-string>  ::= <single-quoted-string> | <double-quoted-string>
+
+<single-quoted-string> ::= <single-quote> <single-quote-chars> <single-quote>
+<double-quoted-string> ::= '"' <double-quote-chars> '"'
+
+<single-quote-chars> ::= (<any-char-except-single-quote-or-backslash> | <escaped-char>)*
+<double-quote-chars> ::= (<any-char-except-double-quote-or-backslash> | <escaped-char>)*
+<escaped-char>       ::= "\'" | '\"' | "\\"
+
+<single-quote>   ::= "'" | "`"
+<numeric-string> ::= <integer> | <float>
+<integer>        ::= <digit>+
+<float>          ::= <digit>+ "." <digit>+
+
+// ── Terminals ─────────────────────────────────────────────────────────────────
+
+<letter>  ::= "a".."z" | "A".."Z"
+<digit>   ::= "0".."9"
+<comment> ::= "#" <any-chars-to-eol> | "//" <any-chars-to-eol>

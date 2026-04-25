@@ -1,0 +1,68 @@
+# ZPL built-in class definitions — shipped with the server.
+# Only the five classes below are truly built-in. User-defined subclasses
+# (employee, database, laptop, etc.) are in example_classes.yaml and can
+# be loaded via POST /classes/load-example or defined from scratch.
+
+classes:
+
+  # ── Built-in root classes ──────────────────────────────────────────────────
+
+  - id:
+    class: users
+    parent: null
+    builtin: true
+    aka: user
+    description: An individual or authority that can be associated with a communication flow
+    attributes:
+      uuid:
+        type: single
+      name:
+        type: single
+      tags:
+        type: multi
+        values: [managed, unmanaged, customer, sales, compliant, internal, public]
+
+  - id:
+    class: endpoints
+    parent: null
+    builtin: true
+    aka: endpoint
+    description: A device that connects to the ZPRnet
+    attributes:
+      uuid:
+        type: single
+      name:
+        type: single
+      tags:
+        type: multi
+        values: [managed, unmanaged, customer, sales, compliant, internal, public]
+
+  - id:
+    class: services
+    parent: null
+    builtin: true
+    aka: service
+    description: An application that listens for communications and responds to them
+    attributes:
+      uuid:
+        type: single
+      name:
+        type: single
+      tags:
+        type: multi
+        values: [managed, unmanaged, customer, sales, compliant, internal, public]
+      providing:
+        type: multi
+  # ── Predefined subclass ────────────────────────────────────────────────────
+
+  - id:
+    class: servers
+    parent: endpoints
+    builtin: true
+    aka: server
+    description: >
+      A server endpoint. Has a multi-valued services attribute listing
+      the services running on it.
+    attributes:
+      services:
+        type: multi
