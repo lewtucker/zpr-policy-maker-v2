@@ -103,9 +103,43 @@ Oracle OCI syntax. The user's account stores their preferred language.
 
 https://github.com/lewtucker/zpr-policy-maker-v2 (private)
 
-## Production (v2 — not yet deployed)
+## Production Infrastructure (ready, not yet deployed)
 
-- **Target**: `zpr-policy2.lewtucker.net`
+The server infrastructure is fully set up and waiting for code:
+
+- **URL**: `https://zpr-policy2.lewtucker.net` (SSL via Certbot, auto-renews 2026-07-24)
+- **nginx**: `/etc/nginx/sites-enabled/zpr-policy2.lewtucker.net` → proxies to port 8082
 - **Server path**: `/opt/zpr-policy-maker-v2/src/server/`
-- **Service**: `zpr-policy-maker-v2`
+- **Systemd service**: `zpr-policy-maker-v2` (created, not yet enabled — no code deployed yet)
 - **Port**: 8082
+
+### First Deployment Checklist
+
+When ready to deploy for the first time:
+
+```bash
+# 1. rsync code (always use full absolute paths)
+rsync -av /Users/lewtucker/Documents/dev/ZPR-Policy-maker-v2/src/server/ \
+    root@72.62.97.102:/opt/zpr-policy-maker-v2/src/server/
+
+# 2. On server: create venv + install deps
+ssh root@72.62.97.102 "cd /opt/zpr-policy-maker-v2 && python3 -m venv venv && \
+    venv/bin/pip install -r src/server/requirements.txt"
+
+# 3. Write .env on server
+ssh root@72.62.97.102 "cat > /opt/zpr-policy-maker-v2/src/server/.env << 'EOF'
+APP_PASSWORD=...
+ANTHROPIC_API_KEY=...
+EOF"
+
+# 4. Enable and start service
+ssh root@72.62.97.102 "systemctl enable --now zpr-policy-maker-v2"
+```
+
+### Subsequent Deploys
+
+```bash
+rsync -av /Users/lewtucker/Documents/dev/ZPR-Policy-maker-v2/src/server/ \
+    root@72.62.97.102:/opt/zpr-policy-maker-v2/src/server/
+ssh root@72.62.97.102 "systemctl restart zpr-policy-maker-v2"
+```
