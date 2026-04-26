@@ -1,0 +1,145 @@
+// ZPEL — Oracle OCI Zero-trust Packet Routing (ZPR)
+// Inferred BNF Grammar — from Oracle public documentation
+// Source: https://docs.oracle.com/en-us/iaas/Content/zero-trust-packet-routing/zpr-policy-syntax.htm
+//         https://docs.oracle.com/en-us/iaas/Content/zero-trust-packet-routing/zpr-policy-examples.htm
+//
+// No formal grammar is published on Oracle's documentation site. This BNF is
+// inferred from the syntax reference pages and corpus of published examples.
+// The formal ZPR PEL v1 spec (see zpel_oracle_zpr_pel_v1.bnf) only defines
+// a single-VCN form. The web documentation describes a second cross-VCN form
+// not present in the v1 spec — likely a later extension or console-layer feature.
+//
+// Key differences from ZPL RFC-15.5:
+//   - Only "allow" statements — no "deny", "never", or "define"
+//   - Allowlist-only model: anything not explicitly allowed is denied
+//   - Two structural forms: single-VCN vs. cross-VCN
+//   - Resources identified by security attributes (namespace.key:value), not class names
+//   - "connect to" is the only verb
+//   - Filter clauses for protocol and connection-state (trailing or per-endpoint)
+//   - VCN always identified by a security attribute, not by name or OCID
+//   - Case-insensitive
+
+// ── Top-level structure ───────────────────────────────────────────────────────
+
+<zpr-policy>      ::= <statement>*
+
+<statement>       ::= <form1-statement>
+                    | <form2-statement>
+
+// ── Form 1: Single VCN ────────────────────────────────────────────────────────
+//
+// Traffic within one VCN (or outgoing/incoming to/from external endpoints).
+// The VCN is identified by its security attribute.
+//
+//   in <vcn-attr> VCN allow <source-endpoint> to connect to <dest-endpoint>
+//   [with <filter>]*
+
+<form1-statement> ::= "in" <security-attribute> "VCN"
+                      "allow" <endpoint>
+                      "to" "connect" "to" <endpoint>
+
+// ── Form 2: Two VCNs (same region and tenancy) ────────────────────────────────
+//
+// Traffic between two peered VCNs in the same region and tenancy.
+// Both endpoints must be security attributes (no IP/CIDR in this form).
+//
+//   allow <source-endpoint> in <vcn-attr> VCN to connect to <dest-endpoint>
+//   [with <filter>]* in <vcn-attr> VCN
+//
+// NOTE: This form does not appear in the formal ZPR PEL v1 BNF. It is described
+// in Oracle's web documentation and console. It may be a v1+ extension.
+
+<form2-statement> ::= "allow" <endpoint>
+                      "in" <security-attribute> "VCN"
+                      "to" "connect" "to" <endpoint>
+                      "in" <security-attribute> "VCN"
+
+// ── Endpoints ─────────────────────────────────────────────────────────────────
+
+<endpoint>        ::= <basic-endpoint>
+                    | <basic-endpoint> <with-attribute-list>
+
+<basic-endpoint>  ::= <security-attribute> "endpoints"?
+                    | <ip-or-CIDR>
+                    | "all-endpoints"
+                    | "osn-services-ip-addresses"
+
+// Source and destination cannot both be "all-endpoints".
+// In Form 2, both endpoints must be security attributes (no IP/CIDR).
+
+// ── With attribute list ───────────────────────────────────────────────────────
+//
+// Multiple filters use comma-separated or "and"-separated syntax or repeated "with":
+//   with protocol='tcp/1521', connection-state='stateless'
+//   with protocol='tcp/1521' and connection-state='stateless'
+//   with protocol='tcp/1521' with connection-state='stateless'
+//
+// The repeated-"with" form (not in the formal v1 spec) is observed in web examples.
+
+<with-attribute-list> ::= "with" <attribute>
+                        | <with-attribute-list> <list-conjunction> <attribute>
+                        | <with-attribute-list> "with" <attribute>
+
+<list-conjunction> ::= ","
+                     | "and"
+                     | "," "and"
+
+// ── Security attributes ───────────────────────────────────────────────────────
+//
+// Key-value pair identifying a required security attribute on an endpoint or VCN.
+// Namespace is optional; if omitted, defaults to "oracle-zpr".
+// If value contains spaces, periods, or special chars, wrap entire clause in
+// single quotes. Single quotes inside values escaped as '' (doubled).
+
+<security-attribute> ::= <namespace> "." <key> ":" <simple-value>
+                       | <key> ":" <simple-value>
+                       | "'" <namespace> "." <key> ":" <value> "'"
+                       | "'" <key> ":" <value> "'"
+
+<namespace>       ::= <simple-name>
+<key>             ::= <simple-name>
+<simple-value>    ::= <simple-name>
+<value>           ::= <string>
+
+// simple-name: ASCII letters, digits, hyphens, underscores; starts with a letter
+<simple-name>     ::= <letter> (<letter> | <digit> | "-" | "_")*
+
+// ── Ordinary attributes ───────────────────────────────────────────────────────
+//
+// Values for ordinary attributes are always single-quoted.
+
+<attribute>       ::= "protocol" "=" "'" <protocol-spec> "'"
+                    | "protocol.icmp.type" "=" "'" <icmp-value> "'"
+                    | "protocol.icmp.code" "=" "'" <icmp-value> "'"
+                    | "connection-state" "=" "'" <connection-state-val> "'"
+
+<protocol-spec>   ::= <protocol>
+                    | <protocol> "/" <port>
+
+// Valid protocol values: decimal integer 0–255, tcp, udp, icmp, ipv6-icmp
+<protocol>        ::= <string>
+
+// port: single number (1–65535) or range low-high
+<port>            ::= <number>
+                    | <number> "-" <number>
+
+<icmp-value>      ::= <string>    // decimal integer; type 0–255, code 0–15
+
+// connection-state defaults to stateful when absent
+<connection-state-val> ::= "stateless"
+                          | "stateful"
+
+// ── IP/CIDR ───────────────────────────────────────────────────────────────────
+
+<ip-or-CIDR>      ::= "'" <ipv4-address> "'"
+                    | "'" <ipv4-address> "/" <number> "'"
+                    | "'" <ipv6-address> "'"
+                    | "'" <ipv6-address> "/" <number> "'"
+
+// ── Terminals ─────────────────────────────────────────────────────────────────
+
+<number>          ::= <digit>+
+<string>          ::= <allowed-string-characters>*    // most printable Unicode; '' escapes '
+<letter>          ::= "a".."z" | "A".."Z"
+<digit>           ::= "0".."9"
+<comment>         ::= "#" <any-chars-to-eol>

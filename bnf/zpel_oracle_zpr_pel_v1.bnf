@@ -1,0 +1,167 @@
+// ZPEL — Oracle OCI Zero-trust Packet Routing Policy Enforcement Language (ZPR PEL)
+// Formal BNF Grammar — Version 1
+// Source: Oracle ZPR PEL Version 1 specification document, January 27, 2025
+//         https://docs.oracle.com/en-us/iaas/Content/zero-trust-packet-routing/
+//
+// This BNF is transcribed directly from Section 4 of the formal specification.
+// Prose constraints from Sections 2 and 3 are annotated as comments.
+//
+// Key differences from ZPL RFC-15.5:
+//   - Only "allow" statements — no "deny", "never", or "define"
+//   - Allowlist-only model: connection permitted iff it matches at least one statement
+//   - One structural form: always begins with "in <security-attribute> vcn"
+//   - Only one verb: "connect to"
+//   - Resources identified by security attributes (namespace.key:value), not class names
+//   - "with" attribute clauses belong to each endpoint clause, not the statement
+//   - Case-insensitive: all letters normalized to lowercase before matching
+
+// ── Top-level structure ───────────────────────────────────────────────────────
+
+<policy_statement> ::= <network_scope> <command> <source_endpoint> "to" <verb> <target_endpoint>
+
+<command>          ::= "allow"
+
+<verb>             ::= "connect" "to"
+
+<source_endpoint>  ::= <endpoint>
+
+<target_endpoint>  ::= <endpoint>
+
+// ── Network scope ─────────────────────────────────────────────────────────────
+//
+// Identifies the enforcing VCN by its security attribute. Exactly one
+// security attribute must be specified. At least one of the source or
+// target endpoints must be within this VCN.
+
+<network_scope>    ::= "in" <security_attribute> "vcn"
+
+// ── Endpoints ─────────────────────────────────────────────────────────────────
+//
+// An endpoint is a basic endpoint clause, optionally followed by a "with
+// attribute list" of ordinary (non-security) attributes. Both source and
+// target use the same endpoint syntax.
+//
+// Well-formedness: at least one of the source or target endpoint clauses
+// must contain a security attribute clause.
+
+<endpoint>         ::= <basic_endpoint>
+                     | <basic_endpoint> <with_attribute_list>
+
+<basic_endpoint>   ::= <security_attribute> "endpoints"
+                     | <ip_or_CIDR>
+                     | "all-endpoints"
+                     | "osn-services-ip-addresses"
+
+// Constraints:
+//   - Source and destination cannot both be "all-endpoints"
+//   - <ip_or_CIDR> and "osn-services-ip-addresses" match only endpoints
+//     that are outside the enforcing VCN
+
+// ── With attribute list ───────────────────────────────────────────────────────
+//
+// Specifies ordinary (non-security) attributes that the endpoint must match.
+// Applies to the specific endpoint it follows — either source or target.
+// Attribute clause order does not matter for matching.
+
+<with_attribute_list> ::= "with" <attribute>
+                        | <with_attribute_list> <list_conjunction> <attribute>
+
+<list_conjunction>  ::= ","
+                      | "and"
+                      | "," "and"
+
+// ── Security attributes ───────────────────────────────────────────────────────
+//
+// A security attribute is a key-value pair identifying an endpoint's
+// required security attribute.
+//
+// Unquoted form: namespace and key must be simple names (no spaces/periods).
+// Quoted form: required when value is not a simple name (contains spaces,
+// periods, or other non-simple characters). Single quotes surround the
+// entire attribute clause. Embedded single quotes escaped as ''.
+
+<security_attribute> ::= <security_attribute_namespace> "." <simple_key> ":" <simple_value>
+                       | <simple_key> ":" <simple_value>
+                       | "'" <security_attribute_namespace> "." <simple_key> ":" <value> "'"
+                       | "'" <simple_key> ":" <value> "'"
+
+<security_attribute_namespace> ::= <simple_name>
+<simple_key>       ::= <simple_name>
+<simple_value>     ::= <simple_name>
+
+// A simple name: nonempty sequence of ASCII letters, digits, hyphens, and
+// underscores that begins with a letter; max length 255.
+<simple_name>      ::= <letter> (<letter> | <digit> | "-" | "_")*   // max 255 chars
+
+// A value that is not simple may be any string (see <string> below).
+<value>            ::= <string>
+
+// A string is any sequence of characters from the set of allowed string
+// characters (most printable Unicode). Single-quote characters within a
+// string are escaped by doubling them ('').
+<string>           ::= <allowed-string-characters>*
+
+// ── Ordinary (non-security) attributes ───────────────────────────────────────
+//
+// Four ordinary attributes are supported. Values are always single-quoted.
+// Period characters in attribute names distinguish them from security
+// attribute namespaces (which may not contain periods in their keys).
+
+<attribute>        ::= "protocol" "=" "'" <protocol_and_optional_port> "'"
+                     | "protocol.icmp.type" "=" "'" <icmp_type> "'"
+                     | "protocol.icmp.code" "=" "'" <icmp_code> "'"
+                     | "connection-state" "=" "'" <stateless_or_stateful> "'"
+
+// protocol_and_optional_port: a protocol alone, or protocol/port
+<protocol_and_optional_port> ::= <protocol>
+                               | <protocol> "/" <port>
+
+// protocol is a string. Well-formed protocol values (Section 3.1):
+//   - A decimal integer 0–255 (IANA protocol number)
+//   - "tcp" followed by optional "/<port>" — e.g. tcp/443, tcp/999-11199
+//   - "udp" followed by optional "/<port>"
+//   - "icmp"
+//   - "ipv6-icmp"
+<protocol>         ::= <string>
+
+// port: a single port number (1–65535) or a range low-high (low <= high)
+<port>             ::= <number>
+                     | <number> "-" <number>
+
+<icmp_type>        ::= <value>    // decimal integer 0–255
+<icmp_code>        ::= <value>    // decimal integer 0–15
+
+// connection-state defaults to stateful when not specified
+<stateless_or_stateful> ::= "stateless"
+                           | "stateful"
+
+// ── Terminals ─────────────────────────────────────────────────────────────────
+
+// number: any nonempty sequence of ASCII digits (decimal only; hex not supported)
+<number>           ::= <digit>+
+
+// ip_or_CIDR: any valid IPv4 address, IPv6 address, IPv4 CIDR range, or IPv6 CIDR range
+//   IPv4 address:  four decimal octets 0–255 separated by '.'
+//   IPv4 CIDR:     IPv4 address "/" integer 0–32 (non-leftmost bits must be 0)
+//   IPv6 address:  standard colon-hexadecimal notation (full or abbreviated)
+//   IPv6 CIDR:     IPv6 address "/" integer 0–128 (non-leftmost bits must be 0)
+<ip_or_CIDR>       ::= <ipv4_address>
+                     | <ipv4_address> "/" <number>
+                     | <ipv6_address>
+                     | <ipv6_address> "/" <number>
+
+<letter>           ::= "a".."z" | "A".."Z"
+<digit>            ::= "0".."9"
+<comment>          ::= "#" <any-chars-to-eol>
+
+// ── Notes ─────────────────────────────────────────────────────────────────────
+//
+// Two-VCN form: Oracle's online documentation describes a second form:
+//   allow <src> endpoints in <vcn-A> VCN to connect to <dest> endpoints in <vcn-B> VCN
+// This form does NOT appear in the formal ZPR PEL v1 BNF. It may be a UI
+// feature, a later extension, or handled outside the PEL statement syntax.
+//
+// Matching semantics (Section 3):
+//   A proposed connection is permitted iff it matches at least one allow statement.
+//   Source endpoints enforce internal (type 1) and outgoing (type 2) connections.
+//   Target endpoints enforce internal (type 1) and incoming (type 3) connections.

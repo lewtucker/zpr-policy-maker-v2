@@ -1,0 +1,63 @@
+{
+  "user": {
+    "parent": "users",
+    "tags": ["full-time", "part-time", "remote", "on-leave", "new-hire", "contractor", "managed"],
+    "suggestions": [
+      {"name": "employee-id",     "type": "single"},
+      {"name": "department",      "type": "enum",  "values": ["marketing", "sales", "engineering", "hr", "finance", "legal", "it"]},
+      {"name": "groups",          "type": "multi", "values": ["marketing", "sales", "engineering", "hr", "finance", "legal", "it"]},
+      {"name": "clearance",       "type": "enum",  "values": ["public", "confidential", "secret", "top-secret"]},
+      {"name": "teams",           "type": "multi", "values": ["backend", "frontend", "infra", "data", "security"]},
+      {"name": "employment-type", "type": "enum",  "values": ["full-time", "part-time", "contractor", "intern"]},
+      {"name": "manager-id",      "type": "single"},
+      {"name": "location",        "type": "enum",  "values": ["hq", "remote", "apac", "emea", "americas"]},
+      {"name": "cost-center",     "type": "single"},
+      {"name": "start-date",      "type": "single"}
+    ]
+  },
+  "service": {
+    "parent": "services",
+    "tags": ["encrypted", "pii", "financial", "public", "internal", "external"],
+    "suggestions": [
+      {"name": "owner",      "type": "enum",  "values": ["hr", "finance", "engineering", "sales", "it"]},
+      {"name": "env",        "type": "enum",  "values": ["production", "staging", "development"]},
+      {"name": "tier",       "type": "enum",  "values": ["critical", "standard", "low"]},
+      {"name": "protocol",   "type": "enum",  "values": ["https", "grpc", "jdbc", "amqp"]},
+      {"name": "version",    "type": "single"},
+      {"name": "region",     "type": "multi", "values": ["us-east", "us-west", "eu", "apac"]},
+      {"name": "port",       "type": "single"},
+      {"name": "sla",        "type": "enum",  "values": ["gold", "silver", "bronze"]},
+      {"name": "data-class", "type": "enum",  "values": ["public", "internal", "confidential", "restricted", "customer", "employee"]},
+      {"name": "database",   "type": "enum",  "values": ["customer", "employee", "hr", "sales", "legal"]}
+    ]
+  },
+  "endpoint": {
+    "parent": "endpoints",
+    "tags": ["managed", "compliant", "internet-facing", "air-gapped"],
+    "suggestions": [
+      {"name": "status",      "type": "enum",   "values": ["production", "development", "staging", "dr"]},
+      {"name": "region",      "type": "enum",   "values": ["us-east", "us-west", "eu", "apac"]},
+      {"name": "ip-range",    "type": "single"},
+      {"name": "os",          "type": "enum",   "values": ["linux", "windows", "macos"]},
+      {"name": "hostname",    "type": "single"},
+      {"name": "subnet",      "type": "single"},
+      {"name": "owner",       "type": "enum",   "values": ["engineering", "it", "security", "networking"]},
+      {"name": "patch-level", "type": "enum",   "values": ["current", "outdated", "critical"]}
+    ]
+  },
+  "server": {
+    "parent": "endpoints",
+    "tags": ["managed", "compliant", "internet-facing", "air-gapped", "virtual", "bare-metal"],
+    "suggestions": [
+      {"name": "status",      "type": "enum",   "values": ["production", "development", "staging", "dr"]},
+      {"name": "os",          "type": "enum",   "values": ["linux", "windows", "macos"]},
+      {"name": "region",      "type": "enum",   "values": ["us-east", "us-west", "eu", "apac"]},
+      {"name": "ip-range",    "type": "single"},
+      {"name": "hostname",    "type": "single"},
+      {"name": "cpu-arch",    "type": "enum",   "values": ["x86_64", "arm64"]},
+      {"name": "patch-level", "type": "enum",   "values": ["current", "outdated", "critical"]},
+      {"name": "owner",       "type": "enum",   "values": ["engineering", "it", "security", "networking"]},
+      {"name": "hypervisor",  "type": "enum",   "values": ["vmware", "kvm", "hyper-v", "none"]}
+    ]
+  }
+}

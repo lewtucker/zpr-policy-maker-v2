@@ -48,9 +48,11 @@ class ClassSchema:
         self._raw: dict[str, dict] = {}
         self._children: dict[str, list[str]] = {}
         self._resolved_cache: dict[str, dict[str, dict]] = {}
+        self._aka_index: dict[str, str] = {}  # alias → canonical name
         self._load(classes)
         self._validate()
         self._build_children_index()
+        self._build_aka_index()
 
     # ── construction ─────────────────────────────────────────────────────────
 
@@ -197,6 +199,12 @@ class ClassSchema:
             if parent is not None:
                 self._children[parent].append(name)
 
+    def _build_aka_index(self) -> None:
+        for name, entry in self._raw.items():
+            aka = entry.get("aka")
+            if aka and isinstance(aka, str) and aka not in self._raw:
+                self._aka_index[aka] = name
+
     # ── queries ──────────────────────────────────────────────────────────────
 
     def names(self) -> list[str]:
@@ -207,27 +215,35 @@ class ClassSchema:
         """Return names of all classes flagged builtin: true."""
         return [n for n, e in self._raw.items() if e.get("builtin")]
 
+    def canonical(self, name: str) -> str:
+        """Return the canonical class name, resolving an aka alias if needed."""
+        if name in self._raw:
+            return name
+        if name in self._aka_index:
+            return self._aka_index[name]
+        raise KeyError(name)
+
+    def aka(self, name: str) -> str | None:
+        """Return the aka alias for this class, or None if none defined."""
+        return self._raw.get(self.canonical(name), {}).get("aka")
+
     def has(self, name: str) -> bool:
-        return name in self._raw
+        return name in self._raw or name in self._aka_index
 
     def get(self, name: str) -> dict:
-        """Return the raw class definition (non-merged).
+        """Return the raw class definition (non-merged), resolving aka aliases.
 
         Raises:
-            KeyError: if no such class.
+            KeyError: if no such class or alias.
         """
-        if name not in self._raw:
-            raise KeyError(name)
-        return self._raw[name]
+        return self._raw[self.canonical(name)]
 
     def parent(self, name: str) -> str | None:
         return self.get(name).get("parent")
 
     def children(self, name: str) -> list[str]:
         """Return immediate children of this class."""
-        if name not in self._raw:
-            raise KeyError(name)
-        return list(self._children[name])
+        return list(self._children[self.canonical(name)])
 
     def ancestors(self, name: str) -> list[str]:
         """Return ancestors from immediate parent up to root (exclusive of self)."""
@@ -240,10 +256,9 @@ class ClassSchema:
 
     def descendants(self, name: str) -> list[str]:
         """Return all transitive descendants (breadth-first)."""
-        if name not in self._raw:
-            raise KeyError(name)
+        canon = self.canonical(name)
         out: list[str] = []
-        queue = list(self._children[name])
+        queue = list(self._children[canon])
         while queue:
             current = queue.pop(0)
             out.append(current)
@@ -252,14 +267,15 @@ class ClassSchema:
 
     def is_subclass(self, child: str, ancestor: str) -> bool:
         """True if ``child`` equals or descends from ``ancestor``."""
+        child = self.canonical(child)
+        ancestor = self.canonical(ancestor)
         if child == ancestor:
-            return child in self._raw
+            return True
         return ancestor in self.ancestors(child)
 
     def kind_of(self, name: str) -> str:
         """Return the built-in root (``users``, ``endpoints``, or ``services``) for ``name``."""
-        if name not in self._raw:
-            raise KeyError(name)
+        name = self.canonical(name)
         chain = [name] + self.ancestors(name)
         root = chain[-1]
         if root not in BUILTIN_ROOTS:
@@ -276,8 +292,7 @@ class ClassSchema:
         for attributes with the same name. The returned dict is cached but
         callers get a fresh copy on each call.
         """
-        if name not in self._raw:
-            raise KeyError(name)
+        name = self.canonical(name)
         if name not in self._resolved_cache:
             chain = list(reversed([name] + self.ancestors(name)))
             merged: dict[str, dict] = {}
@@ -299,7 +314,7 @@ class ClassSchema:
         return len(self._raw)
 
     def __contains__(self, name: object) -> bool:
-        return isinstance(name, str) and name in self._raw
+        return isinstance(name, str) and (name in self._raw or name in self._aka_index)
 
     def __repr__(self) -> str:
         return f"ClassSchema(classes={len(self._raw)})"

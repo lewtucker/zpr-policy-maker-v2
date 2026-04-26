@@ -20,7 +20,7 @@ from typing import Any
 import anthropic
 
 # Default model — latest Sonnet. AI endpoints use this unless overridden.
-ANTHROPIC_MODEL = "claude-sonnet-4-5"
+ANTHROPIC_MODEL = "claude-sonnet-4-6"
 
 
 def available() -> bool:
