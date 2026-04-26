@@ -1,5 +1,14 @@
 # CLAUDE.md — ZPR Policy Maker v2
 
+## ⚠️ PROJECT STATUS: ON HOLD
+
+This project has been put on hold as of 2026-04-26. Development work was redirected to the original
+**ZPR Policy Maker v1** project (`zpr-policy.lewtucker.net`), where the new features and UI
+improvements are being applied instead. Do not deploy or continue development here without
+re-confirming intent with the user.
+
+---
+
 ## ⚠️ DEPLOYMENT SAFETY — READ THIS FIRST AND NEVER VIOLATE
 
 There are **three separate applications** on the production server (72.62.97.102).
