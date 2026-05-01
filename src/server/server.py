@@ -3,31 +3,41 @@
 Endpoints
 ─────────
 Auth
+  GET  /setup          first-run admin creation (only when no users exist)
   GET  /login          login page
-  POST /login          submit password
+  POST /login          submit username + password
   POST /logout
 
-API (all require auth)
+User management (all require auth)
+  GET  /api/users                list users created by the active owner
+  POST /api/users                create a new owner under the active owner
+
+Context
+  GET  /api/context              current login + active owner
+  POST /api/context/switch       switch active owner (must be a descendant)
+  POST /api/context/reset        switch back to the login owner
+
+API (all require auth, scoped to active owner)
   POST /api/parse      parse ZPL or ZPEL text → ParseResult
   POST /api/validate   syntax-check text → errors only
   POST /api/translate  PolicySet → ZPL or ZPEL text
 
-  GET  /api/simulate/{policy_set_id}   list scenarios for a policy set
-  POST /api/simulate/{policy_set_id}   run scenarios → SimResult list
+  POST /api/simulate/{policy_set_id}   run scenarios (merges ALL namespaces)
 
-  GET  /api/policy_sets              list all (summaries)
-  POST /api/policy_sets              create from IR JSON
+  GET  /api/policy_sets              list (active owner's namespace)
+  POST /api/policy_sets              create
   GET  /api/policy_sets/{id}         get full PolicySet
   PUT  /api/policy_sets/{id}         replace PolicySet
   DELETE /api/policy_sets/{id}       delete
 
   GET  /api/conversations/{id}       get conversation
-  POST /api/chat                     one agent turn (creates/updates conversation)
+  POST /api/chat                     one agent turn
 
   GET  /api/language                 get active language setting
   POST /api/language                 set active language (zpl|zpel)
 
-  GET  /                             SPA index
+  GET  /v2                           legacy v2 UI
+  GET  /                             SPA index (v3 UI)
 """
 from __future__ import annotations
 
@@ -68,7 +78,6 @@ from class_schema import ClassSchema
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-APP_PASSWORD = os.environ.get("APP_PASSWORD", "changeme")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 _signer = URLSafeSerializer(SECRET_KEY, salt="session")
 
@@ -86,43 +95,110 @@ app = FastAPI(title="ZPR Policy Maker v2", lifespan=lifespan)
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-# ── Auth helpers ──────────────────────────────────────────────────────────────
+# ── Session helpers ───────────────────────────────────────────────────────────
 
-def _make_session_token() -> str:
-    return _signer.dumps({"authenticated": True})
+def _make_session(login_user_id: str, login_username: str, login_display_name: str,
+                  active_user_id: str, active_username: str, active_display_name: str) -> str:
+    return _signer.dumps({
+        "authenticated": True,
+        "login_user_id": login_user_id,
+        "login_username": login_username,
+        "login_display_name": login_display_name,
+        "active_user_id": active_user_id,
+        "active_username": active_username,
+        "active_display_name": active_display_name,
+    })
+
+
+def _read_session(request: Request) -> dict | None:
+    token = request.cookies.get("session")
+    if not token:
+        return None
+    try:
+        data = _signer.loads(token)
+        return data if data.get("authenticated") else None
+    except BadSignature:
+        return None
 
 
 def _check_session(request: Request) -> bool:
-    token = request.cookies.get("session")
-    if not token:
-        return False
-    try:
-        data = _signer.loads(token)
-        return bool(data.get("authenticated"))
-    except BadSignature:
-        return False
+    return _read_session(request) is not None
 
 
-def require_auth(request: Request) -> None:
-    if not _check_session(request):
-        raise HTTPException(status_code=401, detail="Not authenticated")
+def get_session(request: Request) -> dict:
+    """FastAPI dependency — returns session dict or raises 401.
+    Accepts session cookie or Authorization: Bearer <token> header."""
+    data = _read_session(request)
+    if data is not None:
+        return data
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Bearer token auth requires async context — use get_session_async")
+    raise HTTPException(status_code=401, detail="Not authenticated")
+
+
+async def get_session_or_token(request: Request) -> dict:
+    """Async dependency — session cookie OR Bearer token."""
+    data = _read_session(request)
+    if data is not None:
+        return data
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth[7:].strip()
+        user = await db.get_user_by_token(token)
+        if user:
+            return _make_session(user["id"], user["username"], user["display_name"],
+                                 user["id"], user["username"], user["display_name"])
+    raise HTTPException(status_code=401, detail="Not authenticated")
+
+
+# ── Setup (first-run only) ────────────────────────────────────────────────────
+
+@app.get("/setup", response_class=HTMLResponse)
+async def setup_page():
+    if await db.user_count() > 0:
+        return Response(status_code=302, headers={"Location": "/login"})
+    return _setup_html()
+
+
+@app.post("/setup")
+async def setup_submit(request: Request):
+    if await db.user_count() > 0:
+        return Response(status_code=302, headers={"Location": "/login"})
+    form = await request.form()
+    username = (form.get("username") or "").strip()
+    password = form.get("password") or ""
+    if not username or not password:
+        return HTMLResponse(_setup_html(error="Username and password required."), status_code=400)
+    user = await db.create_user(username, password, created_by_id=None)
+    token = _make_session(user["id"], user["username"], user["display_name"],
+                          user["id"], user["username"], user["display_name"])
+    response = Response(status_code=302, headers={"Location": "/"})
+    response.set_cookie("session", token, httponly=True, samesite="lax")
+    return response
 
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page():
+    if await db.user_count() == 0:
+        return Response(status_code=302, headers={"Location": "/setup"})
     return _login_html()
 
 
 @app.post("/login")
 async def login(request: Request):
     form = await request.form()
-    password = form.get("password", "")
-    if password != APP_PASSWORD:
+    username = (form.get("username") or "").strip()
+    password = form.get("password") or ""
+    user = await db.get_user_by_username(username)
+    if not user or not db.verify_password(password, user["password_hash"]):
         return HTMLResponse(_login_html(error=True), status_code=401)
+    dn = user.get("display_name") or user["username"]
+    token = _make_session(user["id"], user["username"], dn, user["id"], user["username"], dn)
     response = Response(status_code=302, headers={"Location": "/"})
-    response.set_cookie("session", _make_session_token(), httponly=True, samesite="lax")
+    response.set_cookie("session", token, httponly=True, samesite="lax")
     return response
 
 
@@ -131,6 +207,283 @@ async def logout():
     response = Response(status_code=302, headers={"Location": "/login"})
     response.delete_cookie("session")
     return response
+
+
+# ── User management ───────────────────────────────────────────────────────────
+
+@app.get("/api/users")
+async def list_users(session: dict = Depends(get_session)):
+    """List sub-namespaces created by the LOGIN owner (always root perspective for the tree)."""
+    return await db.list_users_created_by(session["login_user_id"])
+
+
+class CreateUserRequest(BaseModel):
+    namespace_name: str           # display name / used in ZPL
+    username: str | None = None   # login username; required when delegated=True
+    password: str | None = None   # required when delegated=True
+    email: str = ""
+    delegated: bool = False       # True = separate login; False = creator manages it
+    parent_id: str | None = None  # create under a specific node (must be a descendant of login user)
+
+
+@app.post("/api/users", status_code=201)
+async def create_user(req: CreateUserRequest, session: dict = Depends(get_session)):
+    """Create a new namespace (sub-owner) under the active owner or a specified descendant."""
+    import secrets as _sec
+    ns = req.namespace_name.strip()
+    if not ns:
+        raise HTTPException(400, "namespace_name required")
+
+    # Determine parent
+    parent_id = req.parent_id or session["active_user_id"]
+    if parent_id != session["login_user_id"]:
+        if not await db.can_switch_to(session["login_user_id"], parent_id):
+            raise HTTPException(403, "Not authorised to create under that namespace")
+
+    if req.delegated:
+        login = (req.username or "").strip()
+        password = req.password or ""
+        if not login or not password:
+            raise HTTPException(400, "username and password required for delegated namespace")
+    else:
+        import uuid as _uuid
+        login = f"_ns_{_uuid.uuid4().hex[:12]}"
+        password = _sec.token_urlsafe(32)
+
+    existing = await db.get_user_by_username(login)
+    if existing:
+        raise HTTPException(409, f"Username {login!r} already exists")
+    user = await db.create_user(login, password, display_name=ns,
+                                created_by_id=parent_id,
+                                email=req.email.strip(),
+                                delegated=req.delegated)
+    return {"id": user["id"], "username": user["username"],
+            "display_name": user["display_name"], "email": user["email"],
+            "delegated": user["delegated"], "created_by_id": user["created_by_id"]}
+
+
+# ── Profile & token ───────────────────────────────────────────────────────────
+
+@app.get("/api/profile")
+async def get_profile(session: dict = Depends(get_session)):
+    user = await db.get_user_by_id(session["login_user_id"])
+    if not user:
+        raise HTTPException(404, "User not found")
+    return {
+        "id": user["id"],
+        "username": user["username"],
+        "display_name": user["display_name"],
+        "email": user.get("email", ""),
+        "api_token": user.get("api_token"),
+    }
+
+
+class UpdateProfileRequest(BaseModel):
+    email: str = ""
+
+
+@app.post("/api/profile")
+async def update_profile(req: UpdateProfileRequest, session: dict = Depends(get_session)):
+    await db.update_profile(session["login_user_id"], req.email.strip())
+    return {"ok": True}
+
+
+@app.get("/api/users/tree")
+async def get_owner_tree(session: dict = Depends(get_session)):
+    return await db.get_owner_tree(session["login_user_id"])
+
+
+class UpdateUserRequest(BaseModel):
+    display_name: str | None = None
+    username: str | None = None
+    password: str | None = None
+    email: str | None = None
+    delegated: bool | None = None
+
+
+@app.patch("/api/users/{user_id}")
+async def update_user(user_id: str, req: UpdateUserRequest,
+                      session: dict = Depends(get_session)):
+    if not await db.can_switch_to(session["login_user_id"], user_id):
+        raise HTTPException(403, "Not authorised to edit this user")
+    if user_id == session["login_user_id"]:
+        raise HTTPException(400, "Use /api/profile to edit your own account")
+    delegated_to_user_id = None
+    if req.username and req.delegated:
+        existing = await db.get_user_by_username(req.username)
+        if existing and existing["id"] != user_id:
+            # Existing user — delegate to them rather than renaming this namespace's login
+            delegated_to_user_id = existing["id"]
+            await db.update_user(user_id,
+                                 display_name=req.display_name,
+                                 email=req.email,
+                                 delegated=True,
+                                 delegated_to_user_id=delegated_to_user_id)
+            return {"ok": True}
+    await db.update_user(user_id,
+                         display_name=req.display_name,
+                         username=req.username,
+                         password=req.password,
+                         email=req.email,
+                         delegated=req.delegated,
+                         delegated_to_user_id=delegated_to_user_id)
+    return {"ok": True}
+
+
+@app.delete("/api/users/{user_id}", status_code=204)
+async def delete_user(user_id: str, session: dict = Depends(get_session)):
+    if not await db.can_switch_to(session["login_user_id"], user_id):
+        raise HTTPException(403, "Not authorised to delete this user")
+    if user_id == session["login_user_id"]:
+        raise HTTPException(400, "Cannot delete yourself")
+    err = await db.delete_user(user_id)
+    if err:
+        raise HTTPException(409, err)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@app.post("/api/profile/password")
+async def change_password(req: ChangePasswordRequest, session: dict = Depends(get_session)):
+    user = await db.get_user_by_id(session["login_user_id"])
+    if not user or not db.verify_password(req.current_password, user["password_hash"]):
+        raise HTTPException(400, "Current password is incorrect")
+    if len(req.new_password) < 8:
+        raise HTTPException(400, "New password must be at least 8 characters")
+    await db.update_password(session["login_user_id"], req.new_password)
+    return {"ok": True}
+
+
+@app.post("/api/token/regenerate")
+async def regenerate_token(session: dict = Depends(get_session)):
+    token = await db.regenerate_token(session["login_user_id"])
+    return {"api_token": token}
+
+
+class MatchRequest(BaseModel):
+    subject_class: str = "users"
+    subject_name: str | None = None
+    subject_attrs: dict = {}
+    accessor_class: str | None = None
+    accessor_attrs: dict = {}
+    action: str = "access"
+    object_class: str = "services"
+    object_name: str | None = None
+    object_attrs: dict = {}
+
+
+@app.post("/api/match")
+async def match_rule(req: MatchRequest, session: dict = Depends(get_session_or_token)):
+    """Test whether a request matches any rule in the active namespace's ZPL."""
+    zpl_text = await db.get_namespace_zpl(session["active_user_id"])
+    if not zpl_text.strip():
+        return {"verdict": "deny", "rule": None, "reason": "No ZPL defined"}
+    raw = zpl_parser.parse(zpl_text)
+    ps, errors = norm.zpl_to_policy_set(raw)
+    if errors:
+        return {"verdict": "deny", "rule": None, "reason": f"{len(errors)} parse error(s)"}
+    rules = []
+    for s in ps.rules:
+        try:
+            rules.append(Rule.from_dict({
+                "id": s.id, "name": s.name,
+                "result": "never" if s.effect == "deny" else "allow",
+                "priority": s.priority, "verb": s.action,
+                "subject": _subject_to_zpl_dict(s.subject),
+                "object": _object_to_zpl_dict(s.object),
+                "accessor_endpoint": _subject_to_zpl_dict(s.accessor_endpoint),
+                "server_endpoint": _object_to_zpl_dict(s.server_endpoint),
+            }))
+        except Exception:
+            continue
+    schema = _build_schema(ps)
+    check = CheckRequest(
+        subject=Entity(class_name=req.subject_class, name=req.subject_name, attrs=req.subject_attrs),
+        object=Entity(class_name=req.object_class, name=req.object_name, attrs=req.object_attrs),
+        verb=req.action,
+        accessor_endpoint=Entity(class_name=req.accessor_class, attrs=req.accessor_attrs)
+            if req.accessor_class else None,
+    )
+    try:
+        result = ZPLEngine(rules, schema).evaluate(check)
+    except Exception as exc:
+        return {"verdict": "deny", "rule": None, "reason": f"Engine error: {exc}"}
+    return {
+        "verdict": result.verdict,
+        "rule": result.rule_name,
+        "reason": f"Matched rule '{result.rule_name}'" if result.rule_id else "No matching rule",
+    }
+
+
+# ── Context switching ─────────────────────────────────────────────────────────
+
+@app.get("/api/context")
+async def get_context(session: dict = Depends(get_session)):
+    return {
+        "login_user_id":       session["login_user_id"],
+        "login_username":      session["login_username"],
+        "login_display_name":  session.get("login_display_name", session["login_username"]),
+        "active_user_id":      session["active_user_id"],
+        "active_username":     session["active_username"],
+        "active_display_name": session.get("active_display_name", session["active_username"]),
+    }
+
+
+class SwitchContextRequest(BaseModel):
+    user_id: str
+
+
+@app.post("/api/context/switch")
+async def switch_context(req: SwitchContextRequest, request: Request,
+                         session: dict = Depends(get_session)):
+    """Switch active context to a descendant owner."""
+    if not await db.can_switch_to(session["login_user_id"], req.user_id):
+        raise HTTPException(403, "You may only switch to owners you created")
+    target = await db.get_user_by_id(req.user_id)
+    if target is None:
+        raise HTTPException(404, "User not found")
+    tdn = target.get("display_name") or target["username"]
+    token = _make_session(session["login_user_id"], session["login_username"],
+                          session.get("login_display_name", session["login_username"]),
+                          target["id"], target["username"], tdn)
+    resp = JSONResponse({"active_user_id": target["id"], "active_username": target["username"],
+                         "active_display_name": tdn})
+    resp.set_cookie("session", token, httponly=True, samesite="lax")
+    return resp
+
+
+@app.post("/api/context/reset")
+async def reset_context(request: Request, session: dict = Depends(get_session)):
+    """Switch back to the login owner."""
+    ldn = session.get("login_display_name", session["login_username"])
+    token = _make_session(session["login_user_id"], session["login_username"], ldn,
+                          session["login_user_id"], session["login_username"], ldn)
+    resp = JSONResponse({"active_user_id": session["login_user_id"],
+                         "active_username": session["login_username"],
+                         "active_display_name": ldn})
+    resp.set_cookie("session", token, httponly=True, samesite="lax")
+    return resp
+
+
+# ── Namespace ZPL ────────────────────────────────────────────────────────────
+
+@app.get("/api/namespace/zpl")
+async def get_namespace_zpl(session: dict = Depends(get_session)):
+    text = await db.get_namespace_zpl(session["active_user_id"])
+    return {"text": text}
+
+
+class SaveNamespaceZplRequest(BaseModel):
+    text: str
+
+
+@app.put("/api/namespace/zpl")
+async def save_namespace_zpl(req: SaveNamespaceZplRequest, session: dict = Depends(get_session)):
+    await db.save_namespace_zpl(session["active_user_id"], req.text)
+    return {"ok": True}
 
 
 # ── Parse ─────────────────────────────────────────────────────────────────────
@@ -142,26 +495,40 @@ class ParseRequest(BaseModel):
 
 
 @app.post("/api/parse")
-async def parse_text(req: ParseRequest, _: None = Depends(require_auth)):
+async def parse_text(req: ParseRequest, _: dict = Depends(get_session)):
     lang = req.language.lower()
     if lang == "zpl":
         raw = zpl_parser.parse(req.text)
         ps, errors = norm.zpl_to_policy_set(raw, name=req.name)
+        inferred = zpl_parser.infer_missing_classes(raw)
+        inferred_zpl = zpl_parser.inferred_to_zpl(inferred) if inferred else ""
     elif lang == "zpel":
         raw = zpel_parser.parse(req.text)
         ps, errors = norm.zpel_to_policy_set(raw, name=req.name)
+        inferred = []
+        inferred_zpl = ""
     else:
         raise HTTPException(400, f"Unknown language: {req.language!r}")
+
+    raw_classes = ps.model_dump(mode="json").get("classes", [])
+    raw_rules = ps.model_dump(mode="json").get("rules", [])
+    serialized_zpl = (
+        zpl_serializer.classes_to_zpl(raw_classes) + "\n\n" +
+        zpl_serializer.rules_to_zpl(raw_rules)
+    ).strip()
 
     return {
         "language": lang,
         "policy_set": ps.model_dump(mode="json"),
         "errors": [e.model_dump() for e in errors],
+        "inferred_classes": inferred,
+        "inferred_zpl": inferred_zpl,
+        "serialized_zpl": serialized_zpl,
     }
 
 
 @app.post("/api/validate")
-async def validate_text(req: ParseRequest, _: None = Depends(require_auth)):
+async def validate_text(req: ParseRequest, _: dict = Depends(get_session)):
     lang = req.language.lower()
     if lang == "zpl":
         raw = zpl_parser.parse(req.text)
@@ -182,7 +549,7 @@ class TranslateRequest(BaseModel):
 
 
 @app.post("/api/translate")
-async def translate(req: TranslateRequest, _: None = Depends(require_auth)):
+async def translate(req: TranslateRequest, _: dict = Depends(get_session)):
     try:
         ps = PolicySet.model_validate(req.policy_set)
     except Exception as exc:
@@ -207,8 +574,6 @@ async def translate(req: TranslateRequest, _: None = Depends(require_auth)):
 
 
 def _policy_set_to_zpl(ps: PolicySet) -> str:
-    """Render a PolicySet to ZPL text via the existing serializer."""
-    # Convert IR ClassDefinitions → raw dicts for zpl_serializer
     raw_classes = [
         {
             "class": c.name,
@@ -222,7 +587,6 @@ def _policy_set_to_zpl(ps: PolicySet) -> str:
         }
         for c in ps.classes
     ]
-    # Convert IR PolicyStatements → raw rule dicts for zpl_serializer
     raw_rules = []
     for s in ps.rules:
         raw_rules.append({
@@ -268,7 +632,7 @@ def _object_to_zpl_dict(spec: ObjectSpec | None) -> dict | None:
     return out or None
 
 
-# ── Simulate ──────────────────────────────────────────────────────────────────
+# ── Simulate — merges ALL namespaces ─────────────────────────────────────────
 
 class SimRequest(BaseModel):
     scenarios: list[dict]
@@ -278,11 +642,19 @@ class SimRequest(BaseModel):
 async def simulate(
     policy_set_id: str,
     req: SimRequest,
-    _: None = Depends(require_auth),
+    session: dict = Depends(get_session),
 ):
-    ps = await db.get_policy_set(policy_set_id)
+    # Verify the requested policy set exists in the active namespace
+    ps = await db.get_policy_set(policy_set_id, session["active_user_id"])
     if ps is None:
         raise HTTPException(404, "Policy set not found")
+
+    # Merge classes and rules from ALL namespaces for evaluation
+    all_sets = await db.list_all_policy_sets()
+    merged = PolicySet(name="_merged", language="zpl")
+    for s in all_sets:
+        merged.classes.extend(s.classes)
+        merged.rules.extend(s.rules)
 
     results = []
     for scenario_data in req.scenarios:
@@ -293,9 +665,9 @@ async def simulate(
             continue
 
         if ps.language == "zpel":
-            result = _simulate_zpel(ps, scenario)
+            result = _simulate_zpel(merged, scenario)
         else:
-            result = _simulate_zpl(ps, scenario)
+            result = _simulate_zpl(merged, scenario)
         results.append(result.model_dump(mode="json"))
 
     return {"results": results}
@@ -305,7 +677,6 @@ _SYSTEM_CLASSES_PATH = Path(__file__).parent / "defaults" / "system_classes.yaml
 
 
 def _build_schema(ps: PolicySet) -> ClassSchema:
-    """Merge system classes with PolicySet class definitions into a ClassSchema."""
     import yaml
     system = yaml.safe_load(_SYSTEM_CLASSES_PATH.read_text())
     system_classes = system.get("classes", [])
@@ -319,14 +690,12 @@ def _build_schema(ps: PolicySet) -> ClassSchema:
         }
         for c in ps.classes
     ]
-    # User classes override system classes of the same name
     system_names = {c["class"] for c in system_classes}
     merged = system_classes + [c for c in user_classes if c["class"] not in system_names]
     return ClassSchema(merged)
 
 
 def _simulate_zpl(ps: PolicySet, scenario: SimScenario) -> SimResult:
-    """Evaluate a ZPL scenario using ZPLEngine."""
     try:
         schema = _build_schema(ps)
     except Exception as exc:
@@ -389,7 +758,6 @@ def _simulate_zpl(ps: PolicySet, scenario: SimScenario) -> SimResult:
 
 
 def _simulate_zpel(ps: PolicySet, scenario: SimScenario) -> SimResult:
-    """Evaluate a ZPEL scenario by matching VCN scope + endpoint attributes."""
     vcn = scenario.conditions.vcn_scope if scenario.conditions else None
     src_attr = scenario.subject.attribute if scenario.subject else None
     dst_attr = scenario.object.attribute if scenario.object else None
@@ -432,23 +800,23 @@ def _simulate_zpel(ps: PolicySet, scenario: SimScenario) -> SimResult:
 # ── Policy set CRUD ───────────────────────────────────────────────────────────
 
 @app.get("/api/policy_sets")
-async def list_policy_sets(_: None = Depends(require_auth)):
-    return await db.list_policy_sets()
+async def list_policy_sets(session: dict = Depends(get_session)):
+    return await db.list_policy_sets(session["active_user_id"])
 
 
 @app.post("/api/policy_sets", status_code=201)
-async def create_policy_set(data: dict, _: None = Depends(require_auth)):
+async def create_policy_set(data: dict, session: dict = Depends(get_session)):
     try:
         ps = PolicySet.model_validate(data)
     except Exception as exc:
         raise HTTPException(400, f"Invalid PolicySet: {exc}")
-    ps = await db.save_policy_set(ps)
+    ps = await db.save_policy_set(ps, session["active_user_id"])
     return ps.model_dump(mode="json")
 
 
 @app.get("/api/policy_sets/{policy_set_id}")
-async def get_policy_set(policy_set_id: str, _: None = Depends(require_auth)):
-    ps = await db.get_policy_set(policy_set_id)
+async def get_policy_set(policy_set_id: str, session: dict = Depends(get_session)):
+    ps = await db.get_policy_set(policy_set_id, session["active_user_id"])
     if ps is None:
         raise HTTPException(404, "Not found")
     return ps.model_dump(mode="json")
@@ -456,22 +824,22 @@ async def get_policy_set(policy_set_id: str, _: None = Depends(require_auth)):
 
 @app.put("/api/policy_sets/{policy_set_id}")
 async def update_policy_set(
-    policy_set_id: str, data: dict, _: None = Depends(require_auth)
+    policy_set_id: str, data: dict, session: dict = Depends(get_session)
 ):
-    existing = await db.get_policy_set(policy_set_id)
+    existing = await db.get_policy_set(policy_set_id, session["active_user_id"])
     if existing is None:
         raise HTTPException(404, "Not found")
     try:
         ps = PolicySet.model_validate({**data, "id": policy_set_id})
     except Exception as exc:
         raise HTTPException(400, f"Invalid PolicySet: {exc}")
-    ps = await db.save_policy_set(ps)
+    ps = await db.save_policy_set(ps, session["active_user_id"])
     return ps.model_dump(mode="json")
 
 
 @app.delete("/api/policy_sets/{policy_set_id}", status_code=204)
-async def delete_policy_set(policy_set_id: str, _: None = Depends(require_auth)):
-    deleted = await db.delete_policy_set(policy_set_id)
+async def delete_policy_set(policy_set_id: str, session: dict = Depends(get_session)):
+    deleted = await db.delete_policy_set(policy_set_id, session["active_user_id"])
     if not deleted:
         raise HTTPException(404, "Not found")
 
@@ -482,47 +850,48 @@ class ChatRequest(BaseModel):
     message: str
     conversation_id: str | None = None
     policy_set_id: str | None = None
+    policy_set_name: str = "Untitled"
     language: str = "zpl"
 
 
 @app.post("/api/chat")
-async def chat(req: ChatRequest, _: None = Depends(require_auth)):
+async def chat(req: ChatRequest, session: dict = Depends(get_session)):
     from ai_client import available
 
     if not available():
         raise HTTPException(503, "ANTHROPIC_API_KEY not configured")
 
-    # Load or create conversation
+    user_id = session["active_user_id"]
+
     conv: Conversation
     if req.conversation_id:
-        conv = await db.get_conversation(req.conversation_id) or Conversation()
+        conv = await db.get_conversation(req.conversation_id, user_id) or Conversation()
     else:
         conv = Conversation()
 
     if req.policy_set_id:
         conv.policy_set_id = req.policy_set_id
 
-    # Append user message
     conv.messages.append(ChatMessage(role="user", content=req.message))
 
-    # Run agent
     history = [{"role": m.role, "content": m.content} for m in conv.messages]
     reply_text, policy_set = agent_mod.chat(history, language=req.language)
 
-    # Append assistant reply
     conv.messages.append(ChatMessage(role="assistant", content=reply_text))
+    conv = await db.save_conversation(conv, user_id)
 
-    # Persist conversation
-    conv = await db.save_conversation(conv)
-
-    # Persist updated PolicySet if agent emitted one
     saved_ps = None
     if policy_set is not None:
         if conv.policy_set_id:
             policy_set.id = conv.policy_set_id
-        saved_ps = await db.save_policy_set(policy_set)
+            existing = await db.get_policy_set(conv.policy_set_id, user_id)
+            if existing:
+                policy_set.name = existing.name
+        else:
+            policy_set.name = req.policy_set_name
+        saved_ps = await db.save_policy_set(policy_set, user_id)
         conv.policy_set_id = saved_ps.id
-        await db.save_conversation(conv)
+        await db.save_conversation(conv, user_id)
 
     return {
         "conversation_id": conv.id,
@@ -533,8 +902,8 @@ async def chat(req: ChatRequest, _: None = Depends(require_auth)):
 
 
 @app.get("/api/conversations/{conv_id}")
-async def get_conversation(conv_id: str, _: None = Depends(require_auth)):
-    conv = await db.get_conversation(conv_id)
+async def get_conversation(conv_id: str, session: dict = Depends(get_session)):
+    conv = await db.get_conversation(conv_id, session["active_user_id"])
     if conv is None:
         raise HTTPException(404, "Not found")
     return conv.model_dump(mode="json")
@@ -546,7 +915,7 @@ _active_language: str = "zpl"
 
 
 @app.get("/api/language")
-async def get_language(_: None = Depends(require_auth)):
+async def get_language(_: dict = Depends(get_session)):
     return {"language": _active_language}
 
 
@@ -555,7 +924,7 @@ class LanguageRequest(BaseModel):
 
 
 @app.post("/api/language")
-async def set_language(req: LanguageRequest, _: None = Depends(require_auth)):
+async def set_language(req: LanguageRequest, _: dict = Depends(get_session)):
     global _active_language
     lang = req.language.lower()
     if lang not in ("zpl", "zpel"):
@@ -571,7 +940,6 @@ _RULE_AGENT_PROMPT  = Path(__file__).parent / "prompts" / "rule_agent.md"
 
 
 def _classes_context(ps: PolicySet | None) -> str:
-    """Render existing classes as a compact text block for prompt injection."""
     roots = {"users", "endpoints", "services"}
     if not ps or not ps.classes:
         return "None yet — only the built-in roots: users, endpoints, services."
@@ -593,28 +961,26 @@ def _classes_context(ps: PolicySet | None) -> str:
 
 
 class AssistRequest(BaseModel):
-    mode: str                              # "class" or "rule"
+    mode: str
     messages: list[dict[str, str]]
     policy_set_id: str | None = None
 
 
 class AssistAcceptRequest(BaseModel):
-    mode: str                              # "class" or "rule"
+    mode: str
     proposal: dict
     policy_set_id: str | None = None
     policy_set_name: str = "Untitled"
 
 
 @app.post("/api/assist")
-async def assist(req: AssistRequest, _: None = Depends(require_auth)):
-    """One turn of the class or rule builder assistant."""
+async def assist(req: AssistRequest, session: dict = Depends(get_session)):
     from ai_client import complete, extract_json_blocks, strip_tagged_blocks
 
-    # Load policy set for classes context
     ps: PolicySet | None = None
     if req.policy_set_id:
         try:
-            ps = await db.get_policy_set(req.policy_set_id)
+            ps = await db.get_policy_set(req.policy_set_id, session["active_user_id"])
         except Exception:
             pass
 
@@ -635,7 +1001,6 @@ async def assist(req: AssistRequest, _: None = Depends(require_auth)):
     blocks = extract_json_blocks(raw, tag)
     if blocks:
         proposal = blocks[-1]
-        # For rules, inject a zpl field if agent omitted it
         if req.mode == "rule" and "zpl" not in proposal:
             effect = "Allow" if proposal.get("effect") == "allow" else "Never allow"
             proposal["zpl"] = f"{effect} [see rule details]"
@@ -645,15 +1010,14 @@ async def assist(req: AssistRequest, _: None = Depends(require_auth)):
 
 
 @app.post("/api/assist/accept")
-async def assist_accept(req: AssistAcceptRequest, _: None = Depends(require_auth)):
-    """Accept a proposed class or rule into the current (or new) policy set."""
+async def assist_accept(req: AssistAcceptRequest, session: dict = Depends(get_session)):
     from ir_schema import AttributeSpec, ClassDefinition, PolicyStatement
 
-    # Load or create policy set
+    user_id = session["active_user_id"]
     ps: PolicySet | None = None
     if req.policy_set_id:
         try:
-            ps = await db.get_policy_set(req.policy_set_id)
+            ps = await db.get_policy_set(req.policy_set_id, user_id)
         except Exception:
             pass
     if ps is None:
@@ -681,10 +1045,9 @@ async def assist_accept(req: AssistAcceptRequest, _: None = Depends(require_auth
             attributes=attributes,
             description=req.proposal.get("description", ""),
         )
-        # Replace if name already exists, otherwise append
         ps.classes = [c for c in ps.classes if c.name != cls.name] + [cls]
 
-    else:  # rule
+    else:
         from agent import _parse_spec_subject, _parse_spec_object
         from ir_schema import Conditions
         s = req.proposal
@@ -707,7 +1070,7 @@ async def assist_accept(req: AssistAcceptRequest, _: None = Depends(require_auth
         )
         ps.rules = [r for r in ps.rules if r.name != stmt.name] + [stmt]
 
-    ps = await db.save_policy_set(ps)
+    ps = await db.save_policy_set(ps, user_id)
     return {"policy_set": ps.model_dump(mode="json"), "policy_set_id": ps.id}
 
 
@@ -719,14 +1082,14 @@ class GenerateRulesRequest(BaseModel):
 
 
 @app.post("/api/assist/generate-rules")
-async def assist_generate_rules(req: GenerateRulesRequest, _: None = Depends(require_auth)):
-    """Generate a batch of allow/deny rules from the existing class vocabulary."""
+async def assist_generate_rules(req: GenerateRulesRequest, session: dict = Depends(get_session)):
     from ai_client import complete, extract_json_blocks, strip_tagged_blocks
 
+    user_id = session["active_user_id"]
     ps: PolicySet | None = None
     if req.policy_set_id:
         try:
-            ps = await db.get_policy_set(req.policy_set_id)
+            ps = await db.get_policy_set(req.policy_set_id, user_id)
         except Exception:
             pass
 
@@ -755,6 +1118,16 @@ async def assist_generate_rules(req: GenerateRulesRequest, _: None = Depends(req
 
 # ── SPA ───────────────────────────────────────────────────────────────────────
 
+@app.get("/v2", response_class=HTMLResponse)
+async def spa_v2(request: Request):
+    if not _check_session(request):
+        return Response(status_code=302, headers={"Location": "/login"})
+    ui = STATIC_DIR / "ui_v2.html"
+    if ui.exists():
+        return HTMLResponse(ui.read_text())
+    return HTMLResponse("<h1>ZPR Policy Maker v2 UI not found</h1>")
+
+
 @app.get("/{full_path:path}", response_class=HTMLResponse)
 async def spa(request: Request, full_path: str):
     if not _check_session(request):
@@ -762,24 +1135,25 @@ async def spa(request: Request, full_path: str):
     index = STATIC_DIR / "index.html"
     if index.exists():
         return HTMLResponse(index.read_text())
-    return HTMLResponse("<h1>ZPR Policy Maker v2</h1><p>Place index.html in static/</p>")
+    return HTMLResponse("<h1>ZPR Policy Maker v3</h1><p>Place index.html in static/</p>")
 
 
-# ── Login HTML ────────────────────────────────────────────────────────────────
+# ── Login / Setup HTML ────────────────────────────────────────────────────────
 
 def _login_html(error: bool = False) -> str:
-    err = '<p style="color:red">Incorrect password.</p>' if error else ""
+    err = '<p class="err">Incorrect username or password.</p>' if error else ""
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ZPR Policy Maker v2 — Login</title>
+  <title>ZPR Policy Maker — Login</title>
   <style>
     body {{ font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0;
            display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
     .box {{ background: #1e293b; padding: 2rem; border-radius: 0.75rem; width: 320px; }}
     h1 {{ margin: 0 0 0.25rem; font-size: 1.25rem; }}
     p.sub {{ color: #94a3b8; font-size: 0.85rem; margin: 0 0 1.5rem; }}
+    p.err {{ color: #f87171; font-size: 0.85rem; margin: 0 0 1rem; }}
     input {{ width: 100%; box-sizing: border-box; padding: 0.6rem 0.75rem; border-radius: 0.5rem;
              border: 1px solid #334155; background: #0f172a; color: #e2e8f0;
              font-size: 1rem; margin-bottom: 1rem; }}
@@ -790,13 +1164,56 @@ def _login_html(error: bool = False) -> str:
 </head>
 <body>
   <div class="box">
-    <h1>ZPR Policy Maker v2</h1>
-    <p class="sub">Enter password to continue</p>
+    <h1>ZPR Policy Maker</h1>
+    <p class="sub">Sign in to your namespace</p>
     {err}
     <form method="post" action="/login">
-      <input type="password" name="password" placeholder="Password" autofocus>
+      <input type="text" name="username" placeholder="Username" autofocus autocomplete="username">
+      <input type="password" name="password" placeholder="Password" autocomplete="current-password">
       <button type="submit">Sign in</button>
     </form>
+  </div>
+</body>
+</html>"""
+
+
+def _setup_html(error: str = "") -> str:
+    err = f'<p class="err">{error}</p>' if error else ""
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ZPR Policy Maker — First-run Setup</title>
+  <style>
+    body {{ font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0;
+           display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
+    .box {{ background: #1e293b; padding: 2rem; border-radius: 0.75rem; width: 340px; }}
+    h1 {{ margin: 0 0 0.25rem; font-size: 1.25rem; }}
+    p.sub {{ color: #94a3b8; font-size: 0.85rem; margin: 0 0 1.5rem; }}
+    p.err {{ color: #f87171; font-size: 0.85rem; margin: 0 0 1rem; }}
+    label {{ display: block; font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.25rem; }}
+    input {{ width: 100%; box-sizing: border-box; padding: 0.6rem 0.75rem; border-radius: 0.5rem;
+             border: 1px solid #334155; background: #0f172a; color: #e2e8f0;
+             font-size: 1rem; margin-bottom: 1rem; }}
+    button {{ width: 100%; padding: 0.6rem; border-radius: 0.5rem; border: none;
+              background: #3b82f6; color: white; font-size: 1rem; cursor: pointer; }}
+    button:hover {{ background: #2563eb; }}
+    .note {{ font-size: 0.8rem; color: #64748b; margin-top: 1rem; }}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Welcome to ZPR Policy Maker</h1>
+    <p class="sub">Create your root namespace owner to get started.</p>
+    {err}
+    <form method="post" action="/setup">
+      <label>Username (this becomes your namespace name)</label>
+      <input type="text" name="username" placeholder="e.g. admin" autofocus autocomplete="off">
+      <label>Password</label>
+      <input type="password" name="password" placeholder="Choose a password" autocomplete="new-password">
+      <button type="submit">Create account</button>
+    </form>
+    <p class="note">This page is only available when no accounts exist.</p>
   </div>
 </body>
 </html>"""

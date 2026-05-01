@@ -1,1781 +1,1479 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZPR Policy Maker v2</title>
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ZPR Policy Maker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  :root {
-    --bg:        #f1f5f9;
-    --surface:   #ffffff;
-    --surface2:  #f8fafc;
-    --border:    #e2e8f0;
-    --text:      #1e293b;
-    --muted:     #64748b;
-    --accent:    #3b82f6;
-    --accent-h:  #2563eb;
-    --allow:     #16a34a;
-    --deny:      #dc2626;
-    --code-bg:   #f8fafc;
-  }
+    :root {
+      --bg:       #f8fafc;
+      --surface:  #ffffff;
+      --surface2: #f1f5f9;
+      --border:   #e2e8f0;
+      --text:     #0f172a;
+      --muted:    #64748b;
+      --accent:   #2563eb;
+      --accent2:  #1d4ed8;
+      --green:    #16a34a;
+      --red:      #dc2626;
+      --yellow:   #d97706;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+      --blue: #2563eb;
+      --fg:   #0f172a;
+    }
 
-  body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif;
-         font-size: 14px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    html, body { height: 100%; background: var(--bg); color: var(--text);
+                 font-family: system-ui, sans-serif; font-size: 14px; overflow: hidden; }
 
-  /* ── Top bar ── */
-  header { display: flex; align-items: center; gap: 1rem; padding: 0.6rem 1rem;
-           background: var(--surface); border-bottom: 1px solid var(--border);
-           flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
-  header h1 { font-size: 1rem; font-weight: 600; white-space: nowrap; color: var(--text); }
-  header .spacer { flex: 1; }
-  .lang-toggle { display: flex; gap: 0.25rem; }
-  .lang-btn { padding: 0.3rem 0.75rem; border-radius: 0.4rem; border: 1px solid var(--border);
-              background: var(--bg); color: var(--muted); cursor: pointer; font-size: 0.8rem; }
-  .lang-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
-  .logout-btn { padding: 0.3rem 0.75rem; border-radius: 0.4rem; border: 1px solid var(--border);
-                background: var(--bg); color: var(--muted); cursor: pointer; font-size: 0.8rem; }
-  .logout-btn:hover { border-color: var(--accent); color: var(--accent); }
+    /* ── Header ─────────────────────────────────────────────── */
+    header {
+      display: flex; align-items: center; gap: 1rem;
+      padding: 0 1rem; height: 48px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      position: relative; z-index: 100;
+    }
+    .app-title { font-weight: 700; font-size: 0.95rem; color: var(--text); white-space: nowrap; }
+    .app-title span { color: var(--accent); }
 
-  /* ── Main layout ── */
-  .main { display: flex; flex: 1; overflow: hidden; }
+    .hdr-spacer { flex: 1; }
+    .hdr-user { font-size: 0.8rem; color: var(--muted); }
+    .hdr-btn {
+      padding: 0.3rem 0.7rem; border-radius: 5px; font-size: 0.8rem; cursor: pointer;
+      border: 1px solid var(--border); background: transparent; color: var(--muted);
+      transition: all 0.15s;
+    }
+    .hdr-btn:hover { border-color: var(--text); color: var(--text); }
 
-  /* ── Sidebar ── */
-  aside { width: 220px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border);
-          display: flex; flex-direction: column; overflow: hidden; }
-  aside h2 { padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; color: var(--muted);
-             text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
-  .policy-list { flex: 1; overflow-y: auto; }
-  .policy-item { padding: 0.5rem 0.75rem 0.5rem 1rem; cursor: pointer;
-                 border-bottom: 1px solid var(--border); font-size: 0.85rem; color: var(--text);
-                 display: flex; align-items: center; gap: 0.35rem; }
-  .policy-item:hover { background: var(--bg); }
-  .policy-item.active { background: #eff6ff; border-left: 3px solid var(--accent); padding-left: calc(1rem - 3px); }
-  .policy-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .policy-delete-btn { flex-shrink: 0; background: none; border: none; color: var(--muted);
-                       cursor: pointer; font-size: 0.85rem; padding: 0.1rem 0.25rem;
-                       border-radius: 0.25rem; line-height: 1; opacity: 0; }
-  .policy-item:hover .policy-delete-btn { opacity: 1; }
-  .policy-delete-btn:hover { background: #fee2e2; color: #ef4444; }
-  .new-btn { margin: 0.75rem; padding: 0.5rem; border-radius: 0.4rem; border: 1px dashed var(--border);
-             background: transparent; color: var(--muted); cursor: pointer; font-size: 0.8rem;
-             width: calc(100% - 1.5rem); }
-  .new-btn:hover { border-color: var(--accent); color: var(--accent); }
+    /* ── Layout ──────────────────────────────────────────────── */
+    .layout {
+      display: grid;
+      grid-template-columns: 220px 4px 1fr 4px 300px;
+      grid-template-rows: 1fr;
+      height: calc(100vh - 48px);
+    }
 
-  /* ── Content area ── */
-  .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    /* ── Resizer handles ─────────────────────────────────────── */
+    .resizer {
+      background: var(--border); cursor: col-resize;
+      position: relative; z-index: 10;
+      transition: background 0.15s; user-select: none;
+    }
+    .resizer::after {
+      content: ''; position: absolute; inset: 0 -4px;
+    }
+    .resizer:hover { background: #94a3b8; }
+    .resizer.dragging { background: var(--accent); }
 
-  /* ── Tabs ── */
-  .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface);
-          flex-shrink: 0; padding: 0 1rem; }
-  .tab { padding: 0.6rem 1rem; cursor: pointer; font-size: 0.85rem; color: var(--muted);
-         border-bottom: 2px solid transparent; margin-bottom: -1px; }
-  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-  .tab:hover:not(.active) { color: var(--text); }
+    /* ── Sidebar ─────────────────────────────────────────────── */
+    aside.sidebar {
+      background: var(--surface); border-right: none;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .sidebar-header {
+      padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .sidebar-header h2 { font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .new-btn {
+      font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 5px;
+      border: 1px solid var(--border); background: transparent; color: var(--muted);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .new-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* ── Panels ── */
-  .panel { display: none; flex: 1; min-height: 0; overflow: hidden; }
-  .panel.active { display: flex; flex-direction: column; }
+    .ns-tree { flex: 1; overflow-y: auto; padding: 0.4rem 0; min-height: 0; max-height: 50%; }
 
-  /* ── Chat panel ── */
-  .chat-compose-top { padding: 0.6rem 1rem 0.5rem; background: var(--surface);
-                      border-bottom: 1px solid var(--border); flex-shrink: 0; }
-  .chat-input-top { width: 100%; height: 82px; background: var(--bg); border: 1px solid var(--border);
-                    border-radius: 0.5rem; color: var(--text); padding: 0.6rem 0.75rem;
-                    font-size: 0.9rem; line-height: 1.55; font-family: inherit; resize: none; }
-  .chat-input-top:focus { outline: none; border-color: var(--accent); }
+    .sidebar-owners-sep { height: 1px; background: var(--border); margin: 0; flex-shrink: 0; }
+    .sidebar-owners-header { padding: 0.5rem 1rem; display: flex; align-items: center;
+      justify-content: space-between; flex-shrink: 0; }
+    .sidebar-owners-label { font-size: 0.75rem; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.05em; }
+    .sidebar-owners-panel { overflow-y: auto; flex-shrink: 0; max-height: 50vh;
+      border-top: 1px solid var(--border); }
 
-  .chat-messages { flex: 1; min-height: 180px; max-height: 420px; overflow-y: auto;
-                   padding: 0.75rem 1rem; display: flex; flex-direction: column;
-                   gap: 0.6rem; background: var(--bg); border-bottom: 1px solid var(--border); }
+    .ns-tree-item {
+      padding: 0.5rem 1rem; cursor: pointer;
+      display: flex; align-items: center; gap: 0.5rem;
+      border-left: 2px solid transparent; transition: all 0.1s;
+      font-size: 0.85rem;
+    }
+    .ns-tree-item:hover { background: var(--surface2); }
+    .ns-tree-item.active { border-left-color: var(--accent); background: rgba(59,130,246,0.08); }
+    .ns-tree-item.child { padding-left: 1.5rem; }
 
-  .chat-compose-bottom { padding: 0.5rem 1rem 0.6rem; background: var(--surface);
-                         flex-shrink: 0; }
-  .chat-bottom-row { display: flex; gap: 0.5rem; align-items: flex-end; }
-  .chat-input-bottom { flex: 1; height: 52px; background: var(--bg); border: 1px solid var(--border);
-                       border-radius: 0.5rem; color: var(--text); padding: 0.5rem 0.75rem;
-                       font-size: 0.9rem; line-height: 1.55; font-family: inherit; resize: none; }
-  .chat-input-bottom:focus { outline: none; border-color: var(--accent); }
+    .ns-tree-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+    .ns-tree-dot.active { background: var(--accent); }
+    .ns-tree-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ns-tree-name.active { font-weight: 600; color: var(--accent); }
+    .ns-tree-badge { font-size: 0.65rem; color: var(--muted); background: var(--surface2);
+                     padding: 0.1rem 0.35rem; border-radius: 3px; flex-shrink: 0; }
+    .ns-tree-indent { color: #cbd5e1; font-family: var(--font-mono); font-size: 0.75rem; flex-shrink: 0; }
 
-  .send-btn { padding: 0.45rem 1.1rem; border-radius: 0.5rem; background: var(--accent);
-              color: white; border: none; cursor: pointer; font-size: 0.85rem; font-weight: 500; white-space: nowrap; }
-  .send-btn:hover { background: var(--accent-h); }
-  .send-btn:disabled { opacity: 0.5; cursor: default; }
-  .msg { max-width: 82%; padding: 0.65rem 0.9rem; border-radius: 0.6rem;
-         font-size: 0.9rem; line-height: 1.55; }
-  .msg.user { align-self: flex-end; background: var(--accent); color: white; }
-  .msg.assistant { align-self: flex-start; background: var(--surface); color: var(--text);
-                   white-space: pre-wrap; border: 1px solid var(--border);
-                   box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-  .msg.system { align-self: center; background: transparent; color: var(--muted);
-                font-style: italic; font-size: 0.8rem; }
-  .policy-notice { align-self: stretch; background: #eff6ff; border: 1px solid #bfdbfe;
-                   border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.8rem;
-                   color: #1d4ed8; display: flex; align-items: center; gap: 0.5rem; }
+    /* ── Editor pane ─────────────────────────────────────────── */
+    main.editor-pane {
+      display: flex; flex-direction: column; overflow: hidden; min-width: 0;
+    }
+    .editor-toolbar {
+      padding: 0.5rem 0.75rem; background: var(--surface); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+    }
+    .ns-editor-label {
+      font-size: 0.85rem; font-weight: 600; color: var(--text); padding: 0 0.25rem;
+      white-space: nowrap;
+    }
+    .toolbar-sep { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; }
+    .tool-btn {
+      padding: 0.3rem 0.7rem; border-radius: 5px; font-size: 0.8rem; cursor: pointer;
+      border: 1px solid var(--border); background: transparent; color: var(--muted);
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .tool-btn:hover { border-color: var(--text); color: var(--text); }
+    .tool-btn.primary { border-color: var(--accent); color: var(--accent); }
+    .tool-btn.primary:hover { background: var(--accent); color: white; }
+    .tool-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .status-pill {
+      font-size: 0.72rem; padding: 0.2rem 0.55rem; border-radius: 10px;
+      display: flex; align-items: center; gap: 0.3rem;
+    }
+    .status-pill.ok    { color: var(--green); background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.2); }
+    .status-pill.error { color: var(--red);   background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); }
+    .status-pill.dirty { color: var(--yellow); background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); }
+    .status-pill.idle  { color: var(--muted); }
+    .panel-toggle {
+      padding: 0.3rem 0.5rem; border-radius: 5px; font-size: 0.8rem;
+      cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted);
+      transition: all 0.15s;
+    }
+    .panel-toggle:hover { color: var(--text); }
+    .toolbar-right { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; position: relative; }
+    .io-dropdown { position: relative; }
+    .io-menu {
+      display: none; position: absolute; right: 0; top: calc(100% + 4px); z-index: 200;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1); min-width: 160px; overflow: hidden;
+    }
+    .io-menu.open { display: block; }
+    .io-menu-item {
+      padding: 0.5rem 0.85rem; font-size: 0.8rem; cursor: pointer; color: var(--text);
+      display: flex; align-items: center; gap: 0.5rem; white-space: nowrap;
+    }
+    .io-menu-item:hover { background: var(--surface2); }
 
-  /* ── Text editor panel ── */
-  .editor-wrap { flex: 1; display: flex; flex-direction: column; padding: 1rem;
-                 gap: 0.75rem; overflow: hidden; background: var(--bg); }
-  .editor-controls { display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0; }
-  .editor-controls label { color: var(--muted); font-size: 0.8rem; font-weight: 500; }
-  textarea.code { flex: 0 0 180px; resize: none; background: var(--surface);
-                  border: 1px solid var(--border); border-radius: 0.5rem;
-                  color: #1e40af; font-family: "SF Mono","Fira Code",monospace;
-                  font-size: 0.85rem; padding: 0.75rem; line-height: 1.6; }
-  textarea.code:focus { outline: none; border-color: var(--accent); }
-  pre.code-block { flex: 1; overflow: auto; background: var(--surface);
-                   border: 1px solid var(--border); border-radius: 0.5rem;
-                   color: #1e40af; font-family: "SF Mono","Fira Code",monospace;
-                   font-size: 0.85rem; padding: 0.75rem; line-height: 1.6;
-                   white-space: pre; margin: 0; }
-  .btn { padding: 0.4rem 0.9rem; border-radius: 0.4rem; border: 1px solid var(--border);
-         background: var(--surface); color: var(--text); cursor: pointer; font-size: 0.8rem; }
-  .btn:hover { border-color: var(--accent); color: var(--accent); }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
-  .btn.primary:hover { background: var(--accent-h); }
-  .errors-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 0.4rem;
-                padding: 0.6rem 0.75rem; font-size: 0.8rem; color: #991b1b;
-                white-space: pre-wrap; flex-shrink: 0; }
+    .zpl-editor {
+      flex: 1; width: 100%; resize: none; outline: none;
+      background: var(--bg); color: var(--text);
+      font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
+      padding: 1rem; border: none;
+      tab-size: 2;
+    }
+    .zpl-editor::placeholder { color: #cbd5e1; }
 
-  /* ── Policy view panel ── */
-  .policy-view { flex: 1; overflow-y: auto; padding: 1rem; background: var(--bg); }
-  .section-title { font-size: 0.75rem; font-weight: 600; color: var(--muted);
-                   text-transform: uppercase; letter-spacing: 0.05em; margin: 1rem 0 0.5rem; }
-  .section-title:first-child { margin-top: 0; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem;
-          padding: 0.6rem 0.9rem; margin-bottom: 0.5rem; font-size: 0.85rem;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
-  .card .card-title { font-weight: 600; margin-bottom: 0.25rem; color: var(--text); }
-  .card .card-meta { color: var(--muted); font-size: 0.78rem; }
-  .badge { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 0.25rem;
-           font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
-  .badge.allow { background: #dcfce7; color: #166534; }
-  .badge.deny  { background: #fee2e2; color: #991b1b; }
+    .infer-bar {
+      padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(37,99,235,0.2);
+      background: rgba(37,99,235,0.05);
+      display: none; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+      font-size: 0.78rem; color: var(--accent);
+    }
+    .infer-bar.visible { display: flex; }
+    .infer-bar strong { font-weight: 600; }
+    .infer-insert {
+      padding: 0.2rem 0.65rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer;
+      border: 1px solid var(--accent); background: transparent; color: var(--accent);
+      transition: all 0.15s;
+    }
+    .infer-insert:hover { background: var(--accent); color: white; }
+    .infer-dismiss {
+      margin-left: auto; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem;
+      cursor: pointer; border: none; background: transparent; color: var(--muted);
+    }
+    .infer-dismiss:hover { color: var(--text); }
 
-  /* ── Simulator panel ── */
-  .sim-wrap { flex: 1; display: flex; gap: 1rem; padding: 1rem; overflow: hidden; background: var(--bg); }
-  .sim-left { flex: 1; display: flex; flex-direction: column; gap: 0.5rem; overflow: hidden; }
-  .sim-right { width: 340px; flex-shrink: 0; overflow-y: auto; }
-  .sim-scenario { background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem;
-                  padding: 0.6rem 0.75rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
-  .sim-result { padding: 0.5rem 0.75rem; border-radius: 0.4rem; margin-bottom: 0.5rem;
-                font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem; }
-  .sim-result.allow { background: #f0fdf4; border: 1px solid #bbf7d0; }
-  .sim-result.deny  { background: #fef2f2; border: 1px solid #fecaca; }
-  .verdict { font-weight: 700; font-size: 0.75rem; text-transform: uppercase; }
-  .verdict.allow { color: var(--allow); }
-  .verdict.deny  { color: var(--deny); }
+    .error-bar {
+      border-top: 1px solid var(--border); background: rgba(239,68,68,0.06);
+      max-height: 100px; overflow-y: auto; display: none;
+    }
+    .error-bar.visible { display: block; }
+    .error-line { padding: 0.3rem 0.75rem; font-size: 0.78rem; color: var(--red);
+                  font-family: var(--font-mono); border-bottom: 1px solid rgba(239,68,68,0.1); }
 
-  /* ── ZPL statement expand cards ── */
-  .stmt-card { background: var(--surface); border: 1px solid var(--border); border-radius: 0.4rem;
-               margin-bottom: 0.4rem; overflow: hidden; cursor: pointer;
-               box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
-  .stmt-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.75rem;
-                 user-select: none; }
-  .stmt-header:hover { background: var(--bg); }
-  .stmt-del-btn { flex-shrink: 0; background: none; border: none; color: var(--muted);
-                  cursor: pointer; font-size: 0.8rem; padding: 0.1rem 0.3rem;
-                  border-radius: 0.25rem; line-height: 1; opacity: 0; }
-  .stmt-card:hover .stmt-del-btn { opacity: 1; }
-  .stmt-del-btn:hover { background: #fee2e2; color: #ef4444; }
-  .stmt-arrow { color: var(--muted); font-size: 0.7rem; width: 1rem; flex-shrink: 0;
-                transition: transform 0.12s; display: inline-block; }
-  .stmt-card.open .stmt-arrow { transform: rotate(90deg); }
-  .stmt-zpl-text { flex: 1; font-family: "SF Mono","Fira Code",monospace; font-size: 0.82rem; color: #1e40af; }
-  .stmt-yaml-block { display: none; padding: 0.5rem 0.75rem; background: #f0fdf4;
-                     font-family: "SF Mono","Fira Code",monospace; font-size: 0.78rem; color: #166534;
-                     white-space: pre; border-top: 1px solid var(--border); margin: 0; }
-  .stmt-card.open .stmt-yaml-block { display: block; }
+    /* ── Schema pane ─────────────────────────────────────────── */
+    aside.schema-pane {
+      background: var(--surface); border-left: none;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .schema-pane-header {
+      padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .schema-tabs { display: flex; gap: 0.25rem; }
+    .schema-tab {
+      padding: 0.25rem 0.65rem; border-radius: 5px; font-size: 0.78rem; cursor: pointer;
+      color: var(--muted); background: transparent; border: 1px solid transparent;
+      transition: all 0.1s;
+    }
+    .schema-tab.active { color: var(--text); background: var(--surface2); border-color: var(--border); }
+    .schema-body { flex: 1; overflow-y: auto; padding: 0.5rem 0; }
 
-  /* ── Build panel (Class & Rule assistant) ── */
-  /* ── Build panel (Class & Rule assistant) ── */
-  .build-outer { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+    .schema-section { padding: 0.3rem 0.75rem; }
+    .schema-section-title { font-size: 0.7rem; font-weight: 600; color: var(--muted);
+                             text-transform: uppercase; letter-spacing: 0.05em; padding: 0.4rem 0 0.3rem; }
+    .class-node { padding: 0.2rem 0; font-size: 0.82rem; display: flex; align-items: flex-start; }
+    .class-node .indent { color: #cbd5e1; white-space: pre; font-family: var(--font-mono); font-size: 0.75rem; }
+    .class-node .cn-name { color: var(--text); font-family: var(--font-mono); }
+    .class-node .cn-parent { color: var(--muted); font-size: 0.72rem; margin-left: 0.4rem; }
+    .class-node .cn-attrs { font-size: 0.7rem; color: var(--muted); padding-left: 1.2rem; line-height: 1.6; }
 
-  /* Header bar with title + mode toggle */
-  .build-header { padding: 1rem 1.25rem 0.75rem; background: var(--surface);
-                  border-bottom: 1px solid var(--border); flex-shrink: 0; }
-  .build-header h2 { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 0.2rem; }
-  .build-header p  { font-size: 0.82rem; color: var(--muted); margin-bottom: 0.65rem; }
-  .build-mode-row  { display: flex; align-items: center; gap: 0.5rem; }
-  .mode-btn { padding: 0.28rem 0.85rem; border-radius: 0.4rem; border: 1px solid var(--border);
-              background: var(--bg); color: var(--muted); cursor: pointer; font-size: 0.8rem; }
-  .mode-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
-  .build-clear { margin-left: auto; font-size: 0.78rem; color: var(--muted); cursor: pointer;
-                 background: none; border: none; padding: 0; }
-  .build-clear:hover { color: var(--text); }
+    .rule-item {
+      padding: 0.4rem 0.75rem; font-size: 0.8rem; border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .rule-item:last-child { border-bottom: none; }
+    .rule-effect { font-size: 0.7rem; font-weight: 700; padding: 0.1rem 0.4rem;
+                   border-radius: 3px; margin-right: 0.4rem; text-transform: uppercase; }
+    .rule-effect.allow { color: var(--green); background: rgba(34,197,94,0.1); }
+    .rule-effect.deny  { color: var(--red);   background: rgba(239,68,68,0.1); }
+    .rule-name { color: var(--text); }
+    .rule-desc { font-size: 0.75rem; color: var(--muted); margin-top: 0.15rem; font-family: var(--font-mono); }
+    .class-node { cursor: pointer; }
+    .class-node:hover .cn-name { color: var(--accent); }
+    .rule-item:hover { background: var(--surface2); }
+    .json-detail-wrap {
+      margin-top: 0.4rem; border: 1px solid var(--border); border-radius: 4px;
+      background: var(--surface2); cursor: default; width: 100%;
+    }
+    .json-detail-header {
+      display: flex; justify-content: flex-end;
+      padding: 0.15rem 0.3rem; border-bottom: 1px solid var(--border);
+    }
+    .json-close {
+      font-size: 0.7rem; color: var(--muted); background: none; border: none;
+      cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 3px;
+      line-height: 1;
+    }
+    .json-close:hover { color: var(--red); background: rgba(239,68,68,0.1); }
+    .json-detail {
+      font-family: var(--font-mono); font-size: 0.7rem; line-height: 1.5;
+      color: var(--muted); padding: 0.4rem 0.6rem;
+      white-space: pre-wrap; word-break: break-all;
+      display: block;
+    }
 
-  /* Fixed input box */
-  .build-input-wrap { padding: 0.75rem 1.25rem; background: var(--surface);
-                      border-bottom: 1px solid var(--border); flex-shrink: 0; }
-  .build-input-box { display: flex; gap: 0.5rem; align-items: center;
-                     background: var(--bg); border: 1px solid var(--border);
-                     border-radius: 0.5rem; padding: 0.35rem 0.5rem 0.35rem 0.75rem; }
-  .build-input-box:focus-within { border-color: var(--accent); }
-  .build-input { flex: 1; border: none; background: transparent; color: var(--text);
-                 font-size: 0.9rem; font-family: inherit; outline: none; }
+    .zpl-canon {
+      font-family: var(--font-mono); font-size: 0.75rem; line-height: 1.6;
+      color: var(--fg); padding: 0.75rem; white-space: pre-wrap;
+      word-break: break-all; margin: 0;
+    }
 
-  /* Scrollable dialog */
-  .build-feed { padding: 1rem 1.25rem; display: flex; flex-direction: column;
-                gap: 0.75rem; background: var(--bg); }
+    .empty-state { padding: 2rem 0.75rem; text-align: center; color: var(--muted); font-size: 0.82rem; line-height: 1.6; }
 
-  /* User message — gray chip */
-  .bm-user-chip { align-self: flex-start; background: #e2e8f0; color: var(--text);
-                  border-radius: 1rem; padding: 0.35rem 0.85rem; font-size: 0.875rem;
-                  max-width: 80%; }
+    /* ── Config tab ──────────────────────────────────────────── */
+    .cfg { padding: 0.75rem; display: flex; flex-direction: column; gap: 1.25rem;
+      overflow-y: auto; height: 100%; box-sizing: border-box; }
+    .cfg-section { display: flex; flex-direction: column; gap: 0.4rem; }
+    .cfg-section h4 { font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--muted); margin: 0 0 0.2rem; }
+    .cfg-row { display: flex; flex-direction: column; gap: 0.2rem; }
+    .cfg-row label { font-size: 0.72rem; color: var(--muted); }
+    .cfg-row input { font-size: 0.8rem; padding: 0.3rem 0.5rem; border: 1px solid var(--border);
+      border-radius: 4px; background: var(--surface2); color: var(--fg); width: 100%; box-sizing: border-box; }
+    .cfg-row input:focus { outline: none; border-color: var(--blue); }
+    .cfg-btn { font-size: 0.78rem; padding: 0.3rem 0.7rem; border: 1px solid var(--border);
+      border-radius: 4px; background: var(--surface2); color: var(--fg); cursor: pointer; align-self: flex-start; }
+    .cfg-btn:hover { background: var(--blue); color: #fff; border-color: var(--blue); }
+    .cfg-btn.danger:hover { background: var(--red); border-color: var(--red); }
+    .cfg-token { font-family: var(--font-mono); font-size: 0.68rem; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 4px; padding: 0.35rem 0.5rem;
+      word-break: break-all; color: var(--muted); cursor: text; user-select: all; }
+    .cfg-msg { font-size: 0.75rem; padding: 0.25rem 0.5rem; border-radius: 4px; }
+    .cfg-msg.ok  { background: rgba(34,197,94,0.12); color: #166534; }
+    .cfg-msg.err { background: rgba(239,68,68,0.1);  color: var(--red); }
+    .cfg-ns-tree { display: flex; flex-direction: column; gap: 0.2rem; }
+    .cfg-ns-node { display: flex; flex-direction: column; }
+    .cfg-ns-item { font-size: 0.78rem; padding: 0.25rem 0.5rem; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 4px; }
+    .cfg-ns-item .cfg-ns-name { font-weight: 500; }
+    .cfg-ns-item .cfg-ns-meta { font-size: 0.7rem; color: var(--muted); }
+    .cfg-ns-children { margin-left: 1rem; margin-top: 0.2rem;
+      border-left: 2px solid var(--border); padding-left: 0.6rem;
+      display: flex; flex-direction: column; gap: 0.2rem; }
+    .cfg-add-owner { border: 1px dashed var(--border); border-radius: 4px;
+      padding: 0.6rem; display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.4rem; }
+    .cfg-add-owner h5 { font-size: 0.72rem; font-weight: 600; color: var(--muted);
+      margin: 0; text-transform: uppercase; letter-spacing: 0.05em; }
+    .cfg-ns-actions { display: flex; gap: 0.25rem; margin-left: auto; flex-shrink: 0; }
+    .cfg-ns-hdr { display: flex; align-items: flex-start; gap: 0.3rem; }
+    .cfg-ns-hdr-text { flex: 1; min-width: 0; }
+    .cfg-ns-btn { font-size: 0.68rem; padding: 0.1rem 0.4rem; border: 1px solid var(--border);
+      border-radius: 3px; background: none; cursor: pointer; color: var(--muted); line-height: 1.5; white-space: nowrap; }
+    .cfg-ns-btn:hover { background: var(--blue); color: #fff; border-color: var(--blue); }
+    .cfg-ns-btn.danger { color: var(--muted); }
+    .cfg-ns-btn.danger:hover { background: rgba(239,68,68,0.1); color: var(--red); border-color: var(--red); }
+    .cfg-ns-inline { background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 4px; padding: 0.5rem; margin-top: 0.3rem;
+      display: flex; flex-direction: column; gap: 0.35rem; }
+    .cfg-ns-inline h6 { font-size: 0.68rem; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.1rem; }
+    .cfg-ns-inline .cfg-row input { font-size: 0.75rem; padding: 0.2rem 0.4rem; }
+    .cfg-ns-unowned { font-size: 0.7rem; color: var(--muted); font-style: italic; }
+    .match-result { font-size: 0.8rem; padding: 0.4rem 0.6rem; border-radius: 4px; margin-top: 0.3rem; }
+    .match-result.allow { background: rgba(34,197,94,0.12); color: #166534; }
+    .match-result.deny  { background: rgba(239,68,68,0.1);  color: var(--red); }
 
-  /* Agent response — white card full width */
-  .bm-agent-card { background: var(--surface); border: 1px solid var(--border);
-                   border-radius: 0.5rem; padding: 0.75rem 1rem;
-                   font-size: 0.875rem; line-height: 1.6; color: var(--text); }
-  .bm-agent-card b, .bm-agent-card strong { font-weight: 600; }
+    /* ── New owner modal ─────────────────────────────────────── */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.4);
+      z-index: 300; align-items: center; justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.5rem; width: 340px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.15);
+    }
+    .modal h3 { font-size: 1rem; margin-bottom: 0.25rem; }
+    .modal p  { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.25rem; }
+    .modal label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 0.25rem; }
+    .modal input {
+      width: 100%; padding: 0.55rem 0.75rem; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--bg); color: var(--text);
+      font-size: 0.9rem; margin-bottom: 0.85rem; outline: none; transition: border-color 0.15s;
+    }
+    .modal input:focus { border-color: var(--accent); }
+    .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem; }
+    .profile-modal {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      width: 380px; max-width: 95vw; max-height: 85vh;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.15); display: flex; flex-direction: column;
+    }
+    .profile-modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.85rem 1.1rem; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .profile-modal-header h3 { font-size: 0.9rem; font-weight: 600; margin: 0; }
+    .profile-modal-body { overflow-y: auto; flex: 1; }
+    .btn { padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; cursor: pointer;
+           border: 1px solid var(--border); background: transparent; color: var(--muted); transition: all 0.15s; }
+    .btn:hover { color: var(--text); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+    .btn.primary:hover { background: var(--accent2); border-color: var(--accent2); }
+    .modal-err { color: var(--red); font-size: 0.78rem; margin-bottom: 0.5rem; min-height: 1em; }
 
-  /* System notice */
-  .bm-system { color: var(--muted); font-size: 0.8rem; font-style: italic;
-               text-align: center; padding: 0.25rem 0; }
-
-  /* Proposal card — v1 style */
-  .proposal-card { background: var(--surface); border: 1px solid var(--border);
-                   border-radius: 0.5rem; overflow: hidden; }
-  .proposal-card-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em;
-                         text-transform: uppercase; color: var(--muted);
-                         padding: 0.5rem 1rem 0; }
-  .proposal-card-title { font-size: 0.95rem; font-weight: 700; color: var(--text);
-                         padding: 0.2rem 1rem 0.5rem; line-height: 1.4; }
-  .proposal-detail-btn { margin: 0 1rem 0.5rem; padding: 0.25rem 0.65rem;
-                         font-size: 0.8rem; color: var(--accent); cursor: pointer;
-                         background: none; border: 1px solid var(--accent);
-                         border-radius: 0.35rem; display: inline-block; }
-  .proposal-detail-btn:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
-  .proposal-detail { display: none; margin: 0 1rem 0.5rem; background: var(--code-bg);
-                     border: 1px solid var(--border); border-radius: 0.4rem;
-                     padding: 0.5rem 0.65rem; font-size: 0.78rem; color: var(--text); }
-  .proposal-detail.open { display: block; }
-  .proposal-detail .detail-row { display: flex; gap: 0.5rem; margin-bottom: 0.2rem; }
-  .detail-key { color: var(--muted); min-width: 80px; flex-shrink: 0; }
-  .proposal-zpl { font-family: "SF Mono","Fira Code",monospace; color: #1e40af;
-                  background: var(--code-bg); border: 1px solid var(--border);
-                  border-radius: 0.4rem; padding: 0.4rem 0.65rem; margin: 0 1rem 0.5rem;
-                  font-size: 0.82rem; white-space: pre-wrap; }
-  .proposal-actions { display: flex; gap: 0.5rem; padding: 0.6rem 1rem;
-                      border-top: 1px solid var(--border); background: var(--surface2);
-                      align-items: center; }
-  .proposal-actions .spacer { flex: 1; }
-  .attr-chip { display: inline-flex; align-items: center; gap: 0.25rem;
-               padding: 0.15rem 0.5rem; border-radius: 0.3rem; font-size: 0.75rem;
-               background: var(--bg); border: 1px solid var(--border); color: var(--text); }
-  .attr-chip .chip-type { color: var(--muted); font-size: 0.68rem; }
-
-  /* ── Class form (no-agent class builder) ── */
-  .build-class-chooser { padding: 1.75rem 1.5rem; }
-  .build-class-subtitle { font-size: 0.9rem; color: var(--muted); line-height: 1.55;
-                           margin-bottom: 1.5rem; max-width: 520px; }
-  .build-root-btns { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-  .build-root-btn { padding: 0.6rem 1.5rem; border-radius: 0.5rem; font-size: 0.95rem;
-                    font-weight: 600; cursor: pointer; border: 1.5px solid var(--border);
-                    background: var(--surface); color: var(--text); }
-  .build-root-btn:hover { border-color: var(--accent); color: var(--accent); }
-
-  .build-class-form { padding: 1rem 1.5rem 1.5rem; overflow-y: auto; flex: 1;
-                      display: flex; flex-direction: column; gap: 1.1rem; }
-  .form-back-row { display: flex; align-items: center; gap: 0.75rem; font-size: 0.9rem;
-                   color: var(--muted); }
-  .form-back-btn { background: none; border: none; color: var(--accent); cursor: pointer;
-                   font-size: 0.85rem; padding: 0; }
-  .form-back-btn:hover { text-decoration: underline; }
-  .form-section-label { font-size: 0.75rem; font-weight: 700; color: var(--muted);
-                         text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.45rem; }
-  .form-name-input { width: 100%; padding: 0.4rem 0.65rem; border: 1px solid var(--border);
-                     border-radius: 0.4rem; background: var(--bg); color: var(--text);
-                     font-size: 0.9rem; font-family: inherit; box-sizing: border-box; }
-  .form-name-input:focus { outline: none; border-color: var(--accent); }
-
-  .form-inherited-hint { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.5rem;
-                          padding: 0.3rem 0.55rem; background: var(--bg); border: 1px solid var(--border);
-                          border-radius: 0.35rem; }
-  .form-inherited-hint code { font-family: "SF Mono","Fira Code",monospace; font-size: 0.75rem;
-                               color: var(--text); }
-
-  .attr-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-  .attr-table th { text-align: left; font-weight: 600; color: var(--muted);
-                   padding: 0.2rem 0.5rem; border-bottom: 1px solid var(--border);
-                   font-size: 0.73rem; text-transform: uppercase; letter-spacing: 0.04em; }
-  .attr-table td { padding: 0.3rem 0.5rem; vertical-align: middle; border-bottom: 1px solid var(--border); }
-  .attr-name-input, .attr-values-input { border: none; background: transparent; color: var(--text);
-                    font-family: inherit; font-size: 0.85rem; width: 100%; outline: none; padding: 0; }
-  .attr-name-input:focus, .attr-values-input:focus { background: color-mix(in srgb, var(--accent) 6%, transparent);
-                                                     border-radius: 0.2rem; }
-  .attr-type-sel { border: 1px solid var(--border); background: var(--bg); color: var(--text);
-                   font-family: inherit; font-size: 0.82rem; cursor: pointer;
-                   border-radius: 0.3rem; padding: 0.15rem 0.35rem; }
-  .attr-rm-btn { background: none; border: none; color: var(--muted); cursor: pointer;
-                 font-size: 1rem; line-height: 1; padding: 0 0.25rem; }
-  .attr-rm-btn:hover { color: #ef4444; }
-  .attr-add-btn { margin-top: 0.5rem; font-size: 0.8rem; color: var(--accent); background: none;
-                  border: 1px dashed var(--accent); border-radius: 0.4rem;
-                  padding: 0.22rem 0.75rem; cursor: pointer; }
-  .attr-add-btn:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
-  .attr-suggestions { position: fixed; z-index: 9999;
-                      background: var(--surface); border: 1px solid var(--border);
-                      border-radius: 0.5rem; box-shadow: 0 4px 18px rgba(0,0,0,0.13);
-                      min-width: 230px; overflow: hidden; }
-  .attr-sug-item { display: flex; align-items: center; justify-content: space-between;
-                   padding: 0.42rem 0.85rem; cursor: pointer; font-size: 0.85rem; color: var(--text); }
-  .attr-sug-item:hover { background: var(--bg); }
-  .attr-sug-type { font-size: 0.72rem; color: var(--muted); margin-left: 0.5rem; }
-  .attr-sug-divider { border: none; border-top: 1px solid var(--border); margin: 0; }
-
-  .tag-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; min-height: 1.5rem; align-items: center; }
-  .tag-custom-input { border: 1px solid var(--accent); background: var(--bg); color: var(--text);
-                      font-family: inherit; font-size: 0.8rem; border-radius: 1rem;
-                      padding: 0.18rem 0.6rem; outline: none; width: 120px; }
-  .tag-chip { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.18rem 0.55rem;
-              background: var(--bg); border: 1px solid var(--border); border-radius: 1rem;
-              font-size: 0.8rem; color: var(--text); }
-  .tag-chip-rm { background: none; border: none; color: var(--muted); cursor: pointer;
-                 font-size: 0.75rem; padding: 0; line-height: 1; }
-  .tag-chip-rm:hover { color: #ef4444; }
-
-  .zpl-preview-box { font-family: "SF Mono","Fira Code",monospace; font-size: 0.85rem;
-                     background: var(--code-bg); border: 1px solid var(--border);
-                     border-radius: 0.4rem; padding: 0.6rem 0.75rem; color: #1e40af;
-                     white-space: pre-wrap; min-height: 2.2rem; line-height: 1.5; }
-  .yaml-preview-box { font-family: "SF Mono","Fira Code",monospace; font-size: 0.78rem;
-                      background: var(--code-bg); border: 1px solid var(--border);
-                      border-radius: 0.4rem; padding: 0.6rem 0.75rem; color: var(--text);
-                      white-space: pre; overflow-x: auto; margin-top: 0.5rem; }
-  .form-actions { display: flex; gap: 0.6rem; padding-top: 0.25rem; }
-
-  /* Rule mode layout */
-  .build-rule-top { display: flex; gap: 0; border-bottom: 1px solid var(--border);
-                    position: sticky; top: 0; z-index: 10; background: var(--surface); }
-  .build-rule-describe { flex: 1; padding: 1rem 1.25rem; border-right: 1px solid var(--border); }
-  .build-rule-describe h3 { font-size: 0.88rem; font-weight: 700; color: var(--text); margin-bottom: 0.3rem; }
-  .build-rule-describe p  { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.65rem; }
-  .build-rule-describe .rule-input-row { display: flex; gap: 0.5rem; }
-  .build-rule-describe .rule-text-input { flex: 1; border: 1px solid var(--border);
-    border-radius: 0.4rem; background: var(--bg); color: var(--text);
-    font-family: inherit; font-size: 0.85rem; padding: 0.4rem 0.65rem; outline: none; }
-  .build-rule-describe .rule-text-input:focus { border-color: var(--accent); }
-  .build-rule-generate { width: 320px; flex-shrink: 0; padding: 1rem 1.25rem; background: var(--surface2); }
-  .build-rule-generate h3 { font-size: 0.88rem; font-weight: 700; color: var(--text); margin-bottom: 0.3rem; }
-  .build-rule-generate p  { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.65rem; }
-  .gen-controls { display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap; }
-  .gen-field { display: flex; flex-direction: column; gap: 0.2rem; }
-  .gen-field label { font-size: 0.72rem; font-weight: 600; color: var(--muted); }
-  .gen-spinner { width: 60px; border: 1px solid var(--border); border-radius: 0.35rem;
-                 background: var(--bg); color: var(--text); font-size: 0.85rem;
-                 padding: 0.3rem 0.4rem; text-align: center; }
-  .gen-focus { flex: 1; min-width: 100px; border: 1px solid var(--border); border-radius: 0.35rem;
-               background: var(--bg); color: var(--text); font-size: 0.85rem;
-               padding: 0.3rem 0.5rem; outline: none; font-family: inherit; }
-  .gen-focus:focus { border-color: var(--accent); }
-  .gen-actions { display: flex; gap: 0.5rem; margin-top: 0.6rem; align-items: center; }
-  .gen-btn { padding: 0.38rem 0.9rem; border-radius: 0.4rem; border: none;
-             background: var(--accent); color: white; font-size: 0.82rem;
-             font-weight: 600; cursor: pointer; }
-  .gen-btn:hover { background: var(--accent-h); }
-  .gen-btn:disabled { opacity: 0.5; cursor: default; }
-  .gen-accept-all { padding: 0.38rem 0.9rem; border-radius: 0.4rem;
-                    border: 1px solid var(--border); background: var(--surface);
-                    color: var(--text); font-size: 0.82rem; cursor: pointer; }
-  .gen-accept-all:hover { border-color: var(--allow); color: var(--allow); }
-  .gen-accept-all:disabled { opacity: 0.4; cursor: default; }
-
-  /* ── Scrollbars ── */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-</style>
+    /* ── Scrollbars ──────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
 </head>
 <body>
 
+<!-- ── Header ──────────────────────────────────────────────────────── -->
 <header>
-  <h1>ZPR Policy Maker v2</h1>
-  <div class="spacer"></div>
-  <div class="lang-toggle">
-    <button class="lang-btn active" id="btn-zpl" onclick="setLanguage('zpl')">ZPL</button>
-    <button class="lang-btn" id="btn-zpel" onclick="setLanguage('zpel')">ZPEL</button>
-  </div>
-  <form method="post" action="/logout" style="display:inline">
-    <button class="logout-btn" type="submit">Sign out</button>
-  </form>
+  <div class="app-title">ZPR <span>Policy Maker</span></div>
+  <div class="hdr-spacer"></div>
+  <span class="hdr-user" id="hdr-user"></span>
+  <button class="hdr-btn" onclick="openProfilePanel()">Profile</button>
+  <button class="hdr-btn" onclick="doLogout()">Sign out</button>
 </header>
 
-<div class="main">
-  <aside>
-    <h2>Policy Sets</h2>
-    <button class="new-btn" onclick="newConversation()">+ New policy set</button>
-    <div class="policy-list" id="policy-list"></div>
+<!-- ── Layout ───────────────────────────────────────────────────────── -->
+<div class="layout" id="layout">
+
+  <!-- Sidebar: namespace tree -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h2>Namespace Selector</h2>
+      <button class="new-btn" onclick="openNewOwnerModal()">+ New</button>
+    </div>
+    <div class="ns-tree" id="ns-tree"></div>
+
+    <div class="sidebar-owners-sep"></div>
+    <div class="sidebar-owners-header">
+      <span class="sidebar-owners-label">Namespace Owners</span>
+      <button class="new-btn" onclick="toggleOwnersPanel()">Edit</button>
+    </div>
+    <div class="sidebar-owners-panel" id="owners-panel" style="display:none"></div>
   </aside>
 
-  <div class="content">
-    <div class="tabs">
-      <div class="tab active" data-tab="chat"   onclick="switchTab('chat')">Chat</div>
-      <div class="tab"        data-tab="build"  onclick="switchTab('build')">Create Classes and Rules</div>
-      <div class="tab"        data-tab="zpl"    onclick="switchTab('zpl')" id="tab-lang-view">Show ZPL</div>
-      <div class="tab"        data-tab="policy" onclick="switchTab('policy')">List Policies</div>
-      <div class="tab"        data-tab="sim"    onclick="switchTab('sim')">Test Runner</div>
-      <div style="flex:1"></div>
-      <div class="tab"        data-tab="ir"     onclick="switchTab('ir')">IR</div>
-    </div>
+  <div class="resizer" id="resizer-left"></div>
 
-    <!-- Chat panel: top input, messages, follow-up input -->
-    <div class="panel active" id="panel-chat">
-      <div class="chat-compose-top">
-        <textarea class="chat-input-top" id="chat-input-top"
-          placeholder="Describe your environment and access rules in plain language…&#10;&#10;Example: My datacenter has employees and partners. HR staff should access HR systems. Interns should never access dev systems."
-          onkeydown="inputKeydown(event,'top')"></textarea>
-      </div>
-      <div class="chat-messages" id="chat-messages">
-        <div class="msg system">Describe your environment and access rules above. The agent will generate ZPL policy.</div>
-      </div>
-      <div class="chat-compose-bottom">
-        <div class="chat-bottom-row">
-          <textarea class="chat-input-bottom" id="chat-input-bottom"
-            placeholder="Continue the conversation…"
-            onkeydown="inputKeydown(event,'bottom')"></textarea>
-          <button class="btn" id="generate-btn" onclick="generateNow()" title="Ask the agent to emit the full PolicySet now">Generate ZPL</button>
-          <button class="send-btn" id="send-btn" onclick="sendMessage()">Send →</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Build panel: form-based class builder + agent-based rule builder -->
-    <div class="panel" id="panel-build">
-      <div class="build-outer">
-        <div class="build-header">
-          <div class="build-mode-row">
-            <button class="mode-btn active" id="mode-btn-class" onclick="setBuildMode('class')">Classes</button>
-            <button class="mode-btn" id="mode-btn-rule" onclick="setBuildMode('rule')">Rules</button>
+  <!-- Editor pane -->
+  <main class="editor-pane">
+    <div class="editor-toolbar">
+      <span class="tool-btn" style="cursor:default;font-weight:600;color:var(--muted)">ZPL Editor</span>
+      <div class="toolbar-sep"></div>
+      <span class="ns-editor-label" id="ns-editor-label"></span>
+      <div class="toolbar-sep"></div>
+      <button class="tool-btn" onclick="doParse()">Parse</button>
+      <button class="tool-btn" onclick="doValidate()">Validate</button>
+      <button class="tool-btn primary" id="save-btn" onclick="doSave()">Save</button>
+      <button class="tool-btn" onclick="doReset()">Reset</button>
+      <span class="status-pill idle" id="status-pill"></span>
+      <div class="toolbar-right">
+        <div class="io-dropdown" id="io-dropdown">
+          <button class="tool-btn" onclick="toggleIoMenu(event)" title="Upload / Download ZPL">↑↓</button>
+          <div class="io-menu" id="io-menu">
+            <div class="io-menu-item" onclick="doUploadZpl()">↑ Upload ZPL file</div>
+            <div class="io-menu-item" onclick="doDownloadZpl()">↓ Download ZPL file</div>
           </div>
         </div>
-
-        <!-- Class mode: chooser → form (no agent) -->
-        <div id="build-class-panel" style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
-
-          <!-- Step 1: choose root class -->
-          <div id="build-class-chooser" class="build-class-chooser">
-            <p class="build-class-subtitle">ZPL has 4 main classes: Users, Services, Endpoints and Servers.
-              Choose one and we'll help you write the ZPL define statement. Note: these are the types of
-              object, not instances, so in general you would not set the department, name or other things
-              that don't apply to all instances of these classes.</p>
-            <div class="build-root-btns">
-              <button class="build-root-btn" onclick="buildClassChooseRoot('users','User','user')">User</button>
-              <button class="build-root-btn" onclick="buildClassChooseRoot('services','Service','service')">Service</button>
-              <button class="build-root-btn" onclick="buildClassChooseRoot('endpoints','Endpoint','endpoint')">Endpoint</button>
-              <button class="build-root-btn" onclick="buildClassChooseRoot('endpoints','Server','server')">Server</button>
-            </div>
-          </div>
-
-          <!-- Step 2: fill in the form -->
-          <div id="build-class-form" class="build-class-form" style="display:none">
-            <div class="form-back-row">
-              <button class="form-back-btn" onclick="buildClassBack()">← Back</button>
-              <span>Define a <strong id="form-root-label">User</strong> subclass</span>
-            </div>
-
-            <div>
-              <div class="form-section-label">Class name</div>
-              <input class="form-name-input" id="form-class-name"
-                placeholder="e.g. employee" oninput="buildClassUpdatePreview()">
-            </div>
-
-            <div>
-              <div class="form-section-label">Attributes</div>
-              <div class="form-inherited-hint">Inherited from root: <code>name</code> (single) — no need to add it.</div>
-              <table class="attr-table">
-                <thead><tr><th>Name</th><th>Type</th><th>Values (comma-separated)</th><th></th></tr></thead>
-                <tbody id="attr-tbody"></tbody>
-              </table>
-              <button class="attr-add-btn" onclick="buildClassToggleSuggestions(event)">+ Add attribute</button>
-            </div>
-
-            <div>
-              <div class="form-section-label">Tags <span style="font-size:0.7rem;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(inherited tags attribute)</span></div>
-              <button class="attr-add-btn" onclick="buildClassToggleTagSuggestions(event)">+ Add tag</button>
-              <div class="tag-chips" id="tag-chips" style="margin-top:0.5rem"></div>
-              <input class="tag-custom-input" id="tag-custom-input" style="display:none;margin-top:0.35rem"
-                placeholder="custom tag"
-                onkeydown="if(event.key==='Enter'){event.preventDefault();buildClassAddCustomTag();}
-                           else if(event.key==='Escape'){this.style.display='none';}"
-                onblur="if(!this.value.trim())this.style.display='none'">
-            </div>
-
-            <div>
-              <div class="form-section-label">ZPL Definition</div>
-              <div class="zpl-preview-box" id="zpl-preview-box">—</div>
-              <button class="proposal-detail-btn" id="yaml-toggle-btn"
-                data-show="Show YAML" data-hide="Hide YAML"
-                onclick="buildClassToggleYaml()" style="margin:0.4rem 0 0">Show YAML</button>
-              <pre class="yaml-preview-box" id="yaml-preview-box" style="display:none"></pre>
-            </div>
-
-            <div class="form-actions">
-              <button class="btn primary" onclick="buildClassAccept()">✓ Accept</button>
-              <button class="btn" onclick="buildClassBack()">✕ Discard</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Rule mode: two-column top + shared feed -->
-        <div id="build-rule-panel" style="display:none;flex:1;min-height:0;flex-direction:column;overflow-y:auto">
-          <div class="build-rule-top">
-
-            <!-- Left: describe one rule -->
-            <div class="build-rule-describe">
-              <h3>Describe a rule</h3>
-              <p>The assistant will propose a ZPL rule — review and accept.</p>
-              <div class="rule-input-row">
-                <input class="rule-text-input" id="build-input"
-                  placeholder="e.g. Allow HR group to access employee data…"
-                  onkeydown="buildKeydown(event)" autocomplete="off">
-                <button class="send-btn" id="build-send-btn" onclick="buildSend()">Send</button>
-              </div>
-            </div>
-
-            <!-- Right: generate from vocabulary -->
-            <div class="build-rule-generate">
-              <h3>Generate Rules from Vocabulary</h3>
-              <p>Ask Claude to propose a batch of rules based on your defined classes.</p>
-              <div class="gen-controls">
-                <div class="gen-field">
-                  <label>Allow</label>
-                  <input class="gen-spinner" id="gen-allow" type="number" min="0" max="10" value="3">
-                </div>
-                <div class="gen-field">
-                  <label>Deny</label>
-                  <input class="gen-spinner" id="gen-deny" type="number" min="0" max="10" value="2">
-                </div>
-                <div class="gen-field" style="flex:1">
-                  <label>Focus on… (optional)</label>
-                  <input class="gen-focus" id="gen-focus" placeholder="e.g. finance data">
-                </div>
-              </div>
-              <div class="gen-actions">
-                <button class="gen-btn" id="gen-btn" onclick="buildGenerate()">⚡ Generate</button>
-                <button class="gen-accept-all" id="gen-accept-all-btn" onclick="buildAcceptAll()" disabled>✓ Accept All</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="build-feed" id="build-feed">
-            <div class="bm-system">Describe a rule above, or generate rules from your vocabulary.</div>
-          </div>
-        </div>
-
+        <button class="panel-toggle" id="panel-toggle" onclick="togglePanel()" title="Toggle schema panel">⊟</button>
       </div>
     </div>
+    <input type="file" id="zpl-file-input" accept=".zpl,.txt" style="display:none" onchange="onZplFileSelected(event)">
+    <textarea class="zpl-editor" id="zpl-editor"
+      placeholder="define adapter as an endpoint with zpr.adapter.cn
 
-    <!-- ZPL panel -->
-    <div class="panel" id="panel-zpl">
-      <div class="editor-wrap">
-        <div class="editor-controls">
-          <label>ZPL (RFC-15.5)</label>
-          <div style="flex:1"></div>
-          <button class="btn" onclick="parseText('zpl')">Parse</button>
-          <button class="btn" onclick="validateText('zpl')">Validate</button>
-          <button class="btn primary" onclick="translateTo('zpl');renderZplStatements(state.policySet)">↻ Refresh</button>
-          <button class="btn" style="color:#ef4444;border-color:#fecaca" onclick="deleteAllRules()">✕ Delete All</button>
-        </div>
-        <textarea class="code" id="zpl-editor" spellcheck="false"
-          placeholder="ZPL will appear here after a conversation generates a policy set."></textarea>
-        <div class="errors-box" id="zpl-errors" style="display:none"></div>
-        <div id="zpl-statements" style="display:none;flex:1;overflow-y:auto;min-height:0;padding-top:0.25rem"></div>
-      </div>
+define A1 as adapter with zpr.adapter.cn:adapter1
+define A2 as adapter with zpr.adapter.cn:adapter2
+
+allow A1 to access A2
+allow A2 to access A1"
+      spellcheck="false"
+      oninput="onEditorInput()"
+      onkeydown="handleTabKey(event)"></textarea>
+    <div class="infer-bar" id="infer-bar">
+      <span id="infer-msg"></span>
+      <button class="infer-insert" onclick="insertInferredClasses()">Insert definitions</button>
+      <button class="infer-dismiss" onclick="dismissInferBar()" title="Dismiss">✕</button>
     </div>
+    <div class="error-bar" id="error-bar"></div>
+  </main>
 
-    <!-- ZPEL panel -->
-    <div class="panel" id="panel-zpel">
-      <div class="editor-wrap">
-        <div class="editor-controls">
-          <label>ZPEL (Oracle ZPR PEL v1)</label>
-          <div style="flex:1"></div>
-          <button class="btn" onclick="parseText('zpel')">Parse</button>
-          <button class="btn" onclick="validateText('zpel')">Validate</button>
-          <button class="btn primary" onclick="translateTo('zpel')">↻ Refresh</button>
-        </div>
-        <textarea class="code" id="zpel-editor" spellcheck="false"
-          placeholder="ZPEL will appear here after a conversation generates a policy set."></textarea>
-        <div class="errors-box" id="zpel-errors" style="display:none"></div>
+  <div class="resizer" id="resizer-right"></div>
+
+  <!-- Schema pane -->
+  <aside class="schema-pane" id="schema-pane">
+    <div class="schema-pane-header">
+      <div class="schema-tabs">
+        <button class="schema-tab active" onclick="setSchemaTab('classes',this)">Classes</button>
+        <button class="schema-tab" onclick="setSchemaTab('rules',this)">Rules</button>
+        <button class="schema-tab" onclick="setSchemaTab('zpl',this)">ZPL</button>
       </div>
+      <button class="panel-toggle" id="schema-expand" onclick="toggleSchemaExpand()" title="Expand schema panel">⊞</button>
     </div>
-
-    <!-- IR panel -->
-    <div class="panel" id="panel-ir">
-      <div class="editor-wrap">
-        <div class="editor-controls">
-          <label>Common IR (JSON)</label>
-          <div style="flex:1"></div>
-          <button class="btn" onclick="copyIR()">Copy JSON</button>
-        </div>
-        <pre class="code-block" id="ir-view">No policy set loaded. Start a conversation in Chat.</pre>
-      </div>
+    <div class="schema-body" id="schema-body">
+      <div class="empty-state">Parse ZPL to see<br>classes and rules here.</div>
     </div>
+  </aside>
 
-    <!-- Policy view panel -->
-    <div class="panel" id="panel-policy">
-      <div class="policy-view" id="policy-view">
-        <p style="color:var(--muted);font-size:0.85rem">No policy set loaded.</p>
-      </div>
+</div>
+
+<!-- ── New namespace modal ──────────────────────────────────────────── -->
+<div class="modal-backdrop" id="new-owner-modal">
+  <div class="modal">
+    <h3>Create sub-namespace</h3>
+    <p>Creates a namespace under yours. Optionally delegate it to a new user with their own login.</p>
+    <div class="modal-err" id="new-owner-err"></div>
+    <label>Namespace name (used in ZPL, e.g. Marketing)</label>
+    <input type="text" id="new-ns-name" placeholder="e.g. Marketing" autocomplete="off">
+    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;margin-bottom:0.75rem">
+      <input type="checkbox" id="new-delegate-toggle" onchange="toggleDelegate(this.checked)"
+             style="width:auto;margin:0;padding:0">
+      Delegate to a new user (give someone else login access)
+    </label>
+    <div id="new-delegate-fields" style="display:none">
+      <label>Login username</label>
+      <input type="text" id="new-owner-username" placeholder="e.g. alice" autocomplete="off">
+      <label>Password</label>
+      <input type="password" id="new-owner-password" placeholder="Choose a password">
     </div>
-
-    <!-- Simulator panel -->
-    <div class="panel" id="panel-sim">
-      <div class="sim-wrap">
-        <div class="sim-left">
-          <div style="display:flex;gap:0.5rem;align-items:center;flex-shrink:0">
-            <span style="color:var(--muted);font-size:0.8rem">Test scenarios</span>
-            <div style="flex:1"></div>
-            <button class="btn" onclick="addScenario()">+ Add scenario</button>
-            <button class="btn primary" onclick="runSimulation()">Run</button>
-          </div>
-          <div id="scenarios" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:0.5rem"></div>
-        </div>
-        <div class="sim-right">
-          <div style="font-size:0.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;
-                      letter-spacing:0.05em;margin-bottom:0.5rem">Results</div>
-          <div id="sim-results"></div>
-        </div>
-      </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeNewOwnerModal()">Cancel</button>
+      <button class="btn primary" onclick="submitNewOwner()">Create</button>
     </div>
   </div>
 </div>
 
+<!-- ── Profile modal ────────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="profile-modal" onclick="closeProfilePanel()">
+  <div class="profile-modal" onclick="event.stopPropagation()">
+    <div class="profile-modal-header">
+      <h3>Profile</h3>
+      <button class="hdr-btn" onclick="closeProfilePanel()">✕</button>
+    </div>
+    <div class="profile-modal-body" id="profile-modal-body"></div>
+  </div>
+</div>
+
 <script>
+'use strict';
+
 // ── State ──────────────────────────────────────────────────────────────────
 
-let state = {
-  language: 'zpl',
-  conversationId: null,
-  policySetId: null,
-  policySet: null,
-  pendingPolicySetName: 'Untitled',
-  scenarios: [],
+const S = {
+  context: null,
+  subOwners: [],
+  dirty: false,
+  schemaTab: 'classes',
+  lastParsed: null,
+  inferredZpl: '',
+  serializedZpl: '',
+  profile: null,
+  panelOpen: true,
+  panelExpanded: false,
+  sidebarWidth: 220,
+  panelWidth: 300,
+  parseTimer: null,
 };
 
-// ── Init ───────────────────────────────────────────────────────────────────
-
-async function init() {
-  const lang = await api('GET', '/api/language');
-  state.language = lang.language || 'zpl';
-  updateLangButtons();
-  await loadPolicyList();
-  fetch('/static/class_templates.json').then(r => r.json()).then(d => { window.classTemplates = d; }).catch(() => {});
-}
-
-// ── Language toggle ────────────────────────────────────────────────────────
-
-async function setLanguage(lang) {
-  await api('POST', '/api/language', { language: lang });
-  state.language = lang;
-  updateLangButtons();
-}
-
-function updateLangButtons() {
-  document.getElementById('btn-zpl').classList.toggle('active', state.language === 'zpl');
-  document.getElementById('btn-zpel').classList.toggle('active', state.language === 'zpel');
-  const langTab = document.getElementById('tab-lang-view');
-  if (state.language === 'zpel') {
-    langTab.textContent = 'Show ZPEL';
-    langTab.dataset.tab = 'zpel';
-    langTab.setAttribute('onclick', "switchTab('zpel')");
-  } else {
-    langTab.textContent = 'Show ZPL';
-    langTab.dataset.tab = 'zpl';
-    langTab.setAttribute('onclick', "switchTab('zpl')");
-  }
-}
-
-// ── Tabs ───────────────────────────────────────────────────────────────────
-
-function switchTab(name) {
-  document.querySelectorAll('.tab[data-tab]').forEach(t =>
-    t.classList.toggle('active', t.dataset.tab === name));
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.getElementById('panel-' + name).classList.add('active');
-
-  if (name === 'zpl'    && state.policySet) { translateTo('zpl'); renderZplStatements(state.policySet); }
-  if (name === 'zpel'   && state.policySet) translateTo('zpel');
-  if (name === 'ir')    renderIRView();
-  if (name === 'policy' && state.policySet) renderPolicyView();
-}
-
-// ── Sidebar ────────────────────────────────────────────────────────────────
-
-async function loadPolicyList() {
-  const items = await api('GET', '/api/policy_sets');
-  const list = document.getElementById('policy-list');
-  list.innerHTML = '';
-  for (const item of (items || [])) {
-    const el = document.createElement('div');
-    el.className = 'policy-item' + (item.id === state.policySetId ? ' active' : '');
-    el.dataset.id = item.id;
-    el.innerHTML = `<span class="policy-item-name">${esc(item.name)}</span>
-      <button class="policy-delete-btn" title="Delete" onclick="deletePolicySet(event,'${item.id}')">✕</button>`;
-    el.onclick = (e) => { if (!e.target.closest('.policy-delete-btn')) loadPolicySet(item.id); };
-    list.appendChild(el);
-  }
-}
-
-async function deletePolicySet(e, id) {
-  e.stopPropagation();
-  await api('DELETE', '/api/policy_sets/' + id);
-  if (state.policySetId === id) {
-    state.policySetId = null;
-    state.policySet = null;
-  }
-  await loadPolicyList();
-}
-
-async function loadPolicySet(id) {
-  const ps = await api('GET', '/api/policy_sets/' + id);
-  state.policySetId = id;
-  state.policySet = ps;
-  state.conversationId = null;
-  updateActiveItem();
-  renderPolicyView();
-  renderIRView();
-}
-
-function updateActiveItem() {
-  document.querySelectorAll('.policy-item').forEach(el => {
-    el.classList.toggle('active', el.dataset.id === state.policySetId);
-  });
-}
-
-function newConversation() {
-  const name = prompt('Name this policy set:', 'Untitled');
-  if (name === null) return; // cancelled
-  state.pendingPolicySetName = name.trim() || 'Untitled';
-  state.conversationId = null;
-  state.policySetId = null;
-  state.policySet = null;
-  document.getElementById('chat-input-top').value = '';
-  document.getElementById('chat-input-bottom').value = '';
-  document.getElementById('chat-messages').innerHTML =
-    '<div class="msg system">Describe your environment and access rules above. The agent will generate ZPL policy.</div>';
-  document.getElementById('zpl-editor').value = '';
-  document.getElementById('zpl-statements').style.display = 'none';
-  document.getElementById('ir-view').textContent = 'No policy set loaded. Start a conversation in Chat.';
-  switchTab('chat');
-  updateActiveItem();
-}
-
-// ── Chat ───────────────────────────────────────────────────────────────────
-
-function inputKeydown(e, which) {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(which); }
-}
-
-async function generateNow() {
-  const bottom = document.getElementById('chat-input-bottom');
-  const top = document.getElementById('chat-input-top');
-  if (bottom.value.trim() || top.value.trim()) {
-    await sendMessage();
-  } else {
-    bottom.value = 'Please generate the full PolicySet now based on everything discussed so far.';
-    await sendMessage('bottom');
-  }
-}
-
-async function sendMessage(prefer) {
-  const bottom = document.getElementById('chat-input-bottom');
-  const top = document.getElementById('chat-input-top');
-  let input = (prefer === 'top') ? top : (bottom.value.trim() ? bottom : top);
-  const msg = input.value.trim();
-  if (!msg) return;
-  input.value = '';
-  appendMsg('user', msg);
-
-  const btn = document.getElementById('send-btn');
-  btn.disabled = true;
-  appendMsg('assistant', '…');
-
-  try {
-    const res = await api('POST', '/api/chat', {
-      message: msg,
-      conversation_id: state.conversationId,
-      policy_set_id: state.policySetId,
-      language: state.language,
-    });
-
-    document.getElementById('chat-messages').lastElementChild.remove();
-    appendMsg('assistant', res.reply);
-
-    state.conversationId = res.conversation_id;
-    if (res.policy_set_id) {
-      state.policySetId = res.policy_set_id;
-      state.policySet = res.policy_set;
-      await loadPolicyList();
-      updateActiveItem();
-      // Keep UI in sync in background — ZPL and IR tabs will be ready when opened
-      translateTo('zpl');
-      renderZplStatements(state.policySet);
-      renderIRView();
-      appendPolicyNotice();
-    }
-  } catch (err) {
-    document.getElementById('chat-messages').lastElementChild.textContent = 'Error: ' + err.message;
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-function appendMsg(role, text) {
-  const msgs = document.getElementById('chat-messages');
-  const el = document.createElement('div');
-  el.className = 'msg ' + role;
-  el.textContent = text;
-  msgs.appendChild(el);
-  msgs.scrollTop = msgs.scrollHeight;
-}
-
-function appendPolicyNotice() {
-  const msgs = document.getElementById('chat-messages');
-  const el = document.createElement('div');
-  el.className = 'policy-notice';
-  el.innerHTML = '&#10003; Policy set updated — <a href="#" style="color:inherit;margin-left:0.25rem" onclick="switchTab(\'zpl\');return false">view ZPL</a> &nbsp;|&nbsp; <a href="#" style="color:inherit" onclick="switchTab(\'ir\');return false">view IR</a>';
-  msgs.appendChild(el);
-  msgs.scrollTop = msgs.scrollHeight;
-}
-
-// ── Build assistant ────────────────────────────────────────────────────────
-
-const buildState = { mode: 'class', messages: [], proposal: null };
-
-function setBuildMode(mode) {
-  buildState.mode = mode;
-  document.getElementById('mode-btn-class').classList.toggle('active', mode === 'class');
-  document.getElementById('mode-btn-rule').classList.toggle('active', mode === 'rule');
-  document.getElementById('build-class-panel').style.display = mode === 'class' ? 'flex' : 'none';
-  const rp = document.getElementById('build-rule-panel');
-  rp.style.display = mode === 'rule' ? 'flex' : 'none';
-  rp.style.flexDirection = 'column';
-  if (mode === 'rule') {
-    buildState.messages = [];
-    buildState.proposal = null;
-    const feed = document.getElementById('build-feed');
-    feed.innerHTML = '<div class="bm-system">Describe a rule — the assistant will propose it. Accept to add it to your policy.</div>';
-  }
-}
-
-// ── Class form (no-agent) ──────────────────────────────────────────────────
-
-const buildClassState = { root: null, rootLabel: null, templateKey: null, tags: [], nextId: 0, yamlOpen: false };
-
-function buildClassChooseRoot(root, label, templateKey) {
-  buildClassState.root = root;
-  buildClassState.rootLabel = label;
-  buildClassState.templateKey = templateKey;
-  buildClassState.tags = [];
-  buildClassState.nextId = 0;
-  buildClassState.yamlOpen = false;
-  document.getElementById('form-root-label').textContent = label;
-  document.getElementById('form-class-name').value = '';
-  document.getElementById('attr-tbody').innerHTML = '';
-  const _tci = document.getElementById('tag-custom-input');
-  if (_tci) { _tci.value = ''; _tci.style.display = 'none'; }
-  document.getElementById('zpl-preview-box').textContent = '—';
-  document.getElementById('yaml-preview-box').style.display = 'none';
-  document.getElementById('yaml-toggle-btn').textContent = 'Show YAML';
-
-  const tmpl = (window.classTemplates || {})[templateKey] || {};
-  buildClassState.tags = [];
-  buildClassRenderTags();
-  buildClassUpdatePreview();
-
-  document.getElementById('build-class-chooser').style.display = 'none';
-  document.getElementById('build-class-form').style.display = 'flex';
-  document.getElementById('form-class-name').focus();
-}
-
-function buildClassBack() {
-  document.getElementById('build-class-form').style.display = 'none';
-  document.getElementById('build-class-chooser').style.display = '';
-}
-
-function buildAttrValuesHtml(id, type, values) {
-  if (type === 'enum') {
-    const opts = (typeof values === 'string' ? values.split(',') : values || [])
-                   .map(v => v.trim()).filter(Boolean);
-    if (opts.length) {
-      const optsHtml = `<option value=""></option>` +
-        opts.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
-      return `<select class="attr-values-input attr-type-sel" style="width:100%"
-                onchange="buildClassUpdatePreview()">${optsHtml}</select>`;
-    }
-  }
-  const txt = (type === 'single') ? '' :
-              (typeof values === 'string' ? values : (values || []).join(', '));
-  const ph  = (type === 'single') ? '' : 'val1, val2, …';
-  const dis = (type === 'single') ? 'disabled style="opacity:0.35"' : '';
-  return `<input class="attr-values-input" value="${esc(txt)}" placeholder="${ph}"
-           oninput="buildClassUpdatePreview()" ${dis}>`;
-}
-
-function buildAttrTypeChanged(id) {
-  const tr  = document.getElementById('attr-row-' + id);
-  const type = tr.querySelector('.attr-type-sel').value;
-  document.getElementById('attr-val-cell-' + id).innerHTML =
-    buildAttrValuesHtml(id, type, tr.dataset.options || '');
-  buildClassUpdatePreview();
-}
-
-function buildClassAddAttr(name = '', type = 'single', values = '') {
-  const id = buildClassState.nextId++;
-  const tr = document.createElement('tr');
-  tr.id = 'attr-row-' + id;
-  tr.dataset.options = values;
-  tr.innerHTML = `
-    <td><input class="attr-name-input" value="${esc(name)}" placeholder="attr-name"
-         oninput="buildClassUpdatePreview()"></td>
-    <td><select class="attr-type-sel" onchange="buildAttrTypeChanged(${id})">
-      <option value="single"${type==='single'?' selected':''}>single</option>
-      <option value="enum"${type==='enum'?' selected':''}>enum</option>
-      <option value="multi"${type==='multi'?' selected':''}>multi</option>
-    </select></td>
-    <td id="attr-val-cell-${id}">${buildAttrValuesHtml(id, type, values)}</td>
-    <td><button class="attr-rm-btn" onclick="buildClassRemoveAttr(${id})">✕</button></td>`;
-  document.getElementById('attr-tbody').appendChild(tr);
-  tr.querySelector('.attr-name-input').focus();
-}
-
-function buildClassRemoveAttr(id) {
-  const row = document.getElementById('attr-row-' + id);
-  if (row) row.remove();
-  buildClassUpdatePreview();
-}
-
-function buildClassToggleSuggestions(e) {
-  e.stopPropagation();
-  const popup = document.getElementById('attr-suggestions');
-  if (popup.style.display !== 'none') { popup.style.display = 'none'; return; }
-  const tmpl = (window.classTemplates || {})[buildClassState.templateKey] || {};
-  const suggestions = tmpl.suggestions || [];
-  const existing = new Set([...document.querySelectorAll('.attr-name-input')].map(i => i.value.trim()).filter(Boolean));
-  existing.add('name');
-  existing.add('tags');
-  const available = suggestions.filter(s => !existing.has(s.name));
-  let html = available.map(s => {
-    const vals = (s.values || []).join(', ');
-    return `<div class="attr-sug-item" onclick="buildClassPickSuggestion('${s.name}','${s.type||'single'}','${vals.replace(/'/g,"\\'")}')">
-      <span>${esc(s.name)}</span><span class="attr-sug-type">${esc(s.type||'single')}</span>
-    </div>`;
-  }).join('');
-  html += `<hr class="attr-sug-divider">
-    <div class="attr-sug-item" onclick="buildClassPickSuggestion('','single','')"><em>Custom…</em></div>`;
-  popup.innerHTML = html;
-  const rect = e.currentTarget.getBoundingClientRect();
-  popup.style.left = rect.left + 'px';
-  popup.style.top  = (rect.bottom + 4) + 'px';
-  popup.style.display = 'block';
-}
-
-function buildClassPickSuggestion(name, type, values) {
-  document.getElementById('attr-suggestions').style.display = 'none';
-  buildClassAddAttr(name, type, values);
-  buildClassUpdatePreview();
-}
-
-function buildClassReadAttrs() {
-  const attrs = {};
-  for (const tr of document.querySelectorAll('#attr-tbody tr')) {
-    const n = tr.querySelector('.attr-name-input').value.trim();
-    const t = tr.querySelector('.attr-type-sel').value;
-    if (!n) continue;
-    if (t === 'single') {
-      attrs[n] = { type: 'single' };
-    } else if (t === 'enum') {
-      const sel = tr.querySelector('.attr-values-input');
-      const v = sel ? sel.value.trim() : '';
-      attrs[n] = v ? { type: 'enum', values: [v] } : { type: 'enum' };
-    } else {
-      const inp = tr.querySelector('.attr-values-input');
-      const raw = inp ? inp.value.trim() : '';
-      const vals = raw.split(',').map(s => s.trim()).filter(Boolean);
-      attrs[n] = { type: t, ...(vals.length ? { values: vals } : {}) };
-    }
-  }
-  if (buildClassState.tags.length) {
-    attrs['tags'] = { type: 'multi', values: [...buildClassState.tags] };
-  }
-  return attrs;
-}
-
-const ZPL_ROOT_AKA = { users: 'user', endpoints: 'endpoint', services: 'service', servers: 'server' };
-
-function proposalToZpl(proposal) {
-  const attrs = proposal.attributes || {};
-  const parts = [];
-  for (const [k, v] of Object.entries(attrs)) {
-    if (k === 'tags') {
-      const vals = (v.values || []).join(', ');
-      parts.push(vals ? `optional tags ${vals}` : 'optional tags');
-    } else if (v.type === 'multi') {
-      const vals = (v.values || []).join(', ');
-      parts.push(vals ? `multiple ${k}:{${vals}}` : `multiple ${k}`);
-    } else if (v.type === 'enum') {
-      const vals = v.values || [];
-      if (vals.length === 1) parts.push(`${k}:${vals[0]}`);
-      else if (vals.length > 1) parts.push(`${k}:{${vals.join('|')}}`);
-      else parts.push(k);
-    } else {
-      parts.push(k);
-    }
-  }
-  const parent = proposal.parent || 'users';
-  const parentLabel = ZPL_ROOT_AKA[parent] || parent;
-  const withClause = parts.length ? ` with ${parts.join(', ')}` : '';
-  return `Define ${proposal.name || 'unnamed'} as a ${parentLabel}${withClause}.`;
-}
-
-function buildClassUpdatePreview() {
-  const name = document.getElementById('form-class-name').value.trim() || 'unnamed';
-  const proposal = {
-    name,
-    parent: buildClassState.root || 'users',
-    attributes: buildClassReadAttrs(),
-  };
-  document.getElementById('zpl-preview-box').textContent = proposalToZpl(proposal);
-  if (buildClassState.yamlOpen) {
-    document.getElementById('yaml-preview-box').textContent = JSON.stringify(proposal, null, 2);
-  }
-}
-
-function buildClassToggleTagSuggestions(e) {
-  e.stopPropagation();
-  const popup = document.getElementById('tag-suggestions');
-  if (popup.style.display !== 'none') { popup.style.display = 'none'; return; }
-  const tmpl = (window.classTemplates || {})[buildClassState.templateKey] || {};
-  const available = (tmpl.tags || []).filter(t => !buildClassState.tags.includes(t));
-  let html = available.map(t =>
-    `<div class="attr-sug-item" onclick="buildClassPickTag('${esc(t)}')">${esc(t)}</div>`
-  ).join('');
-  html += `<hr class="attr-sug-divider">
-    <div class="attr-sug-item" onclick="buildClassShowCustomTagInput()"><em>Custom…</em></div>`;
-  popup.innerHTML = html;
-  const rect = e.currentTarget.getBoundingClientRect();
-  popup.style.left = rect.left + 'px';
-  popup.style.top  = (rect.bottom + 4) + 'px';
-  popup.style.display = 'block';
-}
-
-function buildClassPickTag(tag) {
-  document.getElementById('tag-suggestions').style.display = 'none';
-  if (!buildClassState.tags.includes(tag)) {
-    buildClassState.tags.push(tag);
-    buildClassRenderTags();
-    buildClassUpdatePreview();
-  }
-}
-
-function buildClassShowCustomTagInput() {
-  document.getElementById('tag-suggestions').style.display = 'none';
-  const input = document.getElementById('tag-custom-input');
-  input.style.display = 'inline-block';
-  input.focus();
-}
-
-function buildClassAddCustomTag() {
-  const input = document.getElementById('tag-custom-input');
-  const val = input.value.trim().toLowerCase().replace(/\s+/g, '-');
-  input.value = '';
-  input.style.display = 'none';
-  if (!val || buildClassState.tags.includes(val)) return;
-  buildClassState.tags.push(val);
-  buildClassRenderTags();
-  buildClassUpdatePreview();
-}
-
-function buildClassRemoveTag(val) {
-  buildClassState.tags = buildClassState.tags.filter(t => t !== val);
-  buildClassRenderTags();
-  buildClassUpdatePreview();
-}
-
-function buildClassRenderTags() {
-  const container = document.getElementById('tag-chips');
-  if (!container) return;
-  container.innerHTML = buildClassState.tags.map(t =>
-    `<span class="tag-chip">${esc(t)}<button class="tag-chip-rm" onclick="buildClassRemoveTag('${esc(t)}')">✕</button></span>`
-  ).join('');
-}
-
-function buildClassToggleYaml() {
-  const box = document.getElementById('yaml-preview-box');
-  const btn = document.getElementById('yaml-toggle-btn');
-  buildClassState.yamlOpen = !buildClassState.yamlOpen;
-  if (buildClassState.yamlOpen) {
-    const name = document.getElementById('form-class-name').value.trim() || 'unnamed';
-    const proposal = { name, parent: buildClassState.root || 'users', attributes: buildClassReadAttrs() };
-    box.textContent = JSON.stringify(proposal, null, 2);
-    box.style.display = 'block';
-    btn.textContent = 'Hide YAML';
-  } else {
-    box.style.display = 'none';
-    btn.textContent = 'Show YAML';
-  }
-}
-
-async function buildClassAccept() {
-  const name = document.getElementById('form-class-name').value.trim();
-  if (!name) { document.getElementById('form-class-name').focus(); return; }
-  const proposal = { name, parent: buildClassState.root || 'users', attributes: buildClassReadAttrs() };
-  try {
-    const res = await api('POST', '/api/assist/accept', {
-      mode: 'class',
-      proposal,
-      policy_set_id: state.policySetId,
-      policy_set_name: state.pendingPolicySetName,
-    });
-    state.policySetId = res.policy_set_id;
-    state.policySet = res.policy_set;
-    await loadPolicyList();
-    updateActiveItem();
-    renderIRView();
-    translateTo('zpl');
-    renderZplStatements(state.policySet);
-    buildClassBack();
-  } catch (err) {
-    alert('Error saving class: ' + err.message);
-  }
-}
-
-// ── Rule assistant (agent-based) ───────────────────────────────────────────
-
-function buildKeydown(e) {
-  if (e.key === 'Enter') { e.preventDefault(); buildSend(); }
-}
-
-function renderMd(text) {
-  return esc(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-}
-
-function buildFeedAppend(el) {
-  const feed = document.getElementById('build-feed');
-  feed.appendChild(el);
-  const panel = document.getElementById('build-rule-panel');
-  if (panel) panel.scrollTop = panel.scrollHeight;
-  return el;
-}
-
-function buildAddChip(text) {
-  const el = document.createElement('div');
-  el.className = 'bm-user-chip';
-  el.textContent = text;
-  return buildFeedAppend(el);
-}
-
-function buildAddAgentCard(html) {
-  const el = document.createElement('div');
-  el.className = 'bm-agent-card';
-  el.innerHTML = html;
-  return buildFeedAppend(el);
-}
-
-function buildAddSystem(text) {
-  const el = document.createElement('div');
-  el.className = 'bm-system';
-  el.textContent = text;
-  return buildFeedAppend(el);
-}
-
-function buildToggleDetail(id) {
-  const el = document.getElementById(id);
-  const btn = document.getElementById(id + '-btn');
-  const open = el.classList.toggle('open');
-  btn.textContent = open ? btn.dataset.hide : btn.dataset.show;
-}
-
-function buildRenderProposal(proposal, fromGenerate = false) {
-  const card = document.createElement('div');
-  const uid = 'pd-' + Date.now() + '-' + Math.random().toString(36).slice(2);
-  card.className = 'proposal-card' + (fromGenerate ? ' build-gen-card' : '');
-  card.id = fromGenerate ? uid : 'build-proposal-card';
-
-  if (fromGenerate) buildGenState.proposalMap[uid] = proposal;
-
-  const subj = proposal.subject ? (proposal.subject.cls || proposal.subject.attribute || '') : '';
-  const obj  = proposal.object  ? (proposal.object.cls  || proposal.object.attribute  || '') : '';
-  const detailRows = [
-    `<div class="detail-row"><span class="detail-key">effect</span><span>${esc(proposal.effect || 'allow')}</span></div>`,
-    `<div class="detail-row"><span class="detail-key">priority</span><span>${proposal.priority || 100}</span></div>`,
-    `<div class="detail-row"><span class="detail-key">subject</span><span>${esc(subj)}</span></div>`,
-    `<div class="detail-row"><span class="detail-key">action</span><span>${esc(proposal.action || 'access')}</span></div>`,
-    `<div class="detail-row"><span class="detail-key">object</span><span>${esc(obj)}</span></div>`,
-  ].join('');
-  const acceptFn  = fromGenerate ? `buildGenAcceptOne('${uid}')` : `buildRuleAccept()`;
-  const discardFn = fromGenerate ? `buildGenDiscard('${uid}')`   : `buildRuleDiscard()`;
-  card.innerHTML = `
-    <div class="proposal-card-label">Proposed Rule</div>
-    <div class="proposal-card-title">${esc(proposal.name || proposal.zpl || '')}</div>
-    <div class="proposal-zpl">${esc(proposal.zpl || '')}</div>
-    <button class="proposal-detail-btn" id="${uid}-btn"
-      data-show="Show YAML" data-hide="Hide YAML"
-      onclick="buildToggleDetail('${uid}')">Show YAML</button>
-    <div class="proposal-detail" id="${uid}-detail">${detailRows}</div>
-    <div class="proposal-actions">
-      <button class="btn primary" onclick="${acceptFn}">✓ Accept</button>
-      <button class="btn" onclick="${discardFn}">✕ Discard</button>
-    </div>`;
-  buildFeedAppend(card);
-}
-
-async function buildGenAcceptOne(uid) {
-  const card     = document.getElementById(uid);
-  const proposal = buildGenState.proposalMap[uid];
-  if (!proposal) return;
-  try {
-    const res = await api('POST', '/api/assist/accept', {
-      mode: 'rule',
-      proposal,
-      policy_set_id: state.policySetId,
-      policy_set_name: state.pendingPolicySetName,
-    });
-    state.policySetId = res.policy_set_id;
-    state.policySet   = res.policy_set;
-    if (card) card.remove();
-    delete buildGenState.proposalMap[uid];
-    await loadPolicyList();
-    updateActiveItem();
-    renderIRView();
-    translateTo('zpl');
-    renderZplStatements(state.policySet);
-  } catch (err) {
-    buildAddSystem('Error: ' + err.message);
-  }
-}
-
-function buildGenDiscard(uid) {
-  const card = document.getElementById(uid);
-  if (card) card.remove();
-  delete buildGenState.proposalMap[uid];
-}
-
-async function buildSend() {
-  const input = document.getElementById('build-input');
-  const msg = input.value.trim();
-  if (!msg) return;
-  input.value = '';
-  const existing = document.getElementById('build-proposal-card');
-  if (existing) existing.remove();
-  buildState.proposal = null;
-  buildAddChip(msg);
-  buildState.messages.push({ role: 'user', content: msg });
-  const btn = document.getElementById('build-send-btn');
-  btn.disabled = true;
-  const thinking = buildAddAgentCard('…');
-  try {
-    const res = await api('POST', '/api/assist', {
-      mode: 'rule',
-      messages: buildState.messages,
-      policy_set_id: state.policySetId,
-    });
-    thinking.remove();
-    if (res.reply) buildAddAgentCard(renderMd(res.reply));
-    buildState.messages.push({ role: 'assistant', content: res.reply || '' });
-    if (res.proposal) {
-      buildState.proposal = res.proposal;
-      buildRenderProposal(res.proposal);
-    }
-  } catch (err) {
-    thinking.innerHTML = 'Error: ' + esc(err.message);
-  } finally {
-    btn.disabled = false;
-    input.focus();
-  }
-}
-
-async function buildRuleAccept(keepHistory = false) {
-  if (!buildState.proposal) return;
-  try {
-    const res = await api('POST', '/api/assist/accept', {
-      mode: 'rule',
-      proposal: buildState.proposal,
-      policy_set_id: state.policySetId,
-      policy_set_name: state.pendingPolicySetName,
-    });
-    state.policySetId = res.policy_set_id;
-    state.policySet = res.policy_set;
-    await loadPolicyList();
-    updateActiveItem();
-    renderIRView();
-    translateTo('zpl');
-    renderZplStatements(state.policySet);
-    const card = document.getElementById('build-proposal-card');
-    if (card) card.remove();
-    buildState.proposal = null;
-    if (!keepHistory) buildState.messages = [];
-    const hint = keepHistory ? 'Describe another rule to keep building.' : 'Describe another rule or switch to Classes.';
-    buildAddSystem(`✓ Rule accepted and added to policy. ${hint}`);
-    document.getElementById('build-input').focus();
-  } catch (err) {
-    buildAddSystem('Error: ' + err.message);
-  }
-}
-
-function buildRuleDiscard() {
-  const card = document.getElementById('build-proposal-card');
-  if (card) card.remove();
-  buildState.proposal = null;
-  buildState.messages = [];
-  buildAddSystem('Discarded. Describe it differently or start fresh.');
-}
-
-// pending proposals from batch generate
-const buildGenState = { pending: [], proposalMap: {} };
-
-async function buildGenerate() {
-  const nAllow = parseInt(document.getElementById('gen-allow').value) || 0;
-  const nDeny  = parseInt(document.getElementById('gen-deny').value)  || 0;
-  const focus  = document.getElementById('gen-focus').value.trim();
-  if (nAllow + nDeny === 0) return;
-
-  const btn = document.getElementById('gen-btn');
-  btn.disabled = true;
-  btn.textContent = '⚡ Generating…';
-  buildAddSystem(`Generating ${nAllow} allow + ${nDeny} deny rule(s)…`);
-
-  try {
-    const res = await api('POST', '/api/assist/generate-rules', {
-      n_allow: nAllow,
-      n_deny: nDeny,
-      focus_on: focus,
-      policy_set_id: state.policySetId,
-    });
-    const proposals = res.proposals || [];
-    buildGenState.pending = [...proposals];
-    if (!proposals.length) {
-      buildAddSystem('No proposals returned — try adjusting counts or focus.');
-    } else {
-      for (const p of proposals) buildRenderProposal(p, true);
-      document.getElementById('gen-accept-all-btn').disabled = false;
-    }
-  } catch (err) {
-    buildAddSystem('Error: ' + err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '⚡ Generate';
-  }
-}
-
-async function buildAcceptAll() {
-  const pending = [...buildGenState.pending];
-  if (!pending.length) return;
-  const btn = document.getElementById('gen-accept-all-btn');
-  btn.disabled = true;
-
-  let psId = state.policySetId;
-  let ps   = state.policySet;
-  for (const proposal of pending) {
-    try {
-      const res = await api('POST', '/api/assist/accept', {
-        mode: 'rule',
-        proposal,
-        policy_set_id: psId,
-        policy_set_name: state.pendingPolicySetName,
-      });
-      psId = res.policy_set_id;
-      ps   = res.policy_set;
-    } catch (_) { /* skip failed */ }
-  }
-  state.policySetId = psId;
-  state.policySet   = ps;
-  buildGenState.pending = [];
-
-  // Remove all pending proposal cards
-  for (const el of document.querySelectorAll('.build-gen-card')) el.remove();
-
-  await loadPolicyList();
-  updateActiveItem();
-  renderIRView();
-  translateTo('zpl');
-  renderZplStatements(state.policySet);
-  buildAddSystem(`✓ ${pending.length} rule(s) accepted and added to policy.`);
-}
-
-async function deleteClass(index) {
-  if (!state.policySet || !state.policySetId) return;
-  const nonBuiltin = state.policySet.classes.filter(c => !c.builtin);
-  const toRemove = nonBuiltin[index];
-  if (!toRemove) return;
-  state.policySet.classes = state.policySet.classes.filter(c => c !== toRemove);
-  const saved = await api('PUT', '/api/policy_sets/' + state.policySetId, state.policySet);
-  state.policySet = saved;
-  translateTo('zpl');
-  renderZplStatements(state.policySet);
-  renderIRView();
-}
-
-async function deleteRule(index) {
-  if (!state.policySet || !state.policySetId) return;
-  state.policySet.rules = state.policySet.rules.filter((_, i) => i !== index);
-  const saved = await api('PUT', '/api/policy_sets/' + state.policySetId, state.policySet);
-  state.policySet = saved;
-  translateTo('zpl');
-  renderZplStatements(state.policySet);
-  renderIRView();
-}
-
-async function deleteAllRules() {
-  if (!state.policySet || !state.policySetId) return;
-  if (!confirm('Delete all rules in this policy set?')) return;
-  state.policySet.rules = [];
-  const saved = await api('PUT', '/api/policy_sets/' + state.policySetId, state.policySet);
-  state.policySet = saved;
-  translateTo('zpl');
-  renderZplStatements(state.policySet);
-  renderIRView();
-}
-
-// ── ZPL / ZPEL editors ─────────────────────────────────────────────────────
-
-async function parseText(lang) {
-  const text = document.getElementById(lang + '-editor').value;
-  const res = await api('POST', '/api/parse', { text, language: lang, name: 'Parsed policy' });
-  showEditorErrors(lang, res.errors || []);
-  if (res.policy_set) {
-    const saved = await api('POST', '/api/policy_sets', res.policy_set);
-    state.policySetId = saved.id;
-    state.policySet = saved;
-    await loadPolicyList();
-    updateActiveItem();
-    renderIRView();
-  }
-}
-
-async function validateText(lang) {
-  const text = document.getElementById(lang + '-editor').value;
-  const res = await api('POST', '/api/validate', { text, language: lang });
-  showEditorErrors(lang, res.errors || []);
-  if (res.valid) showEditorErrors(lang, [], '✓ Valid ' + lang.toUpperCase());
-}
-
-async function translateTo(lang) {
-  if (!state.policySet) return;
-  try {
-    const res = await api('POST', '/api/translate', { policy_set: state.policySet, target: lang });
-    document.getElementById(lang + '-editor').value = res.text || '';
-    if (res.untranslatable?.length) {
-      showEditorErrors(lang, res.untranslatable.map(u => ({
-        line: 0, message: `Cannot translate to ${lang.toUpperCase()}: "${u.name || u.id}"`
-      })));
-    } else {
-      showEditorErrors(lang, []);
-    }
-  } catch (err) {
-    showEditorErrors(lang, [{ message: 'Translation failed: ' + err.message }]);
-  }
-}
-
-function showEditorErrors(lang, errors, successMsg) {
-  const box = document.getElementById(lang + '-errors');
-  if (successMsg) {
-    box.style.display = 'block';
-    box.style.background = '#f0fdf4';
-    box.style.borderColor = '#bbf7d0';
-    box.style.color = '#166534';
-    box.textContent = successMsg;
-    return;
-  }
-  box.style.background = '';
-  box.style.borderColor = '';
-  box.style.color = '';
-  if (!errors.length) { box.style.display = 'none'; return; }
-  box.style.display = 'block';
-  box.textContent = errors.map(e => e.line ? `Line ${e.line}: ${e.message}` : e.message).join('\n');
-}
-
-// ── IR view ────────────────────────────────────────────────────────────────
-
-function compactJson(val, depth = 0) {
-  if (Array.isArray(val)) {
-    const allScalar = val.every(v => v === null || typeof v !== 'object');
-    if (allScalar) return '[' + val.map(v => JSON.stringify(v)).join(', ') + ']';
-    const pad = '  '.repeat(depth + 1);
-    const close = '  '.repeat(depth);
-    return '[\n' + val.map(v => pad + compactJson(v, depth + 1)).join(',\n') + '\n' + close + ']';
-  }
-  if (val !== null && typeof val === 'object') {
-    const pad = '  '.repeat(depth + 1);
-    const close = '  '.repeat(depth);
-    const entries = Object.entries(val)
-      .map(([k, v]) => `${pad}${JSON.stringify(k)}: ${compactJson(v, depth + 1)}`);
-    return '{\n' + entries.join(',\n') + '\n' + close + '}';
-  }
-  return JSON.stringify(val);
-}
-
-function renderIRView() {
-  const el = document.getElementById('ir-view');
-  el.textContent = state.policySet
-    ? compactJson(state.policySet)
-    : 'No policy set loaded. Start a conversation in Chat.';
-}
-
-function copyIR() {
-  if (state.policySet) navigator.clipboard.writeText(compactJson(state.policySet));
-}
-
-// ── Policy view ────────────────────────────────────────────────────────────
-
-function renderPolicyView() {
-  const ps = state.policySet;
-  const el = document.getElementById('policy-view');
-  if (!ps) { el.innerHTML = '<p style="color:var(--muted)">No policy set loaded.</p>'; return; }
-
-  let html = `<div style="display:flex;align-items:baseline;gap:0.75rem;margin-bottom:1rem">
-    <h2 style="font-size:1rem;color:var(--text)">${esc(ps.name)}</h2>
-    <span style="color:var(--muted);font-size:0.8rem">${(ps.language || '').toUpperCase()}</span>
-  </div>`;
-
-  if (ps.classes?.length) {
-    html += '<div class="section-title">Classes</div>';
-    for (const c of ps.classes) {
-      const attrs = Object.keys(c.attributes || {}).join(', ');
-      html += `<div class="card">
-        <div class="card-title">${esc(c.name)}</div>
-        <div class="card-meta">extends ${esc(c.parent)}${attrs ? ' · ' + esc(attrs) : ''}</div>
-      </div>`;
-    }
-  }
-
-  if (ps.rules?.length) {
-    html += '<div class="section-title">Rules</div>';
-    for (const s of ps.rules) {
-      const badge = `<span class="badge ${s.effect}">${s.effect}</span>`;
-      const subj = s.subject ? (s.subject.cls || s.subject.attribute || s.subject.name || '') : '';
-      const obj  = s.object  ? (s.object.cls  || s.object.attribute  || s.object.name  || '') : '';
-      html += `<div class="card">
-        <div class="card-title" style="display:flex;align-items:center;gap:0.5rem">
-          ${badge} ${esc(s.name || `${s.effect} ${subj} → ${obj}`)}
-        </div>
-        <div class="card-meta">priority ${s.priority} · ${esc(subj)} → ${esc(s.action)} → ${esc(obj)}</div>
-      </div>`;
-    }
-  }
-
-  el.innerHTML = html;
-}
-
-// ── Simulator ──────────────────────────────────────────────────────────────
-
-function addScenario() {
-  state.scenarios.push({ id: 'sc-' + Date.now(), description: '', subject: {}, action: 'access', object: {}, conditions: {} });
-  renderScenarios();
-}
-
-function renderScenarios() {
-  const el = document.getElementById('scenarios');
-  el.innerHTML = '';
-  state.scenarios.forEach((sc, i) => {
-    el.innerHTML += `<div class="sim-scenario">
-      <span style="color:var(--muted);font-size:0.75rem;white-space:nowrap">#${i+1}</span>
-      <input type="text" value="${esc(sc.description)}" placeholder="Description"
-        onchange="state.scenarios[${i}].description=this.value"
-        style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:0.3rem;
-               color:var(--text);padding:0.3rem 0.5rem;font-size:0.8rem">
-      <input type="text" value="${esc(sc.subject?.cls || sc.subject?.attribute || '')}" placeholder="Subject"
-        onchange="state.scenarios[${i}].subject={cls:this.value}"
-        style="width:130px;background:var(--bg);border:1px solid var(--border);border-radius:0.3rem;
-               color:var(--text);padding:0.3rem 0.5rem;font-size:0.8rem">
-      <input type="text" value="${esc(sc.object?.cls || sc.object?.attribute || '')}" placeholder="Object"
-        onchange="state.scenarios[${i}].object={cls:this.value}"
-        style="width:130px;background:var(--bg);border:1px solid var(--border);border-radius:0.3rem;
-               color:var(--text);padding:0.3rem 0.5rem;font-size:0.8rem">
-      <button class="btn" style="padding:0.25rem 0.5rem;font-size:0.75rem"
-        onclick="state.scenarios.splice(${i},1);renderScenarios()">✕</button>
-    </div>`;
-  });
-}
-
-async function runSimulation() {
-  if (!state.policySetId) { alert('Load a policy set first.'); return; }
-  if (!state.scenarios.length) { alert('Add at least one scenario.'); return; }
-  const res = await api('POST', `/api/simulate/${state.policySetId}`, { scenarios: state.scenarios });
-  const el = document.getElementById('sim-results');
-  el.innerHTML = '';
-  for (const r of (res.results || [])) {
-    if (r.error) { el.innerHTML += `<div class="sim-result deny">${esc(r.error)}</div>`; continue; }
-    el.innerHTML += `<div class="sim-result ${r.verdict}">
-      <span class="verdict ${r.verdict}">${r.verdict}</span>
-      <span style="flex:1">${esc(r.description || r.scenario_id)}</span>
-      <span style="color:var(--muted);font-size:0.75rem">${esc(r.matched_statement_name || r.reason || '')}</span>
-    </div>`;
-  }
-}
-
-// ── ZPL statement expand ────────────────────────────────────────────────────
-
-function renderZplStatements(ps) {
-  const container = document.getElementById('zpl-statements');
-  const hasClasses = ps?.classes?.filter(c => !c.builtin).length > 0;
-  const hasRules   = ps?.rules?.length > 0;
-  if (!ps || (!hasClasses && !hasRules)) { container.style.display = 'none'; return; }
-  container.style.display = 'block';
-  let html = '';
-
-  if (hasClasses) {
-    html += '<div class="section-title" style="margin-top:0;margin-bottom:0.4rem">Classes — click to expand</div>';
-    ps.classes.filter(c => !c.builtin).forEach((c, i) => {
-      const zplLine = classToZplLine(c);
-      const yaml = toYaml(classToCleanObj(c));
-      html += `<div class="stmt-card" id="cls-${i}" onclick="this.classList.toggle('open')">
-        <div class="stmt-header">
-          <span class="stmt-arrow">&#9658;</span>
-          <span class="stmt-zpl-text">${esc(zplLine)}</span>
-          <span class="badge allow" style="background:#dbeafe;color:#1e40af">${esc(c.parent)}</span>
-          <button class="stmt-del-btn" title="Delete class"
-            onclick="event.stopPropagation();deleteClass(${i})">✕</button>
-        </div>
-        <pre class="stmt-yaml-block">${esc(yaml)}</pre>
-      </div>`;
-    });
-  }
-
-  if (hasRules) {
-    html += `<div class="section-title" style="margin-top:${hasClasses ? '1rem' : '0'};margin-bottom:0.4rem">Rules — click to expand IR</div>`;
-    ps.rules.forEach((s, i) => {
-      const line = stmtToZplLine(s);
-      const yaml = toYaml(stmtToCleanObj(s));
-      html += `<div class="stmt-card" id="stmt-${i}" onclick="this.classList.toggle('open')">
-        <div class="stmt-header">
-          <span class="stmt-arrow">&#9658;</span>
-          <span class="stmt-zpl-text">${esc(line)}</span>
-          <span class="badge ${s.effect}">${s.effect}</span>
-          <button class="stmt-del-btn" title="Delete rule"
-            onclick="event.stopPropagation();deleteRule(${i})">✕</button>
-        </div>
-        <pre class="stmt-yaml-block">${esc(yaml)}</pre>
-      </div>`;
-    });
-  }
-
-  container.innerHTML = html;
-}
-
-function classToZplLine(c) {
-  const attrs = c.attributes || {};
-  const parts = [];
-  for (const [k, v] of Object.entries(attrs)) {
-    if (k === 'tags') {
-      const vals = (v.values || []).join(', ');
-      parts.push(vals ? `optional tags ${vals}` : 'optional tags');
-    } else if (v.type === 'multi') {
-      const vals = (v.values || []).join(', ');
-      parts.push(vals ? `multiple ${k}:{${vals}}` : `multiple ${k}`);
-    } else if (v.type === 'enum') {
-      const vals = v.values || [];
-      if (vals.length === 1) parts.push(`${k}:${vals[0]}`);
-      else if (vals.length > 1) parts.push(`${k}:{${vals.join('|')}}`);
-      else parts.push(k);
-    } else {
-      parts.push(k);
-    }
-  }
-  const withClause = parts.length ? ` with ${parts.join(', ')}` : '';
-  const parentLabel = { users: 'user', endpoints: 'endpoint', services: 'service', servers: 'server' }[c.parent] || c.parent;
-  return `Define ${c.name} as a ${parentLabel}${withClause}.`;
-}
-
-function classToCleanObj(c) {
-  const o = { name: c.name, parent: c.parent };
-  if (c.aka) o.aka = c.aka;
-  if (c.description) o.description = c.description;
-  if (Object.keys(c.attributes || {}).length) o.attributes = c.attributes;
-  return o;
-}
-
-function stmtToZplLine(s) {
-  const subj = s.subject?.cls || s.subject?.attribute || s.subject?.name || '?';
-  const obj  = s.object?.cls  || s.object?.attribute  || s.object?.name  || '?';
-  return `${s.effect === 'deny' ? 'Never allow' : 'Allow'} ${subj} to ${s.action || 'access'} ${obj}.`;
-}
-
-function stmtToCleanObj(s) {
-  const o = { effect: s.effect, priority: s.priority, action: s.action };
-  if (s.name) o.name = s.name;
-  if (s.subject) {
-    const sub = {};
-    if (s.subject.cls)       sub.cls       = s.subject.cls;
-    if (s.subject.attribute) sub.attribute = s.subject.attribute;
-    if (s.subject.name)      sub.name      = s.subject.name;
-    if (s.subject.ip_cidr)   sub.ip_cidr   = s.subject.ip_cidr;
-    if (Object.keys(s.subject.attrs || {}).length) sub.attrs = s.subject.attrs;
-    o.subject = sub;
-  }
-  if (s.object) {
-    const ob = {};
-    if (s.object.cls)       ob.cls       = s.object.cls;
-    if (s.object.attribute) ob.attribute = s.object.attribute;
-    if (s.object.name)      ob.name      = s.object.name;
-    if (s.object.ip_cidr)   ob.ip_cidr   = s.object.ip_cidr;
-    if (Object.keys(s.object.attrs || {}).length) ob.attrs = s.object.attrs;
-    o.object = ob;
-  }
-  const c = s.conditions || {};
-  if (c.vcn_scope || c.protocol || c.connection_state) {
-    o.conditions = {};
-    if (c.vcn_scope)          o.conditions.vcn_scope          = c.vcn_scope;
-    if (c.protocol)           o.conditions.protocol           = c.protocol;
-    if (c.connection_state)   o.conditions.connection_state   = c.connection_state;
-  }
-  return o;
-}
-
-function toYaml(v, depth = 0) {
-  const pad = '  '.repeat(depth);
-  if (v === null || v === undefined) return 'null';
-  if (typeof v === 'boolean' || typeof v === 'number') return String(v);
-  if (typeof v === 'string') {
-    if (v === '' || /[\n:#{}[\],&*?|<>=!%@`'"\\]/.test(v) || /^(true|false|null|yes|no)$/.test(v))
-      return '"' + v.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
-    return v;
-  }
-  if (Array.isArray(v)) {
-    if (!v.length) return '[]';
-    return v.map(item => pad + '- ' + toYaml(item, depth + 1)).join('\n');
-  }
-  const keys = Object.keys(v);
-  if (!keys.length) return '{}';
-  return keys.map(k => {
-    const val = v[k];
-    if (val !== null && typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length)
-      return pad + k + ':\n' + toYaml(val, depth + 1);
-    if (Array.isArray(val) && val.length)
-      return pad + k + ':\n' + toYaml(val, depth + 1);
-    return pad + k + ': ' + toYaml(val, 0);
-  }).join('\n');
-}
-
-// ── API helper ─────────────────────────────────────────────────────────────
+// ── API ────────────────────────────────────────────────────────────────────
 
 async function api(method, path, body) {
   const opts = { method, headers: {} };
-  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
-  const r = await fetch(path, opts);
-  if (!r.ok) { const t = await r.text(); throw new Error(`${r.status}: ${t}`); }
-  if (r.status === 204) return null;
-  return r.json();
+  if (body !== undefined) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(path, opts);
+  if (res.status === 401) { location.href = '/login'; throw new Error('Not authenticated'); }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || res.statusText);
+  }
+  if (res.status === 204) return null;
+  return res.json();
 }
 
 function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 
-document.addEventListener('click', () => {
-  ['attr-suggestions', 'tag-suggestions'].forEach(id => {
-    const p = document.getElementById(id);
-    if (p) p.style.display = 'none';
-  });
+async function boot() {
+  initResizers();
+  try {
+    await loadContext();
+    await Promise.all([loadSubOwners(), loadNamespaceZpl(),
+      api('GET', '/api/profile').then(p => { S.profile = p; }).catch(() => {})]);
+  } catch (e) {
+    console.error('boot error', e);
+  }
+}
+
+// ── Context ────────────────────────────────────────────────────────────────
+
+async function loadContext() {
+  S.context = await api('GET', '/api/context');
+  renderHeader();
+}
+
+function renderHeader() {
+  const ctx = S.context;
+  if (!ctx) return;
+  const isDefault = ctx.active_user_id === ctx.login_user_id;
+  const nsLabel = isDefault ? '(default)' : (ctx.active_display_name || ctx.active_username);
+  document.getElementById('hdr-user').textContent = ctx.login_username;
+  document.getElementById('ns-editor-label').textContent = nsLabel;
+}
+
+// ── Sub-owners (namespace tree) ────────────────────────────────────────────
+
+async function loadSubOwners() {
+  const tree = await api('GET', '/api/users/tree');
+  S._ownerTree = tree || {};
+  S.subOwners = flattenTree(tree ? tree.children || [] : []);
+  renderNsTree();
+  refreshOwnersPanel();
+}
+
+function toggleOwnersPanel() {
+  const panel = document.getElementById('owners-panel');
+  const open = panel.style.display === 'none';
+  panel.style.display = open ? '' : 'none';
+  if (open) refreshOwnersPanel();
+}
+
+function refreshOwnersPanel() {
+  const panel = document.getElementById('owners-panel');
+  if (panel.style.display === 'none') return;
+  if (!S._ownerTree || !S.profile) {
+    renderOwnersPanel(null, null);
+    return;
+  }
+  renderOwnersPanel(S.profile, S._ownerTree);
+}
+
+function renderOwnersPanel(profile, tree) {
+  const panel = document.getElementById('owners-panel');
+  if (!profile || !tree) { panel.innerHTML = '<div class="cfg" style="padding:0.5rem">Loading…</div>'; return; }
+  const childNodes = (tree.children || []).map(c => renderOwnerTree(c, 1)).join('');
+  panel.innerHTML = `<div class="cfg" style="padding:0.5rem">
+    <div class="cfg-ns-tree">
+      <div class="cfg-ns-node">
+        <div class="cfg-ns-item" style="border-color:var(--blue)">
+          <div class="cfg-ns-name">${esc(profile.display_name)} <span style="font-weight:400;color:var(--muted)">(you)</span></div>
+          <div class="cfg-ns-meta">login: ${esc(profile.username)}${profile.email ? ' · ' + esc(profile.email) : ''}</div>
+        </div>
+        ${childNodes ? `<div class="cfg-ns-children">${childNodes}</div>` : ''}
+      </div>
+    </div>
+    <div id="profile-top-new"></div>
+    <button class="cfg-btn" style="margin-top:0.4rem" onclick="toggleProfileTopNew()">+ New sub-namespace</button>
+  </div>`;
+}
+
+function flattenTree(nodes, depth = 0) {
+  const result = [];
+  for (const n of nodes) {
+    result.push({ ...n, _depth: depth });
+    if (n.children && n.children.length) {
+      result.push(...flattenTree(n.children, depth + 1));
+    }
+  }
+  return result;
+}
+
+function renderNsTree() {
+  const ctx = S.context;
+  const tree = document.getElementById('ns-tree');
+  if (!ctx) { tree.innerHTML = ''; return; }
+
+  let html = '';
+
+  // Root namespace — always shown as "(default)"
+  const rootActive = ctx.active_user_id === ctx.login_user_id;
+  html += `<div class="ns-tree-item${rootActive ? ' active' : ''}"
+               onclick="switchToOwner('${esc(ctx.login_user_id)}')">
+    <span class="ns-tree-dot${rootActive ? ' active' : ''}"></span>
+    <span class="ns-tree-name${rootActive ? ' active' : ''}">(default)</span>
+    ${rootActive ? '<span class="ns-tree-badge">active</span>' : ''}
+  </div>`;
+
+  // All descendant namespaces, flattened with depth for indentation
+  for (const u of S.subOwners) {
+    const isActive = ctx.active_user_id === u.id;
+    const dn = u.display_name || u.username;
+    const indent = '&nbsp;&nbsp;'.repeat(u._depth) + '└ ';
+    const ownerBadge = u.owner_username ? `<span class="ns-tree-badge">${esc(u.owner_username)}</span>` : '';
+    html += `<div class="ns-tree-item child${isActive ? ' active' : ''}"
+                 onclick="switchToOwner('${esc(u.id)}')">
+      <span class="ns-tree-indent">${indent}</span>
+      <span class="ns-tree-dot${isActive ? ' active' : ''}"></span>
+      <span class="ns-tree-name${isActive ? ' active' : ''}">${esc(dn)}</span>
+      ${ownerBadge}
+      ${isActive ? '<span class="ns-tree-badge">active</span>' : ''}
+    </div>`;
+  }
+
+  tree.innerHTML = html;
+}
+
+async function switchToOwner(userId) {
+  const ctx = S.context;
+  if (userId === ctx.active_user_id) return;
+  if (S.dirty && !confirm('Discard unsaved changes?')) return;
+  try {
+    if (userId === ctx.login_user_id) {
+      await api('POST', '/api/context/reset');
+    } else {
+      await api('POST', '/api/context/switch', { user_id: userId });
+    }
+    await loadContext();
+    await Promise.all([loadSubOwners(), loadNamespaceZpl()]);
+  } catch(e) { alert('Could not switch namespace: ' + e.message); }
+}
+
+// ── New owner modal ────────────────────────────────────────────────────────
+
+function openNewOwnerModal() {
+  document.getElementById('new-ns-name').value = '';
+  document.getElementById('new-owner-username').value = '';
+  document.getElementById('new-owner-password').value = '';
+  document.getElementById('new-owner-err').textContent = '';
+  document.getElementById('new-delegate-toggle').checked = false;
+  document.getElementById('new-delegate-fields').style.display = 'none';
+  document.getElementById('new-owner-modal').classList.add('open');
+  setTimeout(() => document.getElementById('new-ns-name').focus(), 50);
+}
+
+function closeNewOwnerModal() {
+  document.getElementById('new-owner-modal').classList.remove('open');
+}
+
+function toggleDelegate(on) {
+  document.getElementById('new-delegate-fields').style.display = on ? 'block' : 'none';
+}
+
+async function submitNewOwner() {
+  const namespace_name = document.getElementById('new-ns-name').value.trim();
+  const delegated = document.getElementById('new-delegate-toggle').checked;
+  const username = delegated ? document.getElementById('new-owner-username').value.trim() : null;
+  const password = delegated ? document.getElementById('new-owner-password').value : null;
+  const errEl = document.getElementById('new-owner-err');
+  errEl.textContent = '';
+  if (!namespace_name) { errEl.textContent = 'Namespace name required.'; return; }
+  if (delegated && (!username || !password)) { errEl.textContent = 'Login username and password required for delegation.'; return; }
+  try {
+    const newUser = await api('POST', '/api/users', { namespace_name, username, password, delegated });
+    closeNewOwnerModal();
+    // Switch into the new namespace immediately
+    await api('POST', '/api/context/switch', { user_id: newUser.id });
+    await loadContext();
+    await Promise.all([loadSubOwners(), loadNamespaceZpl()]);
+  } catch(e) {
+    errEl.textContent = e.message.includes('already exists') ? `Username "${username}" is already taken.` : e.message;
+  }
+}
+
+document.getElementById('new-owner-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitNewOwner();
 });
 
-init();
+// ── Namespace ZPL load / save ──────────────────────────────────────────────
+
+async function loadNamespaceZpl() {
+  try {
+    const res = await api('GET', '/api/namespace/zpl');
+    document.getElementById('zpl-editor').value = res.text || '';
+    S.dirty = false;
+    setStatus('idle');
+    clearErrors();
+    clearInferBar();
+    S.lastParsed = null;
+    renderSchemaBody();
+    if (res.text) autoParse();
+  } catch(e) { console.error('loadNamespaceZpl', e); }
+}
+
+// ── ZPL editor ─────────────────────────────────────────────────────────────
+
+function handleTabKey(e) {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const ta = e.target;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    ta.value = ta.value.substring(0, start) + '  ' + ta.value.substring(end);
+    ta.selectionStart = ta.selectionEnd = start + 2;
+  }
+}
+
+function onEditorInput() {
+  markDirty();
+  scheduleAutoParse();
+}
+
+function markDirty() {
+  if (!S.dirty) {
+    S.dirty = true;
+    setStatus('dirty', '● unsaved');
+  }
+}
+
+function scheduleAutoParse() {
+  clearTimeout(S.parseTimer);
+  S.parseTimer = setTimeout(autoParse, 600);
+}
+
+async function autoParse() {
+  const text = document.getElementById('zpl-editor').value.trim();
+  if (!text) { S.lastParsed = null; clearErrors(); clearInferBar(); renderSchemaBody(); return; }
+  try {
+    const res = await api('POST', '/api/parse', { text, language: 'zpl' });
+    S.lastParsed = res.policy_set;
+    S.serializedZpl = res.serialized_zpl || '';
+    if (res.errors && res.errors.length) showErrors(res.errors);
+    else clearErrors();
+    showInferBar(res.inferred_classes || [], res.inferred_zpl || '');
+    renderSchemaBody();
+  } catch(e) { /* silent */ }
+}
+
+async function doParse() {
+  const text = document.getElementById('zpl-editor').value.trim();
+  if (!text) return;
+  setStatus('idle', 'Parsing…');
+  try {
+    const res = await api('POST', '/api/parse', { text, language: 'zpl' });
+    S.lastParsed = res.policy_set;
+    S.serializedZpl = res.serialized_zpl || '';
+    if (res.errors && res.errors.length) {
+      showErrors(res.errors);
+      setStatus('error', `${res.errors.length} error${res.errors.length>1?'s':''}`);
+    } else {
+      clearErrors();
+      setStatus('ok', `${(res.policy_set?.classes||[]).length} classes · ${(res.policy_set?.rules||[]).length} rules`);
+    }
+    renderSchemaBody();
+  } catch(e) { setStatus('error', 'Parse failed'); }
+}
+
+async function doValidate() {
+  const text = document.getElementById('zpl-editor').value.trim();
+  if (!text) return;
+  setStatus('idle', 'Validating…');
+  try {
+    const res = await api('POST', '/api/validate', { text, language: 'zpl' });
+    if (res.valid) { clearErrors(); setStatus('ok', 'Valid ZPL'); }
+    else { showErrors(res.errors); setStatus('error', `${res.errors.length} error${res.errors.length>1?'s':''}`); }
+  } catch(e) { setStatus('error', 'Validate failed'); }
+}
+
+async function doSave() {
+  const text = document.getElementById('zpl-editor').value.trim();
+  document.getElementById('save-btn').disabled = true;
+  try {
+    if (text) {
+      const parsed = await api('POST', '/api/parse', { text, language: 'zpl' });
+      if (parsed.errors && parsed.errors.length) {
+        showErrors(parsed.errors);
+        setStatus('error', 'Fix errors before saving');
+        return;
+      }
+      S.lastParsed = parsed.policy_set;
+      clearErrors();
+      renderSchemaBody();
+    }
+    await api('PUT', '/api/namespace/zpl', { text });
+    S.dirty = false;
+    setStatus('ok', 'Saved');
+  } catch(e) {
+    setStatus('error', 'Save failed: ' + e.message);
+  } finally {
+    document.getElementById('save-btn').disabled = false;
+  }
+}
+
+// ── Upload / Download ─────────────────────────────────────────────────────
+
+function toggleIoMenu(e) {
+  e.stopPropagation();
+  document.getElementById('io-menu').classList.toggle('open');
+}
+
+document.addEventListener('click', () => {
+  document.getElementById('io-menu')?.classList.remove('open');
+});
+
+function doUploadZpl() {
+  document.getElementById('io-menu').classList.remove('open');
+  document.getElementById('zpl-file-input').click();
+}
+
+function onZplFileSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('zpl-editor').value = ev.target.result;
+    e.target.value = '';
+    S.dirty = true;
+    onEditorInput();
+  };
+  reader.readAsText(file);
+}
+
+function doDownloadZpl() {
+  document.getElementById('io-menu').classList.remove('open');
+  const text = document.getElementById('zpl-editor').value;
+  const ctx = S.context;
+  const ns = ctx ? (ctx.active_display_name || ctx.active_username || 'namespace') : 'namespace';
+  const filename = ns.replace(/[^a-z0-9_-]/gi, '_').toLowerCase() + '.zpl';
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function doReset() {
+  if (S.dirty && !confirm('Clear the editor and discard unsaved changes?')) return;
+  if (!S.dirty && document.getElementById('zpl-editor').value.trim() &&
+      !confirm('Clear the editor?')) return;
+  document.getElementById('zpl-editor').value = '';
+  S.dirty = false;
+  S.lastParsed = null;
+  clearErrors();
+  clearInferBar();
+  setStatus('idle');
+  renderSchemaBody();
+}
+
+// ── Infer bar ──────────────────────────────────────────────────────────────
+
+function showInferBar(classes, zpl) {
+  const bar = document.getElementById('infer-bar');
+  if (!classes.length) { clearInferBar(); return; }
+  S.inferredZpl = zpl;
+  const names = classes.map(c => c.class).join(', ');
+  document.getElementById('infer-msg').innerHTML =
+    `<strong>${classes.length} undefined class${classes.length > 1 ? 'es' : ''}:</strong> ${esc(names)}`;
+  bar.classList.add('visible');
+}
+
+function clearInferBar() {
+  document.getElementById('infer-bar').classList.remove('visible');
+  S.inferredZpl = '';
+}
+
+function dismissInferBar() { clearInferBar(); }
+
+function insertInferredClasses() {
+  if (!S.inferredZpl) return;
+  const ta = document.getElementById('zpl-editor');
+  ta.value = S.inferredZpl + '\n\n' + ta.value;
+  clearInferBar();
+  markDirty();
+  autoParse();
+}
+
+// ── Status & errors ────────────────────────────────────────────────────────
+
+function setStatus(type, msg) {
+  const el = document.getElementById('status-pill');
+  el.className = 'status-pill ' + type;
+  el.textContent = msg || '';
+}
+
+function showErrors(errors) {
+  const bar = document.getElementById('error-bar');
+  bar.innerHTML = errors.map(e =>
+    `<div class="error-line">Line ${esc(e.line)}: ${esc(e.message)}</div>`
+  ).join('');
+  bar.classList.add('visible');
+}
+
+function clearErrors() {
+  const bar = document.getElementById('error-bar');
+  bar.innerHTML = '';
+  bar.classList.remove('visible');
+}
+
+// ── Schema panel ───────────────────────────────────────────────────────────
+
+function setSchemaTab(tab, btn) {
+  S.schemaTab = tab;
+  document.querySelectorAll('.schema-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderSchemaBody();
+}
+
+function renderSchemaBody() {
+  const body = document.getElementById('schema-body');
+  const ps = S.lastParsed;
+  if (!ps) {
+    body.innerHTML = '<div class="empty-state">Parse ZPL to see<br>classes and rules here.</div>';
+    return;
+  }
+  if (S.schemaTab === 'classes') renderClasses(body, ps.classes || []);
+  else if (S.schemaTab === 'rules') renderRules(body, ps.rules || []);
+  else renderZpl(body);
+}
+
+function renderZpl(body) {
+  if (!S.serializedZpl) {
+    body.innerHTML = '<div class="empty-state">No ZPL to display.</div>';
+    return;
+  }
+  body.innerHTML = `<pre class="zpl-canon">${esc(S.serializedZpl)}</pre>`;
+}
+
+// ── Profile tab ────────────────────────────────────────────────────────────
+
+async function openProfilePanel() {
+  document.getElementById('profile-modal').classList.add('open');
+  await loadProfile();
+}
+
+function closeProfilePanel() {
+  document.getElementById('profile-modal').classList.remove('open');
+}
+
+async function loadProfile() {
+  const body = document.getElementById('profile-modal-body');
+  body.innerHTML = '<div class="empty-state">Loading…</div>';
+  try {
+    S.profile = await api('GET', '/api/profile');
+    renderProfile(S.profile);
+    refreshOwnersPanel();
+  } catch(e) {
+    body.innerHTML = '<div class="empty-state">Failed to load profile.</div>';
+  }
+}
+
+function renderOwnerTree(node, depth) {
+  const children = node.children || [];
+  const childHtml = children.length
+    ? `<div class="cfg-ns-children">${children.map(c => renderOwnerTree(c, depth + 1)).join('')}</div>`
+    : '';
+  const uid = node.id;
+  const ownerMeta = node.owner_username
+    ? `<div class="cfg-ns-meta">owner: ${esc(node.owner_username)}${node.owner_email ? ' · ' + esc(node.owner_email) : ''}</div>`
+    : `<div class="cfg-ns-unowned">No owner assigned</div>`;
+  const nodeData = JSON.stringify({ id: node.id, display_name: node.display_name,
+    username: node.username, email: node.email || '', delegated: !!node.delegated });
+  return `<div class="cfg-ns-node" id="ns-node-${uid}">
+    <div class="cfg-ns-item">
+      <div class="cfg-ns-hdr">
+        <div class="cfg-ns-hdr-text">
+          <div class="cfg-ns-name">${esc(node.display_name)}</div>
+          ${ownerMeta}
+        </div>
+        <div class="cfg-ns-actions">
+          <button class="cfg-ns-btn" onclick="toggleNsNew('${uid}')">+ New</button>
+          <button class="cfg-ns-btn" onclick="toggleNsEdit('${uid}',${esc(JSON.stringify(nodeData))})">Edit</button>
+        </div>
+      </div>
+      <div id="ns-new-${uid}"></div>
+      <div id="ns-edit-${uid}"></div>
+    </div>
+    ${childHtml}
+  </div>`;
+}
+
+function renderProfile(profile) {
+  const body = document.getElementById('profile-modal-body');
+  const token = profile.api_token || '';
+
+  body.innerHTML = `
+  <div class="cfg">
+
+    <div class="cfg-section">
+      <h4>Profile</h4>
+      <div class="cfg-row"><label>Username (login)</label>
+        <input value="${esc(profile.username)}" readonly></div>
+      <div class="cfg-row"><label>Namespace name</label>
+        <input value="${esc(profile.display_name)}" readonly></div>
+      <div class="cfg-row"><label>Email</label>
+        <input id="cfg-email" type="email" value="${esc(profile.email || '')}" placeholder="email@example.com"></div>
+      <button class="cfg-btn" onclick="doSaveProfile()">Save</button>
+      <div id="cfg-profile-msg"></div>
+    </div>
+
+    <div class="cfg-section">
+      <h4>API Token</h4>
+      <div class="cfg-token" id="cfg-token-display">${token ? esc(token) : '(none — click Regenerate to create)'}</div>
+      <div style="display:flex;gap:0.4rem;margin-top:0.3rem">
+        <button class="cfg-btn" onclick="doCopyToken()" ${token ? '' : 'disabled'}>Copy</button>
+        <button class="cfg-btn danger" onclick="doRegenToken()">Regenerate</button>
+      </div>
+      <div id="cfg-token-msg"></div>
+    </div>
+
+    <div class="cfg-section">
+      <h4>Change Password</h4>
+      <div class="cfg-row"><label>Current password</label>
+        <input id="cfg-pw-cur" type="password" placeholder="Current password"></div>
+      <div class="cfg-row"><label>New password</label>
+        <input id="cfg-pw-new" type="password" placeholder="New password (min 8 chars)"></div>
+      <div class="cfg-row"><label>Confirm new password</label>
+        <input id="cfg-pw-confirm" type="password" placeholder="Confirm new password"></div>
+      <button class="cfg-btn" onclick="doChangePassword()">Update Password</button>
+      <div id="cfg-pw-msg"></div>
+    </div>
+
+    <div class="cfg-section">
+      <h4>Test Rule Match</h4>
+      <div class="cfg-row"><label>Subject class</label>
+        <input id="m-subj-cls" value="employee" placeholder="e.g. employee"></div>
+      <div class="cfg-row"><label>Subject attrs (JSON)</label>
+        <input id="m-subj-attrs" value="{}" placeholder='{"dept":"sales"}'></div>
+      <div class="cfg-row"><label>Action</label>
+        <input id="m-action" value="access"></div>
+      <div class="cfg-row"><label>Object class</label>
+        <input id="m-obj-cls" value="services" placeholder="e.g. services"></div>
+      <div class="cfg-row"><label>Object attrs (JSON)</label>
+        <input id="m-obj-attrs" value="{}" placeholder='{"content":"red"}'></div>
+      <button class="cfg-btn" onclick="doMatch()">Test</button>
+      <div id="cfg-match-result"></div>
+    </div>
+
+  </div>`;
+}
+
+async function doSaveProfile() {
+  const email = document.getElementById('cfg-email').value.trim();
+  const msg = document.getElementById('cfg-profile-msg');
+  try {
+    await api('POST', '/api/profile', { email });
+    S.profile.email = email;
+    msg.className = 'cfg-msg ok'; msg.textContent = 'Saved.';
+    setTimeout(() => { msg.textContent = ''; }, 2000);
+  } catch(e) {
+    msg.className = 'cfg-msg err'; msg.textContent = e.message || 'Failed.';
+  }
+}
+
+async function doChangePassword() {
+  const cur = document.getElementById('cfg-pw-cur').value;
+  const nw  = document.getElementById('cfg-pw-new').value;
+  const cnf = document.getElementById('cfg-pw-confirm').value;
+  const msg = document.getElementById('cfg-pw-msg');
+  if (nw !== cnf) { msg.className='cfg-msg err'; msg.textContent='Passwords do not match.'; return; }
+  try {
+    await api('POST', '/api/profile/password', { current_password: cur, new_password: nw });
+    msg.className='cfg-msg ok'; msg.textContent='Password updated.';
+    document.getElementById('cfg-pw-cur').value = '';
+    document.getElementById('cfg-pw-new').value = '';
+    document.getElementById('cfg-pw-confirm').value = '';
+  } catch(e) {
+    msg.className='cfg-msg err'; msg.textContent=e.message||'Failed.';
+  }
+}
+
+async function doRegenToken() {
+  if (!confirm('Regenerate token? The old token will stop working immediately.')) return;
+  try {
+    const res = await api('POST', '/api/token/regenerate');
+    S.profile.api_token = res.api_token;
+    document.getElementById('cfg-token-display').textContent = res.api_token;
+    document.getElementById('cfg-token-msg').className='cfg-msg ok';
+    document.getElementById('cfg-token-msg').textContent='New token generated.';
+    document.querySelector('[onclick="doCopyToken()"]').disabled = false;
+  } catch(e) {
+    document.getElementById('cfg-token-msg').className='cfg-msg err';
+    document.getElementById('cfg-token-msg').textContent='Failed.';
+  }
+}
+
+function doCopyToken() {
+  const token = S.profile?.api_token;
+  if (!token) return;
+  navigator.clipboard.writeText(token).then(() => {
+    const msg = document.getElementById('cfg-token-msg');
+    msg.className='cfg-msg ok'; msg.textContent='Copied to clipboard.';
+    setTimeout(() => { msg.textContent=''; }, 2000);
+  });
+}
+
+async function doMatch() {
+  const res = document.getElementById('cfg-match-result');
+  let subjAttrs = {}, objAttrs = {};
+  try { subjAttrs = JSON.parse(document.getElementById('m-subj-attrs').value || '{}'); } catch { }
+  try { objAttrs  = JSON.parse(document.getElementById('m-obj-attrs').value  || '{}'); } catch { }
+  const body = {
+    subject_class: document.getElementById('m-subj-cls').value || 'users',
+    subject_attrs: subjAttrs,
+    action: document.getElementById('m-action').value || 'access',
+    object_class: document.getElementById('m-obj-cls').value || 'services',
+    object_attrs: objAttrs,
+  };
+  try {
+    const r = await api('POST', '/api/match', body);
+    res.className = `match-result ${r.verdict}`;
+    res.textContent = `${r.verdict.toUpperCase()} — ${r.reason}`;
+  } catch(e) {
+    res.className='match-result deny'; res.textContent=e.message||'Error';
+  }
+}
+
+function toggleProfileTopNew() {
+  const wrap = document.getElementById('profile-top-new');
+  if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
+  const uid = '_top';
+  wrap.innerHTML = `
+    <div class="cfg-ns-inline" style="margin-top:0.4rem">
+      <h6>New top-level namespace</h6>
+      <div class="cfg-row"><label>Namespace name</label>
+        <input id="nn-ns-${uid}" placeholder="e.g. Marketing"></div>
+      <div class="cfg-row"><label>Owner username (optional)</label>
+        <input id="nn-user-${uid}" placeholder="leave blank — assign later"></div>
+      <div class="cfg-row"><label>Password</label>
+        <input id="nn-pw-${uid}" type="password" placeholder="required if username given"></div>
+      <div class="cfg-row"><label>Email</label>
+        <input id="nn-email-${uid}" type="email" placeholder="owner@example.com"></div>
+      <div style="display:flex;gap:0.4rem">
+        <button class="cfg-btn" onclick="doCreateUnder(null)">Create</button>
+        <button class="cfg-btn" onclick="document.getElementById('profile-top-new').innerHTML=''">Cancel</button>
+      </div>
+      <div id="nn-msg-${uid}"></div>
+    </div>`;
+}
+
+function toggleNsNew(uid) {
+  const wrap = document.getElementById(`ns-new-${uid}`);
+  if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `
+    <div class="cfg-ns-inline">
+      <h6>New sub-namespace</h6>
+      <div class="cfg-row"><label>Namespace name</label>
+        <input id="nn-ns-${uid}" placeholder="e.g. West Coast"></div>
+      <div class="cfg-row"><label>Owner username (optional)</label>
+        <input id="nn-user-${uid}" placeholder="leave blank — assign later"></div>
+      <div class="cfg-row"><label>Password</label>
+        <input id="nn-pw-${uid}" type="password" placeholder="required if username given"></div>
+      <div class="cfg-row"><label>Email</label>
+        <input id="nn-email-${uid}" type="email" placeholder="owner@example.com"></div>
+      <div style="display:flex;gap:0.4rem">
+        <button class="cfg-btn" onclick="doCreateUnder('${uid}')">Create</button>
+        <button class="cfg-btn" onclick="document.getElementById('ns-new-${uid}').innerHTML=''">Cancel</button>
+      </div>
+      <div id="nn-msg-${uid}"></div>
+    </div>`;
+}
+
+async function doCreateUnder(uid) {
+  const key  = uid || '_top';
+  const ns   = document.getElementById(`nn-ns-${key}`).value.trim();
+  const user = document.getElementById(`nn-user-${key}`).value.trim();
+  const pw   = document.getElementById(`nn-pw-${key}`).value;
+  const email= document.getElementById(`nn-email-${key}`).value.trim();
+  const msg  = document.getElementById(`nn-msg-${key}`);
+  if (!ns) { msg.className='cfg-msg err'; msg.textContent='Namespace name required.'; return; }
+  if (user && !pw) { msg.className='cfg-msg err'; msg.textContent='Password required when username is set.'; return; }
+  const delegated = !!(user && pw);
+  const body = { namespace_name: ns, email, delegated };
+  if (user) body.username = user;
+  if (pw)   body.password = pw;
+  body.parent_id = uid || S.context.login_user_id;
+  try {
+    await api('POST', '/api/users', body);
+    msg.className='cfg-msg ok'; msg.textContent=`"${ns}" created.`;
+    setTimeout(async () => { await loadSubOwners(); }, 600);
+  } catch(e) {
+    msg.className='cfg-msg err'; msg.textContent=e.message||'Failed.';
+  }
+}
+
+function toggleNsEdit(uid, nodeDataJson) {
+  const wrap = document.getElementById(`ns-edit-${uid}`);
+  if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
+  const node = JSON.parse(nodeDataJson);
+  const delegatedCheck = node.delegated
+    ? `<input type="checkbox" id="ed-del-${uid}" checked> <label for="ed-del-${uid}" style="font-size:0.75rem">Has independent login</label>`
+    : `<input type="checkbox" id="ed-del-${uid}"> <label for="ed-del-${uid}" style="font-size:0.75rem">Assign an owner login</label>`;
+  wrap.innerHTML = `
+    <div class="cfg-ns-inline">
+      <h6>Edit namespace</h6>
+      <div class="cfg-row"><label>Namespace name</label>
+        <input id="ed-ns-${uid}" value="${esc(node.display_name)}"></div>
+      <div style="display:flex;align-items:center;gap:0.4rem;margin:0.1rem 0">${delegatedCheck}</div>
+      <div class="cfg-row"><label>Login username</label>
+        <input id="ed-user-${uid}" value="${node.delegated ? esc(node.username) : ''}"></div>
+      <div class="cfg-row"><label>New password</label>
+        <input id="ed-pw-${uid}" type="password" placeholder="${node.delegated ? 'blank = keep current' : 'set a password'}"></div>
+      <div class="cfg-row"><label>Email</label>
+        <input id="ed-email-${uid}" type="email" value="${esc(node.email)}"></div>
+      <div style="display:flex;gap:0.4rem;flex-wrap:wrap">
+        <button class="cfg-btn" onclick="doSaveOwner('${uid}')">Save</button>
+        <button class="cfg-btn" onclick="document.getElementById('ns-edit-${uid}').innerHTML=''">Cancel</button>
+        <button class="cfg-btn danger" style="margin-left:auto" onclick="doDeleteOwner('${uid}','${esc(node.display_name)}')">Delete</button>
+      </div>
+      <div id="ed-msg-${uid}"></div>
+    </div>`;
+}
+
+async function doSaveOwner(uid) {
+  const ns       = document.getElementById(`ed-ns-${uid}`).value.trim();
+  const user     = document.getElementById(`ed-user-${uid}`).value.trim();
+  const pw       = document.getElementById(`ed-pw-${uid}`).value;
+  const email    = document.getElementById(`ed-email-${uid}`).value.trim();
+  const delegated= document.getElementById(`ed-del-${uid}`).checked;
+  const msg      = document.getElementById(`ed-msg-${uid}`);
+  if (delegated && !user) { msg.className='cfg-msg err'; msg.textContent='Username required when owner login is enabled.'; return; }
+  const body = { display_name: ns, email, delegated };
+  if (user)  body.username = user;
+  if (pw)    body.password = pw;
+  try {
+    await api('PATCH', `/api/users/${uid}`, body);
+    msg.className='cfg-msg ok'; msg.textContent='Saved.';
+    setTimeout(async () => { await loadSubOwners(); }, 600);
+  } catch(e) {
+    msg.className='cfg-msg err'; msg.textContent=e.message||'Failed.';
+  }
+}
+
+async function doDeleteOwner(uid, displayName) {
+  if (!confirm(`Delete namespace "${displayName}"?\n\nThis will also delete their ZPL and cannot be undone.`)) return;
+  try {
+    await api('DELETE', `/api/users/${uid}`);
+    await loadSubOwners();
+  } catch(e) {
+    alert(e.message||'Delete failed.');
+  }
+}
+
+function renderClasses(body, classes) {
+  if (!classes.length) {
+    body.innerHTML = '<div class="empty-state">No classes defined.</div>';
+    return;
+  }
+  let html = '<div class="schema-section">';
+  const roots = ['users', 'endpoints', 'services'];
+  const byParent = {};
+  for (const c of classes) {
+    const p = c.parent || 'root';
+    (byParent[p] = byParent[p] || []).push(c);
+  }
+
+  function renderSubtree(parent, depth) {
+    const children = byParent[parent] || [];
+    for (const c of children) {
+      const indent = '  '.repeat(depth);
+      const prefix = depth === 0 ? '' : (depth === 1 ? '└ ' : '  └ ');
+      const attrs = Object.entries(c.attributes || {});
+      const json = esc(JSON.stringify(c, null, 2));
+      html += `<div class="class-node" onclick="toggleJsonDetail(this)" data-json="${json}">
+        <span class="indent">${esc(indent + prefix)}</span>
+        <div style="flex:1;min-width:0">
+          <span class="cn-name">${esc(c.name)}</span>
+          <span class="cn-parent">← ${esc(c.parent)}</span>
+          ${attrs.length ? `<div class="cn-attrs">${attrs.map(([k,v]) => `${esc(k)}: ${esc(v.type)}`).join('  ')}</div>` : ''}
+        </div>
+      </div>`;
+      renderSubtree(c.name, depth + 1);
+    }
+  }
+
+  for (const root of roots) {
+    if (byParent[root]) {
+      html += `<div class="schema-section-title">${esc(root)}</div>`;
+      renderSubtree(root, 0);
+    }
+  }
+  const knownParents = new Set([...roots, ...classes.map(c => c.name)]);
+  const orphans = classes.filter(c => !knownParents.has(c.parent) && !roots.includes(c.parent));
+  if (orphans.length) {
+    html += `<div class="schema-section-title">other</div>`;
+    for (const c of orphans) {
+      html += `<div class="class-node"><span class="cn-name">${esc(c.name)}</span><span class="cn-parent">← ${esc(c.parent)}</span></div>`;
+    }
+  }
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+function renderRules(body, rules) {
+  if (!rules.length) {
+    body.innerHTML = '<div class="empty-state">No rules defined.</div>';
+    return;
+  }
+
+  function fmtSpec(s) {
+    if (!s) return '—';
+    const base = s.cls || s.name || '?';
+    const attrs = Object.entries(s.attrs || {})
+      .map(([k, v]) => v === '*' ? k : `${k}:${v}`).join(', ');
+    return attrs ? `${base} [${attrs}]` : base;
+  }
+
+  body.innerHTML = rules.map(r => {
+    const effect = r.effect || 'allow';
+    const badgeText = effect === 'deny' ? 'NEVER' : 'ALLOW';
+    const subj = fmtSpec(r.subject);
+    const onPart = r.accessor_endpoint ? ` on ${fmtSpec(r.accessor_endpoint)}` : '';
+    const obj  = fmtSpec(r.object);
+    const desc = `${subj}${onPart} ${r.action || 'access'} ${obj}`;
+    const json = esc(JSON.stringify(r, null, 2));
+    return `<div class="rule-item" onclick="toggleJsonDetail(this)" data-json="${json}">
+      <span class="rule-effect ${effect}">${badgeText}</span>
+      <span class="rule-name">${esc(desc)}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── JSON detail toggle ─────────────────────────────────────────────────────
+
+function toggleJsonDetail(el) {
+  let wrap = el.querySelector('.json-detail-wrap');
+  if (wrap) {
+    wrap.remove();
+    return;
+  }
+  wrap = document.createElement('div');
+  wrap.className = 'json-detail-wrap';
+  wrap.onclick = e => e.stopPropagation();
+
+  const header = document.createElement('div');
+  header.className = 'json-detail-header';
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'json-close';
+  closeBtn.textContent = '✕';
+  closeBtn.onclick = () => wrap.remove();
+  header.appendChild(closeBtn);
+
+  const pre = document.createElement('pre');
+  pre.className = 'json-detail';
+  pre.textContent = JSON.stringify(JSON.parse(el.dataset.json), null, 2);
+
+  wrap.appendChild(header);
+  wrap.appendChild(pre);
+  el.appendChild(wrap);
+}
+
+// ── Panel toggle & resize ──────────────────────────────────────────────────
+
+function updateGridColumns() {
+  let cols;
+  if (S.panelExpanded) {
+    cols = `${S.sidebarWidth}px 4px 0px 0px 1fr`;
+  } else {
+    const right = S.panelOpen ? `${S.panelWidth}px` : '0px';
+    cols = `${S.sidebarWidth}px 4px 1fr 4px ${right}`;
+  }
+  document.getElementById('layout').style.gridTemplateColumns = cols;
+}
+
+function togglePanel() {
+  if (S.panelExpanded) toggleSchemaExpand(); // collapse expand first
+  S.panelOpen = !S.panelOpen;
+  document.getElementById('panel-toggle').textContent = S.panelOpen ? '⊟' : '⊞';
+  updateGridColumns();
+}
+
+function toggleSchemaExpand() {
+  S.panelExpanded = !S.panelExpanded;
+  if (S.panelExpanded) {
+    S.panelOpen = true;
+    document.getElementById('schema-expand').textContent = '⊟';
+    document.getElementById('panel-toggle').textContent = '⊞';
+  } else {
+    document.getElementById('schema-expand').textContent = '⊞';
+    document.getElementById('panel-toggle').textContent = S.panelOpen ? '⊟' : '⊞';
+  }
+  updateGridColumns();
+}
+
+function initResizers() {
+  setupResizer('resizer-left', (dx) => {
+    S.sidebarWidth = Math.max(140, Math.min(480, S.sidebarWidth + dx));
+  });
+  setupResizer('resizer-right', (dx) => {
+    S.panelWidth = Math.max(150, Math.min(600, S.panelWidth - dx));
+  });
+}
+
+function setupResizer(id, onDrag) {
+  const el = document.getElementById(id);
+  el.addEventListener('mousedown', e => {
+    e.preventDefault();
+    let lastX = e.clientX;
+    el.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMove = e => {
+      const dx = e.clientX - lastX;
+      lastX = e.clientX;
+      onDrag(dx);
+      updateGridColumns();
+    };
+    const onUp = () => {
+      el.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+// ── Logout ─────────────────────────────────────────────────────────────────
+
+async function doLogout() {
+  await fetch('/logout', { method: 'POST' });
+  location.href = '/login';
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
+boot();
 </script>
-<div class="attr-suggestions" id="attr-suggestions" style="display:none"></div>
-<div class="attr-suggestions" id="tag-suggestions" style="display:none"></div>
 </body>
 </html>

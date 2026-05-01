@@ -13,7 +13,7 @@ Covered (docs/zpl_rfc15_5.bnf):
   <object-clause>  ::= <service-spec> ("on" <endpoint-spec>)?
 
 Out of scope (deferred):
-  - Namespaces (sales.Timesheet-database)
+  - Quoted strings with escapes (namespace names with dots are now supported)
   - Quoted strings with escapes
   - Signal clauses (tolerated but ignored)
 
@@ -35,6 +35,7 @@ from typing import Any
 _ARTICLES = {"a", "an", "the", "any"}
 _VERBS = {"access", "use", "call", "read", "write"}
 _SEPARATORS = {"on", "to", "and"}
+_STMT_STARTERS = {"define", "allow", "never"}
 
 _BUILTIN_ALIASES = {
     "user": "users", "users": "users",
@@ -47,13 +48,22 @@ _BUILTIN_ALIASES = {
 
 _TOKEN_RE = re.compile(
     r"""
-    (?P<comment> (?:\#|//)[^\n]* )          |
-    (?P<ws>      \s+ )                       |
-    (?P<punct>   [.,:{}=] )                  |
-    (?P<word>    [A-Za-z_][A-Za-z0-9_\-]* )
+    (?P<comment> (?:\#|//)[^\n]* )                                        |
+    (?P<ws>      \s+ )                                                     |
+    (?P<string>  '  [^'\\]* (?:\\.[^'\\]*)* '                             |
+                 `  [^`\\]* (?:\\.[^`\\]*)* `                             |
+                 "  [^"\\]* (?:\\.[^"\\]*)* "  )                          |
+    (?P<punct>   [.,:{}=] )                                                |
+    (?P<word>    [A-Za-z_][A-Za-z0-9_\-]*(?:\.[A-Za-z_][A-Za-z0-9_\-]*)* )
     """,
     re.VERBOSE,
 )
+
+
+def _unescape(s: str) -> str:
+    """Strip outer quotes and process backslash escapes."""
+    inner = s[1:-1]
+    return inner.replace("\\'", "'").replace('\\"', '"').replace("\\\\", "\\")
 
 
 def _tokenize(text: str) -> list[tuple[str, str, int]]:
@@ -70,6 +80,8 @@ def _tokenize(text: str) -> list[tuple[str, str, int]]:
             line += m.group().count("\n")
         elif m.lastgroup == "word":
             out.append(("word", m.group(), line))
+        elif m.lastgroup == "string":
+            out.append(("string", _unescape(m.group()), line))
         elif m.lastgroup == "punct":
             out.append(("punct", m.group(), line))
     return out
@@ -118,9 +130,8 @@ class _P:
             raise ValueError(f"Expected {value!r}, got {_describe(self.peek())}")
 
     def expect_terminator(self) -> None:
-        """Accept '.' or end of input — tolerant statement terminator."""
-        if not self.eat_punct(".") and not self.at_end():
-            raise ValueError(f"Expected '.', got {_describe(self.peek())}")
+        """Consume a '.' statement terminator if present; always optional."""
+        self.eat_punct(".")
 
 
 def _describe(t) -> str:
@@ -345,7 +356,7 @@ def _parse_permission(p: _P, result: str) -> dict:
 
     rule: dict[str, Any] = {
         "id": uuid.uuid4().hex,
-        "name": _default_rule_name(result, subject, verb, object_spec),
+        "name": _default_rule_name(result, subject, verb, object_spec, accessor_endpoint),
         "result": result,
         "priority": 100,
         "verb": verb,
@@ -361,14 +372,15 @@ def _parse_permission(p: _P, result: str) -> dict:
     return rule
 
 
-def _default_rule_name(result: str, subject, verb, obj) -> str:
+def _default_rule_name(result: str, subject, verb, obj, accessor_endpoint=None) -> str:
     def label(s):
         if not s:
             return "?"
         if "name" in s:
             return s["name"]
         return s.get("class", "?")
-    return f"{result.capitalize()} {label(subject)} {verb} {label(obj)}"
+    on_part = f" on {label(accessor_endpoint)}" if accessor_endpoint else ""
+    return f"{result.capitalize()} {label(subject)}{on_part} {verb} {label(obj)}"
 
 
 # ── Spec parsing ────────────────────────────────────────────────────────────
@@ -380,10 +392,10 @@ def _parse_spec(p: _P) -> dict:
 
     while True:
         t = p.peek()
-        if t is None or t[0] != "word":
+        if t is None or t[0] not in ("word", "string"):
             break
         lower = t[1].lower()
-        if lower in _SEPARATORS:
+        if t[0] == "word" and (lower in _SEPARATORS or lower in _STMT_STARTERS):
             break
 
         # Check for "name:..." (kv pair or presence check)
@@ -404,7 +416,7 @@ def _parse_spec(p: _P) -> dict:
 
     # Now the class or named-entity token
     t = p.peek()
-    if t is None or t[0] != "word":
+    if t is None or t[0] not in ("word", "string"):
         raise ValueError(f"Expected class or entity name, got {_describe(t)}")
     class_or_name = p.advance()[1]
 
@@ -431,6 +443,8 @@ def _is_terminator_position(p: _P) -> bool:
         return True
     if nxt[0] == "word" and nxt[1].lower() in _SEPARATORS:
         return True
+    if nxt[0] == "word" and nxt[1].lower() in _STMT_STARTERS:
+        return True
     return False
 
 
@@ -453,15 +467,82 @@ def _parse_attr_value(p: _P) -> Any:
                 if tv[0] == "punct" and tv[1] == ",":
                     p.advance()
                     continue
-                values.append(p.advance()[1])
+                if tv[0] in ("word", "string"):
+                    values.append(p.advance()[1])
             return values
         # Presence check (e.g. "name:")
         return "*"
-    return p.advance()[1]
+    if t[0] in ("word", "string"):
+        return p.advance()[1]
+    return "*"
+
+
+# ── Class inference ─────────────────────────────────────────────────────────
+
+_BUILTIN_CLASSES = {"users", "endpoints", "services", "servers"}
+_PARENT_SINGULAR = {"users": "user", "endpoints": "endpoint", "services": "service", "servers": "server"}
+
+
+def infer_missing_classes(parsed: dict) -> list[dict]:
+    """Return define-dicts for classes used in rules but not defined in the document."""
+    defined = {c["class"] for c in parsed.get("classes", [])} | _BUILTIN_CLASSES
+    inferred: dict[str, dict] = {}  # name → {parent, tags: set, attrs: set}
+
+    for rule in parsed.get("rules", []):
+        _collect_spec(rule.get("subject"),           "users",     inferred, defined)
+        _collect_spec(rule.get("accessor_endpoint"), "endpoints", inferred, defined)
+        _collect_spec(rule.get("object"),            "services",  inferred, defined)
+        _collect_spec(rule.get("server_endpoint"),   "endpoints", inferred, defined)
+
+    return [_build_inferred(name, info) for name, info in inferred.items()]
+
+
+def _collect_spec(spec: dict | None, parent: str, inferred: dict, defined: set) -> None:
+    if not spec:
+        return
+    cls = spec.get("class")
+    if not cls or cls in defined:
+        return
+    if cls not in inferred:
+        inferred[cls] = {"parent": parent, "tags": set(), "attrs": set()}
+    for k, v in spec.get("attrs", {}).items():
+        if v == "*":
+            inferred[cls]["tags"].add(k)
+        else:
+            inferred[cls]["attrs"].add(k)
+
+
+def _build_inferred(name: str, info: dict) -> dict:
+    attributes: dict = {}
+    if info["tags"]:
+        attributes["tags"] = {"type": "multi", "values": sorted(info["tags"])}
+    for k in sorted(info["attrs"]):
+        attributes[k] = {"type": "multi"}
+    return {"class": name, "parent": info["parent"], "attributes": attributes}
+
+
+def inferred_to_zpl(classes: list[dict]) -> str:
+    """Render inferred class dicts as ZPL define statements."""
+    lines = []
+    for c in classes:
+        singular = _PARENT_SINGULAR.get(c["parent"], c["parent"])
+        attrs = c.get("attributes", {})
+        parts = []
+        tags = attrs.get("tags", {}).get("values", [])
+        if tags:
+            parts.append("optional tags " + ", ".join(tags))
+        for k, v in attrs.items():
+            if k == "tags":
+                continue
+            parts.append(f"multiple {k}")
+        with_clause = " with " + ", ".join(parts) if parts else ""
+        article = "an" if singular[0] in "aeiou" else "a"
+        lines.append(f"define {c['class']} as {article} {singular}{with_clause}")
+    return "\n".join(lines)
 
 
 def _consume_name(p: _P) -> str:
     t = p.peek()
-    if t is None or t[0] != "word":
+    if t is None or t[0] not in ("word", "string"):
         raise ValueError(f"Expected name, got {_describe(t)}")
     return p.advance()[1]

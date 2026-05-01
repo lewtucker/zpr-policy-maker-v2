@@ -57,9 +57,6 @@ def rules_to_zpl(rules: list[dict]) -> str:
     for r in rules:
         line = rule_to_zpl(r)
         if line:
-            name = r.get("name", "")
-            if name:
-                lines.append(f"# {name}")
             lines.append(line)
     return "\n".join(lines)
 
@@ -109,19 +106,24 @@ def _join_with_and(parts: list[str]) -> str:
     return ", ".join(parts[:-1]) + " and " + parts[-1]
 
 
+_SINGULAR = {"users": "user", "endpoints": "endpoint", "services": "service", "servers": "server"}
+
+
 def class_to_zpl(cls: dict) -> str | None:
     """Convert a class dict to a ZPL Define statement. Returns None for builtins."""
     if cls.get("builtin"):
         return None
-    name = cls.get("class", "")
+    name = cls.get("name", "")
     aka = cls.get("aka")
     parent = cls.get("parent", "")
     attributes = cls.get("attributes") or {}
 
+    singular = _SINGULAR.get(parent, parent)
+    article = "an" if singular and singular[0] in "aeiou" else "a"
     line = f"Define {name}"
     if aka:
         line += f" AKA {aka}"
-    line += f" as a {parent}"
+    line += f" as {article} {singular}"
 
     attr_parts = _serialize_class_attrs(attributes)
     if attr_parts:
