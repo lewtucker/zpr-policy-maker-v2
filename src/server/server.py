@@ -376,8 +376,8 @@ async def change_password(req: ChangePasswordRequest, session: dict = Depends(ge
     user = await db.get_user_by_id(session["login_user_id"])
     if not user or not db.verify_password(req.current_password, user["password_hash"]):
         raise HTTPException(400, "Current password is incorrect")
-    if len(req.new_password) < 8:
-        raise HTTPException(400, "New password must be at least 8 characters")
+    if len(req.new_password) < 3:
+        raise HTTPException(400, "New password must be at least 3 characters")
     await db.update_password(session["login_user_id"], req.new_password)
     return {"ok": True}
 
