@@ -6,3 +6,8 @@ backups/
 snapshots/
 *.db
 .DS_Store
+.playwright-mcp/
+*.png
+*.pdf
+ZPL_Reference/
+test-cases/
