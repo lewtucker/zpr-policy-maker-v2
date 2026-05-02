@@ -1088,16 +1088,26 @@ async def get_namespace_zpl(session: dict = Depends(get_session)):
 async def get_namespace_zpl_all(session: dict = Depends(get_session)):
     """Return combined ZPL for the active namespace and all its descendants."""
     tree = await db.get_owner_tree(session["active_user_id"])
-    nodes = _flatten_tree_nodes(tree)
-    user_ids = [n["id"] for n in nodes]
-    dn_map = {n["id"]: n["display_name"] for n in nodes}
+
+    # Depth-aware traversal preserving tree order
+    def _walk(node: dict, depth: int, out: list) -> None:
+        if node and node.get("id"):
+            out.append((node["id"], node.get("display_name", ""), depth))
+            for child in node.get("children") or []:
+                _walk(child, depth + 1, out)
+
+    ordered: list[tuple[str, str, int]] = []
+    _walk(tree, 0, ordered)
+
+    user_ids = [uid for uid, _, _ in ordered]
     zpl_map = await db.get_namespace_zpl_batch(user_ids)
+
     sections = []
-    for uid in user_ids:
+    for uid, label, depth in ordered:
         text = (zpl_map.get(uid) or "").strip()
         if text:
-            label = dn_map.get(uid, uid)
-            sections.append(f"# {label}\n{text}")
+            indent = "  " * depth
+            sections.append(f"{indent}# {label}\n{text}")
     return {"text": "\n\n".join(sections)}
 
 
