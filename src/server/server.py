@@ -854,6 +854,10 @@ async def zpl_assist(req: ZplAssistRequest, session: dict = Depends(get_session)
         "- Allow: `Allow [<tag>...] <Class> [on [<tag>...] <End>] to <verb> [<tag>...] <Obj>.`\n"
         "- Never allow: same shape, starts with `Never allow`\n"
         "- Every statement ends with a period.\n\n"
+        "Important rules for 'modify':\n"
+        "- When deleting a class, also remove every rule that references that class.\n"
+        "- When renaming a class, update every rule that references the old name.\n"
+        "- Return the complete updated ZPL with no orphaned class references.\n\n"
         "Return JSON only — one of:\n"
         '  {"intent":"generate","statement":"ZPL statement(s)","reply":"brief explanation"}\n'
         '  {"intent":"modify","new_zpl":"complete updated ZPL text","reply":"what you changed"}\n'
