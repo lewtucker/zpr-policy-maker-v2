@@ -1406,11 +1406,11 @@ async function assistSend() {
     } else if (res.action === 'modify') {
       const mid = ++_assistModId;
       _ASSIST_MODS[mid] = res.new_zpl || '';
-      const extra = `<div id="assist-mod-btns-${mid}" style="margin-top:0.4rem;display:flex;gap:0.4rem">` +
-        `<button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistConfirmMod(${mid})">Yes</button>` +
-        `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistRejectMod(${mid})">No</button>` +
+      const extra = `<div id="assist-mod-btns-${mid}" style="margin-top:0.4rem;display:flex;gap:0.4rem;align-items:center">` +
+        `<button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistConfirmMod(${mid})">OK</button>` +
+        `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.3rem;color:var(--muted)" onclick="assistRejectMod(${mid})" title="Cancel">✕</button>` +
         `</div>`;
-      _assistAppendMsg('assistant', res.reply || 'Apply this change?', extra);
+      _assistAppendMsg('assistant', res.reply || 'Done.', extra);
     } else if (res.action === 'answer') {
       _assistAppendMsg('assistant', res.reply || '');
     } else {
