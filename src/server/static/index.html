@@ -1141,6 +1141,7 @@ function insertInferredClasses() {
   const id = S.assist?.active ? 'assist-top' : 'zpl-editor';
   const ta = document.getElementById(id);
   ta.value = S.inferredZpl + '\n\n' + ta.value;
+  ta.scrollTop = 0;
   clearInferBar();
   markDirty();
   autoParse();

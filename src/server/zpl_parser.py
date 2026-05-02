@@ -600,7 +600,7 @@ def inferred_to_zpl(classes: list[dict]) -> str:
             parts.append(f"multiple {k}")
         with_clause = " with " + ", ".join(parts) if parts else ""
         article = "an" if singular[0] in "aeiou" else "a"
-        lines.append(f"define {c['class']} as {article} {singular}{with_clause}")
+        lines.append(f"Define {c['class']} as {article} {singular}{with_clause}.")
     return "\n".join(lines)
 
 
