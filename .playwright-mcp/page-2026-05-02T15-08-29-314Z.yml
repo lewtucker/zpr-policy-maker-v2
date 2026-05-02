@@ -1,0 +1,79 @@
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]: ZPR Policy Maker
+    - generic [ref=e4]: LT
+    - button "Profile" [ref=e5] [cursor=pointer]
+    - button "Sign out" [ref=e6] [cursor=pointer]
+  - generic [ref=e7]:
+    - complementary [ref=e8]:
+      - generic [ref=e9]:
+        - heading "Namespace Selector" [level=2] [ref=e10]
+        - button "+ New" [ref=e11] [cursor=pointer]
+      - generic [ref=e12]:
+        - generic [ref=e45] [cursor=pointer]:
+          - generic [ref=e47]: Corp
+          - generic [ref=e48]: active
+        - generic [ref=e49] [cursor=pointer]:
+          - generic [ref=e50]: └
+          - generic [ref=e52]: HQ
+          - generic [ref=e53]: Alice
+        - generic [ref=e54] [cursor=pointer]:
+          - generic [ref=e55]: └
+          - generic [ref=e57]: WS
+        - generic [ref=e58] [cursor=pointer]:
+          - generic [ref=e59]: └
+          - generic [ref=e61]: EC
+          - generic [ref=e62]: bob
+        - generic [ref=e63] [cursor=pointer]:
+          - generic [ref=e64]: └
+          - generic [ref=e66]: IT
+          - generic [ref=e67]: Alice
+      - generic [ref=e14]:
+        - generic [ref=e15]: Namespace Management
+        - button "Edit" [ref=e16] [cursor=pointer]
+    - main [ref=e18]:
+      - generic [ref=e19]:
+        - generic [ref=e20]: ZPL Editor
+        - generic [ref=e22]: Corp
+        - button "Check ZPL" [ref=e24] [cursor=pointer]
+        - button "Save" [ref=e25] [cursor=pointer]
+        - button "Reset" [ref=e26] [cursor=pointer]
+        - generic [ref=e28]:
+          - button "⊠ Assist" [ref=e68] [cursor=pointer]
+          - button "↑↓" [ref=e31] [cursor=pointer]
+          - button "⊟" [ref=e32] [cursor=pointer]
+      - generic [ref=e69]:
+        - generic [ref=e70]:
+          - generic [ref=e71]:
+            - generic [ref=e72]: ZPL Assistant
+            - button "✓ Done" [ref=e73] [cursor=pointer]
+          - generic [ref=e74]:
+            - generic [ref=e75]: Type a ZPL statement or describe what you want. Say "done" or "stop" when finished.
+            - generic [ref=e95]: Define Engineer as a user with optional tags frontend, backend.
+            - generic [ref=e96]: Added. Anything else?
+          - generic [ref=e76]:
+            - textbox "Type ZPL or describe what you want… (Enter to send, Shift+Enter for newline)" [active] [ref=e77]
+            - button "Send" [ref=e78] [cursor=pointer]
+        - textbox "ZPL definitions and rules" [ref=e80]: Define Engineer as a user with optional tags frontend, backend.
+    - complementary [ref=e35]:
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - button "Tests" [ref=e38] [cursor=pointer]
+          - button "Classes" [ref=e39] [cursor=pointer]
+          - button "Rules" [ref=e40] [cursor=pointer]
+          - button "ZPL" [ref=e41] [cursor=pointer]
+        - button "⊞" [ref=e42] [cursor=pointer]
+      - generic [ref=e43]:
+        - generic [ref=e81]:
+          - generic [ref=e82]: Manual test
+          - generic [ref=e83]:
+            - generic [ref=e84]:
+              - textbox "subject class" [ref=e85]
+              - textbox "action" [ref=e86]: access
+              - textbox "object class" [ref=e87]
+            - generic [ref=e88]:
+              - button "▶ Run" [ref=e89] [cursor=pointer]
+              - button "+ Add" [ref=e90] [cursor=pointer]
+        - generic [ref=e92]:
+          - button "⚡ Generate from rules" [ref=e93] [cursor=pointer]
+          - button "Prompt" [ref=e94] [cursor=pointer]

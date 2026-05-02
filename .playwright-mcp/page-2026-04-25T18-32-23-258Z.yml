@@ -1,0 +1,1051 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e3]:
+    - navigation [ref=e5]:
+      - generic [ref=e7]:
+        - link "Oracle Cloud" [ref=e9] [cursor=pointer]:
+          - /url: /
+          - img "Oracle Cloud" [ref=e10]
+        - button "Main Navigation" [ref=e13] [cursor=pointer]
+        - link "Help Center" [ref=e16] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e19]:
+          - generic [ref=e20]: Search
+          - textbox "Search" [ref=e21]
+          - link "Oracle Cloud Infrastructure Search scoped to this page. Use this button to use site search instead." [ref=e22]:
+            - generic [ref=e23]:
+              - img [ref=e24]
+              - strong [ref=e29]: Oracle Cloud Infrastructure
+              - button "Search scoped to this page. Use this button to use site search instead." [ref=e30] [cursor=pointer]:
+                - img [ref=e31]
+        - generic "Select Language" [ref=e36]:
+          - generic [ref=e37]:
+            - button [ref=e38] [cursor=pointer]
+            - combobox "Select Language" [ref=e39] [cursor=pointer]:
+              - option "Deutsch"
+              - option "English (US)" [selected]
+              - option "Español"
+              - option "Français (Canada)"
+              - option "Français"
+              - option "Italiano"
+              - option "日本語"
+              - option "Português (Brasil)"
+  - generic [ref=e44]:
+    - generic [ref=e45]:
+      - heading "Oracle Cloud Infrastructure Documentation" [level=3] [ref=e46]:
+        - link "Oracle Cloud Infrastructure Documentation" [ref=e47] [cursor=pointer]:
+          - /url: /iaas/Content/home.htm
+      - separator [ref=e48]
+    - link "Try Free Tier" [ref=e51] [cursor=pointer]:
+      - /url: https://www.oracle.com/cloud/free/?source=:ow:o:h:po:OHPPanel1nav0625&intcmp=:ow:o:h:po:OHPPanel1nav0625
+  - generic [ref=e54]:
+    - generic [ref=e56]:
+      - generic [ref=e58]:
+        - generic [ref=e62]:
+          - paragraph [ref=e63]: Was this article helpful?
+          - generic [ref=e64]:
+            - button "Yes" [ref=e65]:
+              - img "Yes" [ref=e66]
+            - button "No" [ref=e68]:
+              - img "No" [ref=e69]
+        - generic [ref=e72]: Updated 2026-02-18
+      - generic [ref=e73]:
+        - link "Skip to main content" [ref=e74] [cursor=pointer]:
+          - /url: "#dcoc-content-body"
+        - article "Zero Trust Packet Routing Policy" [ref=e77]:
+          - article "Zero Trust Packet Routing Policy" [ref=e78]:
+            - heading "Zero Trust Packet Routing Policy" [level=1] [ref=e79]
+            - generic [ref=e80]:
+              - paragraph [ref=e81]: A Zero Trust Packet Routing policy enforces access control based on the security attributes applied to resources involved in an access attempt.
+              - generic [ref=e82]:
+                - paragraph [ref=e83]:
+                  - text: A policy is a container for a set of policy statements. A policy statement is a rule that specifies who can access what resource, and how. Zero Trust Packet Routing (ZPR) policy is based on an Attribute Based Access Control (ABAC) authorization model that evaluates attributes (or characteristics) to determine access to resources. This approach is different than OCI IAM (see
+                  - link "How ZPR Differs from IAM" [ref=e84] [cursor=pointer]:
+                    - /url: overview.htm#zpr-iam-comparison
+                  - text: ). ZPR policies are designed to achieve "attribute based access control" where the security attributes of source, target, and network are factored into the evaluation of policy using Zero Trust Packet Routing Policy Language (ZPL).
+                - paragraph [ref=e85]: ZPL lets you write policy statements focused on allowing client endpoints with security attributes to access other endpoints.
+                - generic [ref=e86]:
+                  - img [ref=e88]
+                  - strong [ref=e91]: Note
+                  - paragraph [ref=e92]:
+                    - text: ZPR policies don't take the place of setting up peering relationships between VCNs. For peering two VCNs in the same region, see
+                    - link "Local VCN Peering using Local Peering Gateways" [ref=e93] [cursor=pointer]:
+                      - /url: /iaas/Content/Network/Tasks/localVCNpeering.htm
+                    - text: or
+                    - link "Local VCN Peering Through an Upgraded DRG" [ref=e94] [cursor=pointer]:
+                      - /url: /iaas/Content/Network/Tasks/scenario_d.htm
+                    - text: . For peering two VCNs in different regions, see
+                    - link "Remote VCN Peering through an Upgraded DRG" [ref=e95] [cursor=pointer]:
+                      - /url: /iaas/Content/Network/Tasks/scenario_e.htm
+                    - text: .
+                - paragraph [ref=e96]: "ZPL supports the following types of allow statements in regards to communication to, from, and within individual VCNs identified by their security attributes:"
+                - list [ref=e97]:
+                  - listitem [ref=e98]: Allow traffic between two endpoints within a VCN
+                  - listitem [ref=e99]: Allow traffic between endpoints in different VCNs within the same region
+                - paragraph [ref=e100]:
+                  - text: For example, the following policy statement allows
+                  - code [ref=e101]: apps:hr-apps
+                  - text: hosts to read any OCI resource with the
+                  - code [ref=e102]: apps:hr-app-data
+                  - text: "security attribute applied to them within the same VCN:"
+                - code [ref=e104]: in networks:application VCN allow apps:hr-apps endpoints to connect to apps:hr-app-data endpoints
+                - paragraph [ref=e105]:
+                  - text: The following policy statement allows
+                  - code [ref=e106]: networks:net1:App1
+                  - text: endpoints in the
+                  - code [ref=e107]: networks:net1
+                  - text: VCN to connect to
+                  - code [ref=e108]: DB-Server:App1
+                  - text: endpoints in the
+                  - code [ref=e109]: networks:net2
+                  - text: "VCN, when both VCNs are in the same region:"
+                - code [ref=e111]: allow networks:net1:App1 endpoints in networks:net1 VCN to connect to DB-Server:App1 endpoints in networks:net2 VCN
+                - paragraph [ref=e112]:
+                  - text: To allow traffic between endpoints in different VCNs that aren't in the same region, or VCNs in the same region that don't have security attributes assigned to them, you must use CIDR or IP-based policy. For example, if you need to allow a client in
+                  - code [ref=e113]: networks:net1
+                  - text: "VCN to access a Compute instance or database in another VCN in a different region, you need to use IP addresses to reference the targets in the other VCN:"
+                - code [ref=e115]: in networks:net1 VCN allow apps:app1 endpoints to connect to '192.168.0.0/16'
+                - paragraph [ref=e116]:
+                  - text: To create ZPR policies, you must first
+                  - link "create security attributes" [ref=e117] [cursor=pointer]:
+                    - /url: create-security-attribute.htm
+                  - text: . Security attributes are factored into the evaluation of ZPR policy. After you create security attributes, review
+                  - link "ZPR policy syntax" [ref=e118] [cursor=pointer]:
+                    - /url: zpr-policy-syntax.htm
+                  - text: ", then examine the options for creating a policy with"
+                  - link "policy builders" [ref=e119] [cursor=pointer]:
+                    - /url: create-zpr-policy.htm#console
+                  - text: . You can also learn about ZPR policies from
+                  - link "examples" [ref=e120] [cursor=pointer]:
+                    - /url: zpr-policy-examples.htm
+                  - text: .
+                - generic [ref=e121]:
+                  - img [ref=e123]
+                  - strong [ref=e126]: Note
+                  - text: You must add security attributes to OCI resources for ZPR policy to take effect.
+                - paragraph [ref=e127]:
+                  - text: After you create security attributes and ZPR policies, you can
+                  - link "add the security attributes to resources" [ref=e128] [cursor=pointer]:
+                    - /url: managing-resources.htm
+                  - text: .
+                - paragraph [ref=e129]:
+                  - text: See
+                  - link "Resources That Can Be Assigned Security Attributes" [ref=e130] [cursor=pointer]:
+                    - /url: overview.htm#resources-assigned-security-attributes
+                  - text: for the types of resources you can use in ZPR policies.
+    - navigation "Oracle Cloud Infrastructure Documentation" [ref=e133]:
+      - list [ref=e134]:
+        - listitem [ref=e135]:
+          - link "Oracle Cloud Infrastructure Cloud Adoption Framework Open" [ref=e136] [cursor=pointer]:
+            - /url: /en-us/iaas/Content/cloud-adoption-framework/home.htm
+            - generic [ref=e137]: Oracle Cloud Infrastructure Cloud Adoption Framework
+            - button "Open" [ref=e138]:
+              - img [ref=e139]
+        - listitem [ref=e141]:
+          - link "Getting Started Open" [ref=e142] [cursor=pointer]:
+            - /url: /en-us/iaas/Content/GSG/Concepts/baremetalintro.htm
+            - generic [ref=e143]: Getting Started
+            - button "Open" [ref=e144]:
+              - img [ref=e145]
+        - listitem [ref=e147]:
+          - link "Oracle Cloud's Free Tier Open" [ref=e148] [cursor=pointer]:
+            - /url: /en-us/iaas/Content/FreeTier/freetier.htm
+            - generic [ref=e149]: Oracle Cloud's Free Tier
+            - button "Open" [ref=e150]:
+              - img [ref=e151]
+        - listitem [ref=e153]:
+          - link "Oracle Multicloud Open" [ref=e154] [cursor=pointer]:
+            - /url: /en-us/iaas/Content/multicloud/Oraclemulticloud.htm
+            - generic [ref=e155]: Oracle Multicloud
+            - button "Open" [ref=e156]:
+              - img [ref=e157]
+        - listitem [ref=e159]:
+          - link "Oracle Cloud Infrastructure Government Cloud Open" [ref=e160] [cursor=pointer]:
+            - /url: /en-us/iaas/Content/gov-cloud/govlanding.htm
+            - generic [ref=e161]: Oracle Cloud Infrastructure Government Cloud
+            - button "Open" [ref=e162]:
+              - img [ref=e163]
+        - listitem [ref=e165]:
+          - link "Oracle UK Sovereign Cloud Open" [ref=e166] [cursor=pointer]:
+            - /url: /en-us/iaas/Content/uk-sovereign-cloud/home.htm
+            - generic [ref=e167]: Oracle UK Sovereign Cloud
+            - button "Open" [ref=e168]:
+              - img [ref=e169]
+        - listitem [ref=e171]:
+          - link "Oracle EU Sovereign Cloud" [ref=e172] [cursor=pointer]:
+            - /url: /en-us/iaas/Content/sovereign-cloud/eu-sovereign-cloud.htm
+            - generic [ref=e173]: Oracle EU Sovereign Cloud
+        - listitem [ref=e174]:
+          - link "Applications Services Open" [ref=e175] [cursor=pointer]:
+            - /url: /en-us/iaas/Content/applications-manager/applications-services-home.htm
+            - generic [ref=e176]: Applications Services
+            - button "Open" [ref=e177]:
+              - img [ref=e178]
+        - listitem [ref=e180]:
+          - link "Infrastructure Services Close" [ref=e181] [cursor=pointer]:
+            - /url: /en-us/iaas/Content/services.htm
+            - generic [ref=e182]: Infrastructure Services
+            - button "Close" [ref=e183]:
+              - img [ref=e184]
+          - list [ref=e186]:
+            - listitem [ref=e187]:
+              - link "Service Essentials Open" [ref=e188] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/General/serviceessentials.htm
+                - generic [ref=e189]: Service Essentials
+                - button "Open" [ref=e190]:
+                  - img [ref=e191]
+            - listitem [ref=e193]:
+              - link "Access Governance Open" [ref=e194] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/access-governance/home.htm
+                - generic [ref=e195]: Access Governance
+                - button "Open" [ref=e196]:
+                  - img [ref=e197]
+            - listitem [ref=e199]:
+              - link "AI Data Platform" [ref=e200] [cursor=pointer]:
+                - /url: /en-us/iaas/ai-data-platform/index.html
+                - generic [ref=e201]: AI Data Platform
+            - listitem [ref=e202]:
+              - link "Analytics Cloud Open" [ref=e203] [cursor=pointer]:
+                - /url: /en-us/iaas/analytics-cloud/index.html
+                - generic [ref=e204]: Analytics Cloud
+                - button "Open" [ref=e205]:
+                  - img [ref=e206]
+            - listitem [ref=e208]:
+              - link "API Gateway Open" [ref=e209] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/APIGateway/home.htm
+                - generic [ref=e210]: API Gateway
+                - button "Open" [ref=e211]:
+                  - img [ref=e212]
+            - listitem [ref=e214]:
+              - link "Application Dependency Management Open" [ref=e215] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/application-dependency-management/home.htm
+                - generic [ref=e216]: Application Dependency Management
+                - button "Open" [ref=e217]:
+                  - img [ref=e218]
+            - listitem [ref=e220]:
+              - link "Application Performance Monitoring Open" [ref=e221] [cursor=pointer]:
+                - /url: /en-us/iaas/application-performance-monitoring/home.htm
+                - generic [ref=e222]: Application Performance Monitoring
+                - button "Open" [ref=e223]:
+                  - img [ref=e224]
+            - listitem [ref=e226]:
+              - link "Archive Storage Open" [ref=e227] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Archive/home.htm
+                - generic [ref=e228]: Archive Storage
+                - button "Open" [ref=e229]:
+                  - img [ref=e230]
+            - listitem [ref=e232]:
+              - link "Artifact Registry Open" [ref=e233] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/artifacts/home.htm
+                - generic [ref=e234]: Artifact Registry
+                - button "Open" [ref=e235]:
+                  - img [ref=e236]
+            - listitem [ref=e238]:
+              - link "Audit Open" [ref=e239] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Audit/home.htm
+                - generic [ref=e240]: Audit
+                - button "Open" [ref=e241]:
+                  - img [ref=e242]
+            - listitem [ref=e244]:
+              - link "Automated CEMLI Execution Open" [ref=e245] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/auto-cemli-execution/home.htm
+                - generic [ref=e246]: Automated CEMLI Execution
+                - button "Open" [ref=e247]:
+                  - img [ref=e248]
+            - listitem [ref=e250]:
+              - link "Autonomous Linux Open" [ref=e251] [cursor=pointer]:
+                - /url: /en-us/iaas/autonomous-linux/doc/home.htm
+                - generic [ref=e252]: Autonomous Linux
+                - button "Open" [ref=e253]:
+                  - img [ref=e254]
+            - listitem [ref=e256]:
+              - link "Bastion Open" [ref=e257] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Bastion/home.htm
+                - generic [ref=e258]: Bastion
+                - button "Open" [ref=e259]:
+                  - img [ref=e260]
+            - listitem [ref=e262]:
+              - link "Batch Open" [ref=e263] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/oci-batch/home.htm
+                - generic [ref=e264]: Batch
+                - button "Open" [ref=e265]:
+                  - img [ref=e266]
+            - listitem [ref=e268]:
+              - link "Big Data Service Open" [ref=e269] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/bigdata/home.htm
+                - generic [ref=e270]: Big Data Service
+                - button "Open" [ref=e271]:
+                  - img [ref=e272]
+            - listitem [ref=e274]:
+              - link "Billing and Cost Management Open" [ref=e275] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Billing/home.htm
+                - generic [ref=e276]: Billing and Cost Management
+                - button "Open" [ref=e277]:
+                  - img [ref=e278]
+            - listitem [ref=e280]:
+              - link "Block Volume Open" [ref=e281] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Block/home.htm
+                - generic [ref=e282]: Block Volume
+                - button "Open" [ref=e283]:
+                  - img [ref=e284]
+            - listitem [ref=e286]:
+              - link "Blockchain Platform" [ref=e287] [cursor=pointer]:
+                - /url: /en-us/iaas/blockchain-platform/index.html
+                - generic [ref=e288]: Blockchain Platform
+            - listitem [ref=e289]:
+              - link "Certificates Open" [ref=e290] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/certificates/home.htm
+                - generic [ref=e291]: Certificates
+                - button "Open" [ref=e292]:
+                  - img [ref=e293]
+            - listitem [ref=e295]:
+              - link "Cloud Advisor Open" [ref=e296] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/CloudAdvisor/home.htm
+                - generic [ref=e297]: Cloud Advisor
+                - button "Open" [ref=e298]:
+                  - img [ref=e299]
+            - listitem [ref=e301]:
+              - link "Cloud Guard Open" [ref=e302] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/cloud-guard/home.htm
+                - generic [ref=e303]: Cloud Guard
+                - button "Open" [ref=e304]:
+                  - img [ref=e305]
+            - listitem [ref=e307]:
+              - link "Cluster Placement Groups Open" [ref=e308] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/cluster-placement-groups/home.htm
+                - generic [ref=e309]: Cluster Placement Groups
+                - button "Open" [ref=e310]:
+                  - img [ref=e311]
+            - listitem [ref=e313]:
+              - link "Compartment Quotas Open" [ref=e314] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Quotas/home.htm
+                - generic [ref=e315]: Compartment Quotas
+                - button "Open" [ref=e316]:
+                  - img [ref=e317]
+            - listitem [ref=e319]:
+              - link "Compliance Documents Open" [ref=e320] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/ComplianceDocuments/Concepts/compliancedocsoverview.htm
+                - generic [ref=e321]: Compliance Documents
+                - button "Open" [ref=e322]:
+                  - img [ref=e323]
+            - listitem [ref=e325]:
+              - link "Compute Open" [ref=e326] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Compute/home.htm
+                - generic [ref=e327]: Compute
+                - button "Open" [ref=e328]:
+                  - img [ref=e329]
+            - listitem [ref=e331]:
+              - link "Compute Cloud@Customer Open" [ref=e332] [cursor=pointer]:
+                - /url: /en-us/iaas/compute-cloud-at-customer/ccc/home.htm
+                - generic [ref=e333]: Compute Cloud@Customer
+                - button "Open" [ref=e334]:
+                  - img [ref=e335]
+            - listitem [ref=e337]:
+              - link "Compute Cloud@Customer Isolated Open" [ref=e338] [cursor=pointer]:
+                - /url: /en-us/iaas/compute-cloud-at-customer-isolated/c3i/home.htm
+                - generic [ref=e339]: Compute Cloud@Customer Isolated
+                - button "Open" [ref=e340]:
+                  - img [ref=e341]
+            - listitem [ref=e343]:
+              - link "Connector Hub Open" [ref=e344] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/connector-hub/home.htm
+                - generic [ref=e345]: Connector Hub
+                - button "Open" [ref=e346]:
+                  - img [ref=e347]
+            - listitem [ref=e349]:
+              - link "Console Dashboards Open" [ref=e350] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Dashboards/home.htm
+                - generic [ref=e351]: Console Dashboards
+                - button "Open" [ref=e352]:
+                  - img [ref=e353]
+            - listitem [ref=e355]:
+              - link "Container Instances Open" [ref=e356] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/container-instances/home.htm
+                - generic [ref=e357]: Container Instances
+                - button "Open" [ref=e358]:
+                  - img [ref=e359]
+            - listitem [ref=e361]:
+              - link "Container Registry Open" [ref=e362] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Registry/home.htm
+                - generic [ref=e363]: Container Registry
+                - button "Open" [ref=e364]:
+                  - img [ref=e365]
+            - listitem [ref=e367]:
+              - link "Content Management Open" [ref=e368] [cursor=pointer]:
+                - /url: /en-us/iaas/content-management/index.html
+                - generic [ref=e369]: Content Management
+                - button "Open" [ref=e370]:
+                  - img [ref=e371]
+            - listitem [ref=e373]:
+              - link "Data Catalog Open" [ref=e374] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/data-catalog/home.htm
+                - generic [ref=e375]: Data Catalog
+                - button "Open" [ref=e376]:
+                  - img [ref=e377]
+            - listitem [ref=e379]:
+              - link "Data Flow Open" [ref=e380] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/data-flow/using/home.htm
+                - generic [ref=e381]: Data Flow
+                - button "Open" [ref=e382]:
+                  - img [ref=e383]
+            - listitem [ref=e385]:
+              - link "Data Integration Open" [ref=e386] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/data-integration/home.htm
+                - generic [ref=e387]: Data Integration
+                - button "Open" [ref=e388]:
+                  - img [ref=e389]
+            - listitem [ref=e391]:
+              - link "Data Labeling Open" [ref=e392] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/data-labeling/using/home.htm
+                - generic [ref=e393]: Data Labeling
+                - button "Open" [ref=e394]:
+                  - img [ref=e395]
+            - listitem [ref=e397]:
+              - link "Data Safe" [ref=e398] [cursor=pointer]:
+                - /url: /en-us/iaas/data-safe/index.html
+                - generic [ref=e399]: Data Safe
+            - listitem [ref=e400]:
+              - link "Data Science Open" [ref=e401] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/data-science/using/home.htm
+                - generic [ref=e402]: Data Science
+                - button "Open" [ref=e403]:
+                  - img [ref=e404]
+            - listitem [ref=e406]:
+              - link "Database Open" [ref=e407] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Database/home.htm
+                - generic [ref=e408]: Database
+                - button "Open" [ref=e409]:
+                  - img [ref=e410]
+            - listitem [ref=e412]:
+              - link "Database Management Open" [ref=e413] [cursor=pointer]:
+                - /url: /en-us/iaas/database-management/home.htm
+                - generic [ref=e414]: Database Management
+                - button "Open" [ref=e415]:
+                  - img [ref=e416]
+            - listitem [ref=e418]:
+              - link "Database Migration Open" [ref=e419] [cursor=pointer]:
+                - /url: /en-us/iaas/database-migration/index.html
+                - generic [ref=e420]: Database Migration
+                - button "Open" [ref=e421]:
+                  - img [ref=e422]
+            - listitem [ref=e424]:
+              - link "Database Tools Open" [ref=e425] [cursor=pointer]:
+                - /url: /en-us/iaas/database-tools/home.htm
+                - generic [ref=e426]: Database Tools
+                - button "Open" [ref=e427]:
+                  - img [ref=e428]
+            - listitem [ref=e430]:
+              - link "DevOps Open" [ref=e431] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/devops/using/home.htm
+                - generic [ref=e432]: DevOps
+                - button "Open" [ref=e433]:
+                  - img [ref=e434]
+            - listitem [ref=e436]:
+              - link "Digital Assistant Open" [ref=e437] [cursor=pointer]:
+                - /url: /en-us/iaas/digital-assistant/index.html
+                - generic [ref=e438]: Digital Assistant
+                - button "Open" [ref=e439]:
+                  - img [ref=e440]
+            - listitem [ref=e442]:
+              - link "Disaster Recovery Open" [ref=e443] [cursor=pointer]:
+                - /url: /en-us/iaas/disaster-recovery/index.html
+                - generic [ref=e444]: Disaster Recovery
+                - button "Open" [ref=e445]:
+                  - img [ref=e446]
+            - listitem [ref=e448]:
+              - link "DNS and Traffic Management Open" [ref=e449] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/DNS/home.htm
+                - generic [ref=e450]: DNS and Traffic Management
+                - button "Open" [ref=e451]:
+                  - img [ref=e452]
+            - listitem [ref=e454]:
+              - link "Document Understanding Open" [ref=e455] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/document-understanding/using/home.htm
+                - generic [ref=e456]: Document Understanding
+                - button "Open" [ref=e457]:
+                  - img [ref=e458]
+            - listitem [ref=e460]:
+              - link "Email Delivery Open" [ref=e461] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Email/home.htm
+                - generic [ref=e462]: Email Delivery
+                - button "Open" [ref=e463]:
+                  - img [ref=e464]
+            - listitem [ref=e466]:
+              - link "Events Open" [ref=e467] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Events/home.htm
+                - generic [ref=e468]: Events
+                - button "Open" [ref=e469]:
+                  - img [ref=e470]
+            - listitem [ref=e472]:
+              - link "File Storage Open" [ref=e473] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/File/home.htm
+                - generic [ref=e474]: File Storage
+                - button "Open" [ref=e475]:
+                  - img [ref=e476]
+            - listitem [ref=e478]:
+              - link "File Storage with Lustre Open" [ref=e479] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/lustre/home.htm
+                - generic [ref=e480]: File Storage with Lustre
+                - button "Open" [ref=e481]:
+                  - img [ref=e482]
+            - listitem [ref=e484]:
+              - link "Fleet Application Management Open" [ref=e485] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/fleet-management/home.htm
+                - generic [ref=e486]: Fleet Application Management
+                - button "Open" [ref=e487]:
+                  - img [ref=e488]
+            - listitem [ref=e490]:
+              - link "Functions Open" [ref=e491] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Functions/home.htm
+                - generic [ref=e492]: Functions
+                - button "Open" [ref=e493]:
+                  - img [ref=e494]
+            - listitem [ref=e496]:
+              - link "Fusion Data Intelligence Open" [ref=e497] [cursor=pointer]:
+                - /url: /en-us/iaas/analytics-for-applications/index.html
+                - generic [ref=e498]: Fusion Data Intelligence
+                - button "Open" [ref=e499]:
+                  - img [ref=e500]
+            - listitem [ref=e502]:
+              - link "Generative AI Open" [ref=e503] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/generative-ai/home.htm
+                - generic [ref=e504]: Generative AI
+                - button "Open" [ref=e505]:
+                  - img [ref=e506]
+            - listitem [ref=e508]:
+              - link "Generative AI Agents Open" [ref=e509] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/generative-ai-agents/home.htm
+                - generic [ref=e510]: Generative AI Agents
+                - button "Open" [ref=e511]:
+                  - img [ref=e512]
+            - listitem [ref=e514]:
+              - link "Globally Distributed Exadata Database on Exascale Infrastructure" [ref=e515] [cursor=pointer]:
+                - /url: /en-us/iaas/globally-distributed-exascale-database/index.html
+                - generic [ref=e516]: Globally Distributed Exadata Database on Exascale Infrastructure
+            - listitem [ref=e517]:
+              - link "GoldenGate Open" [ref=e518] [cursor=pointer]:
+                - /url: /en-us/iaas/goldengate/index.html
+                - generic [ref=e519]: GoldenGate
+                - button "Open" [ref=e520]:
+                  - img [ref=e521]
+            - listitem [ref=e523]:
+              - link "Health Checks Open" [ref=e524] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/HealthChecks/home.htm
+                - generic [ref=e525]: Health Checks
+                - button "Open" [ref=e526]:
+                  - img [ref=e527]
+            - listitem [ref=e529]:
+              - link "IAM with Identity Domains Open" [ref=e530] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Identity/home.htm
+                - generic [ref=e531]: IAM with Identity Domains
+                - button "Open" [ref=e532]:
+                  - img [ref=e533]
+            - listitem [ref=e535]:
+              - link "IAM without Identity Domains Open" [ref=e536] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Identity/home1.htm
+                - generic [ref=e537]: IAM without Identity Domains
+                - button "Open" [ref=e538]:
+                  - img [ref=e539]
+            - listitem [ref=e541]:
+              - link "Integration 3 Open" [ref=e542] [cursor=pointer]:
+                - /url: /en-us/iaas/application-integration/index.html
+                - generic [ref=e543]: Integration 3
+                - button "Open" [ref=e544]:
+                  - img [ref=e545]
+            - listitem [ref=e547]:
+              - link "Internet of Things Open" [ref=e548] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/internet-of-things/home.htm
+                - generic [ref=e549]: Internet of Things
+                - button "Open" [ref=e550]:
+                  - img [ref=e551]
+            - listitem [ref=e553]:
+              - link "Java Management Open" [ref=e554] [cursor=pointer]:
+                - /url: /en-us/iaas/jms/index.html
+                - generic [ref=e555]: Java Management
+                - button "Open" [ref=e556]:
+                  - img [ref=e557]
+            - listitem [ref=e559]:
+              - link "Kubernetes Engine (OKE) Open" [ref=e560] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/ContEng/home.htm
+                - generic [ref=e561]: Kubernetes Engine (OKE)
+                - button "Open" [ref=e562]:
+                  - img [ref=e563]
+            - listitem [ref=e565]:
+              - link "Language Open" [ref=e566] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/language/using/home.htm
+                - generic [ref=e567]: Language
+                - button "Open" [ref=e568]:
+                  - img [ref=e569]
+            - listitem [ref=e571]:
+              - link "Load Balancer Open" [ref=e572] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Balance/home.htm
+                - generic [ref=e573]: Load Balancer
+                - button "Open" [ref=e574]:
+                  - img [ref=e575]
+            - listitem [ref=e577]:
+              - link "Log Analytics Open" [ref=e578] [cursor=pointer]:
+                - /url: /en-us/iaas/log-analytics/home.htm
+                - generic [ref=e579]: Log Analytics
+                - button "Open" [ref=e580]:
+                  - img [ref=e581]
+            - listitem [ref=e583]:
+              - link "Logging Open" [ref=e584] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Logging/home.htm
+                - generic [ref=e585]: Logging
+                - button "Open" [ref=e586]:
+                  - img [ref=e587]
+            - listitem [ref=e589]:
+              - link "Managed Access Open" [ref=e590] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/managed-access/home.htm
+                - generic [ref=e591]: Managed Access
+                - button "Open" [ref=e592]:
+                  - img [ref=e593]
+            - listitem [ref=e595]:
+              - link "Managed Cloud Self Service Platform Open" [ref=e596] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/managed-cloud-self-service/home.htm
+                - generic [ref=e597]: Managed Cloud Self Service Platform
+                - button "Open" [ref=e598]:
+                  - img [ref=e599]
+            - listitem [ref=e601]:
+              - link "Managed Services for Mac Open" [ref=e602] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/managed-mac/home.htm
+                - generic [ref=e603]: Managed Services for Mac
+                - button "Open" [ref=e604]:
+                  - img [ref=e605]
+            - listitem [ref=e607]:
+              - link "Management Agent Open" [ref=e608] [cursor=pointer]:
+                - /url: /en-us/iaas/management-agents/home.htm
+                - generic [ref=e609]: Management Agent
+                - button "Open" [ref=e610]:
+                  - img [ref=e611]
+            - listitem [ref=e613]:
+              - link "Management Dashboard Open" [ref=e614] [cursor=pointer]:
+                - /url: /en-us/iaas/management-dashboard/home.htm
+                - generic [ref=e615]: Management Dashboard
+                - button "Open" [ref=e616]:
+                  - img [ref=e617]
+            - listitem [ref=e619]:
+              - link "Media Services Open" [ref=e620] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/media-services/home.htm
+                - generic [ref=e621]: Media Services
+                - button "Open" [ref=e622]:
+                  - img [ref=e623]
+            - listitem [ref=e625]:
+              - link "Monitoring Open" [ref=e626] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Monitoring/home.htm
+                - generic [ref=e627]: Monitoring
+                - button "Open" [ref=e628]:
+                  - img [ref=e629]
+            - listitem [ref=e631]:
+              - link "MySQL HeatWave Open" [ref=e632] [cursor=pointer]:
+                - /url: /en-us/iaas/mysql-database/home.htm
+                - generic [ref=e633]: MySQL HeatWave
+                - button "Open" [ref=e634]:
+                  - img [ref=e635]
+            - listitem [ref=e637]:
+              - link "Network Firewall Open" [ref=e638] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/network-firewall/home.htm
+                - generic [ref=e639]: Network Firewall
+                - button "Open" [ref=e640]:
+                  - img [ref=e641]
+            - listitem [ref=e643]:
+              - link "Network Load Balancer Open" [ref=e644] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/NetworkLoadBalancer/home.htm
+                - generic [ref=e645]: Network Load Balancer
+                - button "Open" [ref=e646]:
+                  - img [ref=e647]
+            - listitem [ref=e649]:
+              - link "Networking Open" [ref=e650] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Network/Concepts/landing.htm
+                - generic [ref=e651]: Networking
+                - button "Open" [ref=e652]:
+                  - img [ref=e653]
+            - listitem [ref=e655]:
+              - link "NoSQL Database" [ref=e656] [cursor=pointer]:
+                - /url: /en-us/iaas/nosql-database/index.html
+                - generic [ref=e657]: NoSQL Database
+            - listitem [ref=e658]:
+              - link "Notifications Open" [ref=e659] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Notification/home.htm
+                - generic [ref=e660]: Notifications
+                - button "Open" [ref=e661]:
+                  - img [ref=e662]
+            - listitem [ref=e664]:
+              - link "Object Storage Open" [ref=e665] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Object/home.htm
+                - generic [ref=e666]: Object Storage
+                - button "Open" [ref=e667]:
+                  - img [ref=e668]
+            - listitem [ref=e670]:
+              - link "OCI Cache Open" [ref=e671] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/ocicache/home.htm
+                - generic [ref=e672]: OCI Cache
+                - button "Open" [ref=e673]:
+                  - img [ref=e674]
+            - listitem [ref=e676]:
+              - link "OCI Control Center Open" [ref=e677] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/control-center/home.htm
+                - generic [ref=e678]: OCI Control Center
+                - button "Open" [ref=e679]:
+                  - img [ref=e680]
+            - listitem [ref=e682]:
+              - link "OCI Database with PostgreSQL Open" [ref=e683] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/postgresql/home.htm
+                - generic [ref=e684]: OCI Database with PostgreSQL
+                - button "Open" [ref=e685]:
+                  - img [ref=e686]
+            - listitem [ref=e688]:
+              - link "OpenShift Container Platform on OCI Open" [ref=e689] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/openshift-on-oci/overview.htm
+                - generic [ref=e690]: OpenShift Container Platform on OCI
+                - button "Open" [ref=e691]:
+                  - img [ref=e692]
+            - listitem [ref=e694]:
+              - link "Ops Insights Open" [ref=e695] [cursor=pointer]:
+                - /url: /en-us/iaas/operations-insights/home.htm
+                - generic [ref=e696]: Ops Insights
+                - button "Open" [ref=e697]:
+                  - img [ref=e698]
+            - listitem [ref=e700]:
+              - link "Oracle APEX Application Development" [ref=e701] [cursor=pointer]:
+                - /url: /en-us/iaas/apex/index.html
+                - generic [ref=e702]: Oracle APEX Application Development
+            - listitem [ref=e703]:
+              - link "Oracle Cloud Migrations Open" [ref=e704] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/cloud-migration/home.htm
+                - generic [ref=e705]: Oracle Cloud Migrations
+                - button "Open" [ref=e706]:
+                  - img [ref=e707]
+            - listitem [ref=e709]:
+              - link "Oracle Linux Open" [ref=e710] [cursor=pointer]:
+                - /url: /en-us/iaas/oracle-linux/home.htm
+                - generic [ref=e711]: Oracle Linux
+                - button "Open" [ref=e712]:
+                  - img [ref=e713]
+            - listitem [ref=e715]:
+              - link "OS Management Hub Open" [ref=e716] [cursor=pointer]:
+                - /url: /en-us/iaas/osmh/doc/home.htm
+                - generic [ref=e717]: OS Management Hub
+                - button "Open" [ref=e718]:
+                  - img [ref=e719]
+            - listitem [ref=e721]:
+              - link "Private Cloud Appliance Open" [ref=e722] [cursor=pointer]:
+                - /url: /en-us/iaas/private-cloud-appliance/pca/home.htm
+                - generic [ref=e723]: Private Cloud Appliance
+                - button "Open" [ref=e724]:
+                  - img [ref=e725]
+            - listitem [ref=e727]:
+              - link "Process Automation Open" [ref=e728] [cursor=pointer]:
+                - /url: /en-us/iaas/process-automation/index.html
+                - generic [ref=e729]: Process Automation
+                - button "Open" [ref=e730]:
+                  - img [ref=e731]
+            - listitem [ref=e733]:
+              - link "Pulse Open" [ref=e734] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/pulse/home.htm
+                - generic [ref=e735]: Pulse
+                - button "Open" [ref=e736]:
+                  - img [ref=e737]
+            - listitem [ref=e739]:
+              - link "Queue Open" [ref=e740] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/queue/home.htm
+                - generic [ref=e741]: Queue
+                - button "Open" [ref=e742]:
+                  - img [ref=e743]
+            - listitem [ref=e745]:
+              - link "Resource Analytics Open" [ref=e746] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/resource-analytics/home.htm
+                - generic [ref=e747]: Resource Analytics
+                - button "Open" [ref=e748]:
+                  - img [ref=e749]
+            - listitem [ref=e751]:
+              - link "Resource Manager Open" [ref=e752] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/ResourceManager/home.htm
+                - generic [ref=e753]: Resource Manager
+                - button "Open" [ref=e754]:
+                  - img [ref=e755]
+            - listitem [ref=e757]:
+              - link "Resource Scheduler Open" [ref=e758] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/resource-scheduler/home.htm
+                - generic [ref=e759]: Resource Scheduler
+                - button "Open" [ref=e760]:
+                  - img [ref=e761]
+            - listitem [ref=e763]:
+              - link "Roving Edge Classic Open" [ref=e764] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Rover/home.htm
+                - generic [ref=e765]: Roving Edge Classic
+                - button "Open" [ref=e766]:
+                  - img [ref=e767]
+            - listitem [ref=e769]:
+              - link "Roving Edge Infrastructure Open" [ref=e770] [cursor=pointer]:
+                - /url: /en-us/iaas/roving-edge-infrastructure/rvr/home.htm
+                - generic [ref=e771]: Roving Edge Infrastructure
+                - button "Open" [ref=e772]:
+                  - img [ref=e773]
+            - listitem [ref=e775]:
+              - link "Search Open" [ref=e776] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Search/home.htm
+                - generic [ref=e777]: Search
+                - button "Open" [ref=e778]:
+                  - img [ref=e779]
+            - listitem [ref=e781]:
+              - link "Search with OpenSearch Open" [ref=e782] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/search-opensearch/home.htm
+                - generic [ref=e783]: Search with OpenSearch
+                - button "Open" [ref=e784]:
+                  - img [ref=e785]
+            - listitem [ref=e787]:
+              - link "Secret Management Service Open" [ref=e788] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/secret-management/home.htm
+                - generic [ref=e789]: Secret Management Service
+                - button "Open" [ref=e790]:
+                  - img [ref=e791]
+            - listitem [ref=e793]:
+              - link "Secure Desktops Open" [ref=e794] [cursor=pointer]:
+                - /url: /en-us/iaas/secure-desktops/home.htm
+                - generic [ref=e795]: Secure Desktops
+                - button "Open" [ref=e796]:
+                  - img [ref=e797]
+            - listitem [ref=e799]:
+              - link "Security Advisor Open" [ref=e800] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/SecurityAdvisor/home.htm
+                - generic [ref=e801]: Security Advisor
+                - button "Open" [ref=e802]:
+                  - img [ref=e803]
+            - listitem [ref=e805]:
+              - link "Security Zones Open" [ref=e806] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/security-zone/home.htm
+                - generic [ref=e807]: Security Zones
+                - button "Open" [ref=e808]:
+                  - img [ref=e809]
+            - listitem [ref=e811]:
+              - link "Speech Open" [ref=e812] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/speech/home.htm
+                - generic [ref=e813]: Speech
+                - button "Open" [ref=e814]:
+                  - img [ref=e815]
+            - listitem [ref=e817]:
+              - link "Stack Monitoring Open" [ref=e818] [cursor=pointer]:
+                - /url: /en-us/iaas/stack-monitoring/home.htm
+                - generic [ref=e819]: Stack Monitoring
+                - button "Open" [ref=e820]:
+                  - img [ref=e821]
+            - listitem [ref=e823]:
+              - link "Streaming Open" [ref=e824] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Streaming/home.htm
+                - generic [ref=e825]: Streaming
+                - button "Open" [ref=e826]:
+                  - img [ref=e827]
+            - listitem [ref=e829]:
+              - link "Streaming with Apache Kafka Open" [ref=e830] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/kafka/home.htm
+                - generic [ref=e831]: Streaming with Apache Kafka
+                - button "Open" [ref=e832]:
+                  - img [ref=e833]
+            - listitem [ref=e835]:
+              - link "Tagging Open" [ref=e836] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/Tagging/home.htm
+                - generic [ref=e837]: Tagging
+                - button "Open" [ref=e838]:
+                  - img [ref=e839]
+            - listitem [ref=e841]:
+              - link "Threat Intelligence Open" [ref=e842] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/threat-intel/home.htm
+                - generic [ref=e843]: Threat Intelligence
+                - button "Open" [ref=e844]:
+                  - img [ref=e845]
+            - listitem [ref=e847]:
+              - link "Vault Open" [ref=e848] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/KeyManagement/home.htm
+                - generic [ref=e849]: Vault
+                - button "Open" [ref=e850]:
+                  - img [ref=e851]
+            - listitem [ref=e853]:
+              - link "Vision Open" [ref=e854] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/vision/using/home.htm
+                - generic [ref=e855]: Vision
+                - button "Open" [ref=e856]:
+                  - img [ref=e857]
+            - listitem [ref=e859]:
+              - link "Visual Builder Open" [ref=e860] [cursor=pointer]:
+                - /url: /en-us/iaas/visual-builder/index.html
+                - generic [ref=e861]: Visual Builder
+                - button "Open" [ref=e862]:
+                  - img [ref=e863]
+            - listitem [ref=e865]:
+              - link "Visual Builder Studio Open" [ref=e866] [cursor=pointer]:
+                - /url: /en-us/iaas/visual-builder-studio/index.html
+                - generic [ref=e867]: Visual Builder Studio
+                - button "Open" [ref=e868]:
+                  - img [ref=e869]
+            - listitem [ref=e871]:
+              - link "VMware Solution Open" [ref=e872] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/VMware/home.htm
+                - generic [ref=e873]: VMware Solution
+                - button "Open" [ref=e874]:
+                  - img [ref=e875]
+            - listitem [ref=e877]:
+              - link "Vulnerability Scanning Open" [ref=e878] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/scanning/home.htm
+                - generic [ref=e879]: Vulnerability Scanning
+                - button "Open" [ref=e880]:
+                  - img [ref=e881]
+            - listitem [ref=e883]:
+              - link "Web Application Acceleration Open" [ref=e884] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/web-app-acceleration/home.htm
+                - generic [ref=e885]: Web Application Acceleration
+                - button "Open" [ref=e886]:
+                  - img [ref=e887]
+            - listitem [ref=e889]:
+              - link "Web Application Firewall Open" [ref=e890] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/WAF/home.htm
+                - generic [ref=e891]: Web Application Firewall
+                - button "Open" [ref=e892]:
+                  - img [ref=e893]
+            - listitem [ref=e895]:
+              - link "WebLogic Management Open" [ref=e896] [cursor=pointer]:
+                - /url: /en-us/iaas/wlms/home.htm
+                - generic [ref=e897]: WebLogic Management
+                - button "Open" [ref=e898]:
+                  - img [ref=e899]
+            - listitem [ref=e901]:
+              - link "Zero Trust Packet Routing Close" [ref=e902] [cursor=pointer]:
+                - /url: /en-us/iaas/Content/zero-trust-packet-routing/home.htm
+                - generic [ref=e903]: Zero Trust Packet Routing
+                - button "Close" [ref=e904]:
+                  - img [ref=e905]
+              - list [ref=e907]:
+                - listitem [ref=e908]:
+                  - link "Overview" [ref=e909] [cursor=pointer]:
+                    - /url: /en-us/iaas/Content/zero-trust-packet-routing/overview.htm
+                    - generic [ref=e910]: Overview
+                - listitem [ref=e911]:
+                  - link "Getting Started" [ref=e912] [cursor=pointer]:
+                    - /url: /en-us/iaas/Content/zero-trust-packet-routing/getting-started.htm
+                    - generic [ref=e913]: Getting Started
+                - listitem [ref=e914]:
+                  - link "ZPR Artifacts Close" [ref=e915] [cursor=pointer]:
+                    - /url: /en-us/iaas/Content/zero-trust-packet-routing/zpr-artifacts.htm
+                    - generic [ref=e916]: ZPR Artifacts
+                    - button "Close" [ref=e917]:
+                      - img [ref=e918]
+                  - list [ref=e920]:
+                    - listitem [ref=e921]:
+                      - link "Security Attribute Namespaces" [ref=e922] [cursor=pointer]:
+                        - /url: /en-us/iaas/Content/zero-trust-packet-routing/security-attribute-namespaces.htm
+                        - generic [ref=e923]: Security Attribute Namespaces
+                    - listitem [ref=e924]:
+                      - link "ZPR Policies Close" [ref=e925] [cursor=pointer]:
+                        - /url: /en-us/iaas/Content/zero-trust-packet-routing/zpr-policy-overview.htm
+                        - generic [ref=e926]: ZPR Policies
+                        - button "Close" [ref=e927]:
+                          - img [ref=e928]
+                      - list [ref=e930]:
+                        - listitem [ref=e931]:
+                          - link "New Policy Syntax" [ref=e932] [cursor=pointer]:
+                            - /url: /en-us/iaas/Content/zero-trust-packet-routing/zpr-policy-syntax.htm
+                            - generic [ref=e933]: New
+                            - generic [ref=e934]: Policy Syntax
+                        - listitem [ref=e935]:
+                          - link "Policy Examples" [ref=e936] [cursor=pointer]:
+                            - /url: /en-us/iaas/Content/zero-trust-packet-routing/zpr-policy-examples.htm
+                            - generic [ref=e937]: Policy Examples
+                - listitem [ref=e938]:
+                  - link "Enabling Zero Trust Packet Routing" [ref=e939] [cursor=pointer]:
+                    - /url: /en-us/iaas/Content/zero-trust-packet-routing/enable-zpr.htm
+                    - generic [ref=e940]: Enabling Zero Trust Packet Routing
+                - listitem [ref=e941]:
+                  - link "Managing Security Attribute Namespaces Open" [ref=e942] [cursor=pointer]:
+                    - /url: /en-us/iaas/Content/zero-trust-packet-routing/managing-security-attribute-namespaces.htm
+                    - generic [ref=e943]: Managing Security Attribute Namespaces
+                    - button "Open" [ref=e944]:
+                      - img [ref=e945]
+                - listitem [ref=e947]:
+                  - link "Managing Security Attributes Open" [ref=e948] [cursor=pointer]:
+                    - /url: /en-us/iaas/Content/zero-trust-packet-routing/managing-security-attributes.htm
+                    - generic [ref=e949]: Managing Security Attributes
+                    - button "Open" [ref=e950]:
+                      - img [ref=e951]
+                - listitem [ref=e953]:
+                  - link "Managing Zero Trust Packet Routing Policies Open" [ref=e954] [cursor=pointer]:
+                    - /url: /en-us/iaas/Content/zero-trust-packet-routing/managing-zpr-policies.htm
+                    - generic [ref=e955]: Managing Zero Trust Packet Routing Policies
+                    - button "Open" [ref=e956]:
+                      - img [ref=e957]
+                - listitem [ref=e959]:
+                  - link "Managing Resources Open" [ref=e960] [cursor=pointer]:
+                    - /url: /en-us/iaas/Content/zero-trust-packet-routing/managing-resources.htm
+                    - generic [ref=e961]: Managing Resources
+                    - button "Open" [ref=e962]:
+                      - img [ref=e963]
+                - listitem [ref=e965]:
+                  - link "Managing Work Requests Open" [ref=e966] [cursor=pointer]:
+                    - /url: /en-us/iaas/Content/zero-trust-packet-routing/managingworkrequests.htm
+                    - generic [ref=e967]: Managing Work Requests
+                    - button "Open" [ref=e968]:
+                      - img [ref=e969]
+                - listitem [ref=e971]:
+                  - link "Zero Trust Packet Routing IAM Policies" [ref=e972] [cursor=pointer]:
+                    - /url: /en-us/iaas/Content/zero-trust-packet-routing/policy-reference.htm
+                    - generic [ref=e973]: Zero Trust Packet Routing IAM Policies
+                - listitem [ref=e974]:
+                  - link "Troubleshooting" [ref=e975] [cursor=pointer]:
+                    - /url: /en-us/iaas/Content/zero-trust-packet-routing/troubleshooting.htm
+                    - generic [ref=e976]: Troubleshooting
+                - listitem [ref=e977]:
+                  - link "Known Issues" [ref=e978] [cursor=pointer]:
+                    - /url: /en-us/iaas/Content/zero-trust-packet-routing/known-issues.htm
+                    - generic [ref=e979]: Known Issues
+        - listitem [ref=e980]:
+          - link "Developer Resources Open" [ref=e981] [cursor=pointer]:
+            - /url: /en-us/iaas/Content/devtoolshome.htm
+            - generic [ref=e982]: Developer Resources
+            - button "Open" [ref=e983]:
+              - img [ref=e984]
+        - listitem [ref=e986]:
+          - link "Security Open" [ref=e987] [cursor=pointer]:
+            - /url: /en-us/iaas/Content/Security/Concepts/security.htm
+            - generic [ref=e988]: Security
+            - button "Open" [ref=e989]:
+              - img [ref=e990]
+        - listitem [ref=e992]:
+          - link "Marketplace Open" [ref=e993] [cursor=pointer]:
+            - /url: /en-us/iaas/Content/Marketplace/home.htm
+            - generic [ref=e994]: Marketplace
+            - button "Open" [ref=e995]:
+              - img [ref=e996]
+        - listitem [ref=e998]:
+          - link "More Resources Open" [ref=e999] [cursor=pointer]:
+            - /url: /en-us/iaas/Content/General/Reference/more.htm
+            - generic [ref=e1000]: More Resources
+            - button "Open" [ref=e1001]:
+              - img [ref=e1002]
+        - listitem [ref=e1004]:
+          - link "Glossary" [ref=e1005] [cursor=pointer]:
+            - /url: /en-us/iaas/Content/libraries/glossary/glossary-intro.htm
+            - generic [ref=e1006]: Glossary
+        - listitem [ref=e1007]:
+          - link "Oracle Cloud Console" [ref=e1008] [cursor=pointer]:
+            - /url: https://cloud.oracle.com/
+            - generic [ref=e1009]: Oracle Cloud Console
+  - contentinfo [ref=e1010]:
+    - list [ref=e1012]:
+      - listitem [ref=e1013]:
+        - generic [ref=e1014]: Copyright © 2026, Oracle and/or its affiliates.
+      - listitem [ref=e1015]:
+        - link "About Oracle" [ref=e1016] [cursor=pointer]:
+          - /url: https://www.oracle.com/corporate/index.html
+      - listitem [ref=e1017]:
+        - link "Contact Us" [ref=e1018] [cursor=pointer]:
+          - /url: https://www.oracle.com/corporate/contact/index.html
+      - listitem [ref=e1019]:
+        - link "Legal Notices" [ref=e1020] [cursor=pointer]:
+          - /url: /iaas/Content/legalnotices.htm
+      - listitem [ref=e1021]:
+        - link "Terms of Use & Privacy" [ref=e1022] [cursor=pointer]:
+          - /url: https://www.oracle.com/legal/privacy/
+      - listitem [ref=e1023]:
+        - link "Document Conventions" [ref=e1024] [cursor=pointer]:
+          - /url: /iaas/Content/General/Reference/docconventions.htm
+      - listitem [ref=e1025]:
+        - complementary "Open Cookie Preferences Modal" [ref=e1026]:
+          - link "Cookie Preferences, opens a dedicated popup modal window" [ref=e1027] [cursor=pointer]: Cookie Preferences

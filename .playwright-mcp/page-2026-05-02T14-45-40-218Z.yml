@@ -1,0 +1,8 @@
+- generic [ref=e2]:
+  - heading "ZPR Policy Maker" [level=1] [ref=e3]
+  - paragraph [ref=e4]: Sign in to your namespace
+  - paragraph [ref=e5]: Incorrect username or password.
+  - generic [ref=e6]:
+    - textbox "Username" [active] [ref=e7]
+    - textbox "Password" [ref=e8]
+    - button "Sign in" [ref=e9] [cursor=pointer]

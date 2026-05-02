@@ -1,0 +1,45 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - heading "ZPR Policy Maker v2" [level=1] [ref=e3]
+    - generic [ref=e4]:
+      - button "ZPL" [ref=e5] [cursor=pointer]
+      - button "ZPEL" [ref=e6] [cursor=pointer]
+    - button "Sign out" [ref=e8] [cursor=pointer]
+  - generic [ref=e9]:
+    - complementary [ref=e10]:
+      - heading "Policy Sets" [level=2] [ref=e11]
+      - button "+ New policy set" [ref=e12] [cursor=pointer]
+      - generic [ref=e13]:
+        - generic [ref=e14] [cursor=pointer]: Employee Policy
+        - generic [ref=e15] [cursor=pointer]: Corporate Datacenter Policy
+        - generic [ref=e16] [cursor=pointer]: Corporate Datacenter Policy
+        - generic [ref=e17] [cursor=pointer]: Corporate Datacenter Policy
+        - generic [ref=e18] [cursor=pointer]: Corporate Datacenter Policy
+        - generic [ref=e19] [cursor=pointer]: Corporate Datacenter Policy
+        - generic [ref=e20] [cursor=pointer]: Corporate Datacenter Policy
+        - generic [ref=e21] [cursor=pointer]: Corporate Datacenter Policy
+        - generic [ref=e22] [cursor=pointer]: Corporate Datacenter Policy
+        - generic [ref=e23] [cursor=pointer]: Corporate Datacenter Policy
+        - generic [ref=e24] [cursor=pointer]: Corporate Datacenter Policy
+        - generic [ref=e25] [cursor=pointer]: Corporate Datacenter Access Policy
+    - generic [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e28] [cursor=pointer]: Chat
+        - generic [ref=e29] [cursor=pointer]: Build
+        - generic [ref=e30] [cursor=pointer]: ZPL
+        - generic [ref=e31] [cursor=pointer]: ZPEL
+        - generic [ref=e32] [cursor=pointer]: IR
+        - generic [ref=e33] [cursor=pointer]: Policy
+        - generic [ref=e34] [cursor=pointer]: Simulate
+      - generic [ref=e46]:
+        - generic [ref=e47]:
+          - heading "Class Assistant" [level=2] [ref=e48]
+          - paragraph [ref=e49]: Describe a class — the assistant will propose it. Accept to add it to your policy.
+          - generic [ref=e50]:
+            - button "Classes" [ref=e51] [cursor=pointer]
+            - button "Rules" [ref=e52] [cursor=pointer]
+            - button "Clear all" [ref=e53] [cursor=pointer]
+        - generic [ref=e55]:
+          - 'textbox "e.g. Employees belong to one or more groups: sales, hr, engineering…" [ref=e56]'
+          - button "Send" [ref=e57] [cursor=pointer]
+        - generic [ref=e59]: Describe a class and the assistant will propose it. Accept to add it to your policy.

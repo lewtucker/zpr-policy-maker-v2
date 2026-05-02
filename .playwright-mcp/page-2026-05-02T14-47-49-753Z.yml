@@ -1,0 +1,68 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]: ZPR Policy Maker
+    - generic [ref=e4]: LT
+    - button "Profile" [ref=e5] [cursor=pointer]
+    - button "Sign out" [ref=e6] [cursor=pointer]
+  - generic [ref=e7]:
+    - complementary [ref=e8]:
+      - generic [ref=e9]:
+        - heading "Namespace Selector" [level=2] [ref=e10]
+        - button "+ New" [ref=e11] [cursor=pointer]
+      - generic [ref=e12]:
+        - generic [ref=e13] [cursor=pointer]:
+          - generic [ref=e15]: Corp
+          - generic [ref=e16]: active
+        - generic [ref=e17] [cursor=pointer]:
+          - generic [ref=e18]: └
+          - generic [ref=e20]: HQ
+          - generic [ref=e21]: Alice
+        - generic [ref=e22] [cursor=pointer]:
+          - generic [ref=e23]: └
+          - generic [ref=e25]: WS
+        - generic [ref=e26] [cursor=pointer]:
+          - generic [ref=e27]: └
+          - generic [ref=e29]: EC
+          - generic [ref=e30]: bob
+        - generic [ref=e31] [cursor=pointer]:
+          - generic [ref=e32]: └
+          - generic [ref=e34]: IT
+          - generic [ref=e35]: Alice
+      - generic [ref=e37]:
+        - generic [ref=e38]: Namespace Management
+        - button "Edit" [ref=e39] [cursor=pointer]
+    - main [ref=e41]:
+      - generic [ref=e42]:
+        - generic [ref=e43]: ZPL Editor
+        - generic [ref=e45]: Corp
+        - button "Check ZPL" [ref=e47] [cursor=pointer]
+        - button "Save" [ref=e48] [cursor=pointer]
+        - button "Reset" [ref=e49] [cursor=pointer]
+        - generic [ref=e50]: ● unsaved
+        - generic [ref=e51]:
+          - button "⊕ Assist" [ref=e100] [cursor=pointer]
+          - button "↑↓" [ref=e54] [cursor=pointer]
+          - button "⊟" [ref=e55] [cursor=pointer]
+      - textbox "Add ZPL definitions and rules here" [ref=e56]: Define Employee as a users with optional tags hr, sales, finance.
+    - complementary [ref=e58]:
+      - generic [ref=e59]:
+        - generic [ref=e60]:
+          - button "Tests" [ref=e61] [cursor=pointer]
+          - button "Classes" [ref=e62] [cursor=pointer]
+          - button "Rules" [ref=e63] [cursor=pointer]
+          - button "ZPL" [ref=e64] [cursor=pointer]
+        - button "⊞" [ref=e65] [cursor=pointer]
+      - generic [ref=e66]:
+        - generic [ref=e101]:
+          - generic [ref=e102]: Manual test
+          - generic [ref=e103]:
+            - generic [ref=e104]:
+              - textbox "subject class" [ref=e105]
+              - textbox "action" [ref=e106]: access
+              - textbox "object class" [ref=e107]
+            - generic [ref=e108]:
+              - button "▶ Run" [ref=e109] [cursor=pointer]
+              - button "+ Add" [ref=e110] [cursor=pointer]
+        - generic [ref=e112]:
+          - button "⚡ Generate from rules" [ref=e113] [cursor=pointer]
+          - button "Prompt" [ref=e114] [cursor=pointer]

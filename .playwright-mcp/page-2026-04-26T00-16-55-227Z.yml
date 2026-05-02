@@ -1,0 +1,6 @@
+- generic [ref=e2]:
+  - heading "ZPR Policy Maker v2" [level=1] [ref=e3]
+  - paragraph [ref=e4]: Enter password to continue
+  - generic [ref=e5]:
+    - textbox "Password" [active] [ref=e6]
+    - button "Sign in" [ref=e7] [cursor=pointer]
