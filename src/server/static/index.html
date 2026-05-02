@@ -1203,8 +1203,8 @@ async function explainErrors() {
 // ── ZPL Assistant ──────────────────────────────────────────────────────────
 
 S.assist = { active: false, history: [] };
-const _ASSIST_FIXES = {};
-let _assistFixId = 0;
+const _ASSIST_GENS = {};
+let _assistGenId = 0;
 
 function toggleAssist() {
   if (S.assist.active) closeAssist();
@@ -1292,28 +1292,21 @@ async function assistSend() {
     if (res.action === 'stop') {
       _assistAppendMsg('assistant', res.reply || 'Done!');
       setTimeout(closeAssist, 900);
-    } else if (res.action === 'add' || res.action === 'generate') {
-      const top = document.getElementById('assist-top');
-      if (res.statement) {
-        const cur = top.value.trimEnd();
-        top.value = cur ? cur + '\n' + res.statement : res.statement;
-        scheduleAutoParse();
-      }
-      const reply = res.reply || (res.action === 'add' ? 'Added.' : 'Generated and added.');
-      const codeHtml = (res.action === 'generate' && res.statement)
-        ? `<br><code style="display:block;font-size:0.7rem;color:var(--accent);margin-top:0.25rem;word-break:break-all">${esc(res.statement)}</code>`
-        : '';
-      _assistAppendMsg('assistant', reply, codeHtml);
-    } else if (res.action === 'explain') {
+    } else if (res.action === 'add' || res.action === 'generate' || res.action === 'explain') {
+      const stmt = res.statement || res.suggested_fix || '';
+      const reply = res.reply || (res.action === 'explain' ? 'There is a syntax error.' : 'Here you go:');
       let extra = '';
-      if (res.suggested_fix) {
-        const fid = ++_assistFixId;
-        _ASSIST_FIXES[fid] = res.suggested_fix;
-        extra = `<div style="margin-top:0.35rem;display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">` +
-          `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.45rem" onclick="assistApplyFix(${fid})">Apply fix</button>` +
-          `<code style="font-size:0.7rem;color:var(--accent)">${esc(res.suggested_fix)}</code></div>`;
+      if (stmt) {
+        const gid = ++_assistGenId;
+        _ASSIST_GENS[gid] = stmt;
+        extra = `<br><code style="display:block;font-size:0.7rem;color:var(--accent);margin-top:0.25rem;word-break:break-all">${esc(stmt)}</code>` +
+          `<div id="assist-gen-btns-${gid}" style="margin-top:0.4rem;display:flex;gap:0.4rem">` +
+          `<button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistSaveGen(${gid})">Save</button>` +
+          `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistDeleteGen(${gid})">Delete</button>` +
+          `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistEditGen(${gid})">Edit</button>` +
+          `</div>`;
       }
-      _assistAppendMsg('assistant', res.reply || 'There is a syntax error.', extra);
+      _assistAppendMsg('assistant', reply, extra);
     } else {
       _assistAppendMsg('assistant', res.reply || 'Something went wrong — please try again.');
     }
@@ -1328,14 +1321,39 @@ async function assistSend() {
   }
 }
 
-function assistApplyFix(fid) {
-  const fix = _ASSIST_FIXES[fid];
-  if (!fix) return;
+
+function _assistDisableGenBtns(gid) {
+  const row = document.getElementById(`assist-gen-btns-${gid}`);
+  if (row) row.querySelectorAll('button').forEach(b => { b.disabled = true; b.style.opacity = '0.4'; });
+}
+
+function assistSaveGen(gid) {
+  const stmt = _ASSIST_GENS[gid];
+  if (stmt == null) return;
+  _assistDisableGenBtns(gid);
+  delete _ASSIST_GENS[gid];
   const top = document.getElementById('assist-top');
   const cur = top.value.trimEnd();
-  top.value = cur ? cur + '\n' + fix : fix;
+  top.value = cur ? cur + '\n' + stmt : stmt;
   scheduleAutoParse();
-  _assistAppendMsg('system', 'Fix applied. Anything else?');
+  _assistAppendMsg('system', 'Saved. Anything else?');
+}
+
+function assistDeleteGen(gid) {
+  if (_ASSIST_GENS[gid] == null) return;
+  _assistDisableGenBtns(gid);
+  delete _ASSIST_GENS[gid];
+  _assistAppendMsg('system', 'Discarded. Anything else?');
+}
+
+function assistEditGen(gid) {
+  const stmt = _ASSIST_GENS[gid];
+  if (stmt == null) return;
+  _assistDisableGenBtns(gid);
+  delete _ASSIST_GENS[gid];
+  const input = document.getElementById('assist-input');
+  if (input) { input.value = stmt; input.focus(); }
+  _assistAppendMsg('system', 'Loaded into input for editing.');
 }
 
 // ── Schema panel ───────────────────────────────────────────────────────────
