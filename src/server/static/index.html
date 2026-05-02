@@ -1422,12 +1422,16 @@ function renderProfile(profile) {
 
     <div class="cfg-section">
       <h4>API Token</h4>
-      <div class="cfg-token" id="cfg-token-display">${token ? esc(token) : '(none — click Regenerate to create)'}</div>
-      <div style="display:flex;gap:0.4rem;margin-top:0.3rem">
-        <button class="cfg-btn" onclick="doCopyToken()" ${token ? '' : 'disabled'}>Copy</button>
+      <div class="cfg-row"><label>Current token</label>
+        <input id="cfg-token-input" type="text" value="${esc(token)}"
+               placeholder="(none — paste a token or click Regenerate)"
+               style="font-family:var(--font-mono);font-size:0.72rem"></div>
+      <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.3rem">
+        <button class="cfg-btn" onclick="doSetToken()">Set token</button>
+        <button class="cfg-btn" onclick="doCopyToken()" ${token ? '' : 'disabled'} id="cfg-token-copy-btn">Copy</button>
         <button class="cfg-btn danger" onclick="doRegenToken()">Regenerate</button>
       </div>
-      <div id="cfg-token-msg"></div>
+      <div id="cfg-token-msg" class="cfg-msg"></div>
     </div>
 
     <div class="cfg-section">
@@ -1491,23 +1495,44 @@ async function doChangePassword() {
   }
 }
 
+async function doSetToken() {
+  const input = document.getElementById('cfg-token-input');
+  const msg   = document.getElementById('cfg-token-msg');
+  const t = input?.value.trim();
+  if (!t) { msg.className='cfg-msg err'; msg.textContent='Token cannot be empty.'; return; }
+  try {
+    const res = await api('POST', '/api/token/set', { token: t });
+    S.profile.api_token = res.api_token;
+    if (input) input.value = res.api_token;
+    const copyBtn = document.getElementById('cfg-token-copy-btn');
+    if (copyBtn) copyBtn.disabled = false;
+    msg.className='cfg-msg ok'; msg.textContent='Token saved.';
+    setTimeout(() => { msg.textContent=''; }, 2000);
+  } catch(e) {
+    msg.className='cfg-msg err'; msg.textContent=e.message||'Failed.';
+  }
+}
+
 async function doRegenToken() {
   if (!confirm('Regenerate token? The old token will stop working immediately.')) return;
   try {
     const res = await api('POST', '/api/token/regenerate');
     S.profile.api_token = res.api_token;
-    document.getElementById('cfg-token-display').textContent = res.api_token;
-    document.getElementById('cfg-token-msg').className='cfg-msg ok';
-    document.getElementById('cfg-token-msg').textContent='New token generated.';
-    document.querySelector('[onclick="doCopyToken()"]').disabled = false;
+    const input = document.getElementById('cfg-token-input');
+    if (input) input.value = res.api_token;
+    const copyBtn = document.getElementById('cfg-token-copy-btn');
+    if (copyBtn) copyBtn.disabled = false;
+    const msg = document.getElementById('cfg-token-msg');
+    msg.className='cfg-msg ok'; msg.textContent='New token generated.';
+    setTimeout(() => { msg.textContent=''; }, 2000);
   } catch(e) {
-    document.getElementById('cfg-token-msg').className='cfg-msg err';
-    document.getElementById('cfg-token-msg').textContent='Failed.';
+    const msg = document.getElementById('cfg-token-msg');
+    msg.className='cfg-msg err'; msg.textContent='Failed.';
   }
 }
 
 function doCopyToken() {
-  const token = S.profile?.api_token;
+  const token = document.getElementById('cfg-token-input')?.value || S.profile?.api_token;
   if (!token) return;
   navigator.clipboard.writeText(token).then(() => {
     const msg = document.getElementById('cfg-token-msg');

@@ -380,6 +380,19 @@ async def regenerate_token(session: dict = Depends(get_session)):
     return {"api_token": token}
 
 
+class SetTokenRequest(BaseModel):
+    token: str
+
+
+@app.post("/api/token/set")
+async def set_token(req: SetTokenRequest, session: dict = Depends(get_session)):
+    t = req.token.strip()
+    if not t:
+        raise HTTPException(400, "Token cannot be empty")
+    await db.set_token(session["login_user_id"], t)
+    return {"api_token": t}
+
+
 class MatchRequest(BaseModel):
     subject_class: str = "users"
     subject_name: str | None = None

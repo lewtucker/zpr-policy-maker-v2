@@ -201,6 +201,12 @@ async def regenerate_token(user_id: str) -> str:
     return token
 
 
+async def set_token(user_id: str, token: str) -> None:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        await db.execute("UPDATE users SET api_token = ? WHERE id = ?", (token, user_id))
+        await db.commit()
+
+
 async def update_user(user_id: str, *, display_name: str | None = None,
                       username: str | None = None, password: str | None = None,
                       email: str | None = None, delegated: bool | None = None,
