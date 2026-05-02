@@ -604,6 +604,22 @@ def inferred_to_zpl(classes: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def infer_missing_verbs(parsed: dict) -> list[str]:
+    """Return verb names used in rules that are not built-in and not declared as a verb."""
+    declared = {
+        c.get("class", "").lower() for c in parsed.get("classes", [])
+        if c.get("verb") or c.get("parent", "").lower() == "verb"
+    }
+    missing: list[str] = []
+    seen: set[str] = set()
+    for rule in parsed.get("rules", []):
+        v = rule.get("verb", "").lower()
+        if v and v not in _VERBS and v not in declared and v not in seen:
+            missing.append(v)
+            seen.add(v)
+    return missing
+
+
 def _consume_name(p: _P) -> str:
     t = p.peek()
     if t is None or t[0] not in ("word", "string"):

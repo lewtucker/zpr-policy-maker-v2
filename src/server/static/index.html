@@ -978,7 +978,7 @@ async function autoParse() {
     S.serializedZpl = res.serialized_zpl || '';
     if (res.errors && res.errors.length) showErrors(res.errors);
     else clearErrors();
-    showInferBar(res.inferred_classes || [], res.inferred_zpl || '');
+    showInferBar(res.inferred_classes || [], res.inferred_zpl || '', null, res.inferred_verbs || [], res.inferred_verbs_zpl || '');
     renderSchemaBody();
   } catch(e) { /* silent */ }
 }
@@ -998,6 +998,7 @@ async function doParse() {
       clearErrors();
       setStatus('ok', `${(res.policy_set?.classes||[]).length} classes · ${(res.policy_set?.rules||[]).length} rules`);
     }
+    showInferBar(res.inferred_classes || [], res.inferred_zpl || '', null, res.inferred_verbs || [], res.inferred_verbs_zpl || '');
     renderSchemaBody();
   } catch(e) { setStatus('error', 'Parse failed'); }
 }
@@ -1118,14 +1119,26 @@ function doReset() {
 
 // ── Infer bar ──────────────────────────────────────────────────────────────
 
-function showInferBar(classes, zpl, label) {
+function showInferBar(classes, zpl, label, verbs, verbsZpl) {
+  verbs = verbs || [];
+  verbsZpl = verbsZpl || '';
   const bar = document.getElementById('infer-bar');
-  if (!classes.length) { clearInferBar(); return; }
-  S.inferredZpl = zpl;
-  const names = classes.map(c => c.class).join(', ');
-  const prefix = label || `${classes.length} undefined class${classes.length > 1 ? 'es' : ''}`;
-  document.getElementById('infer-msg').innerHTML =
-    `<strong>${prefix}:</strong> ${esc(names)}`;
+  if (!classes.length && !verbs.length) { clearInferBar(); return; }
+  const parts = [];
+  if (zpl || verbsZpl) {
+    S.inferredZpl = [zpl, verbsZpl].filter(Boolean).join('\n');
+  } else {
+    S.inferredZpl = '';
+  }
+  if (classes.length) {
+    const names = classes.map(c => c.class).join(', ');
+    const prefix = label || `${classes.length} undefined class${classes.length > 1 ? 'es' : ''}`;
+    parts.push(`<strong>${prefix}:</strong> ${esc(names)}`);
+  }
+  if (verbs.length) {
+    parts.push(`<strong>${verbs.length} undefined verb${verbs.length > 1 ? 's' : ''}:</strong> ${esc(verbs.join(', '))}`);
+  }
+  document.getElementById('infer-msg').innerHTML = parts.join(' &nbsp;·&nbsp; ');
   bar.classList.add('visible');
 }
 
@@ -1145,6 +1158,11 @@ function insertInferredClasses() {
   clearInferBar();
   markDirty();
   autoParse();
+  if (S.assist?.active) {
+    const lines = S.inferredZpl.trim().split('\n');
+    const codeHtml = lines.map(l => `<code style="display:block;font-size:0.7rem;color:var(--accent);word-break:break-all">${esc(l)}</code>`).join('');
+    _assistAppendMsg('system', `Added ${lines.length} definition${lines.length > 1 ? 's' : ''} to your ZPL:` + '<br>' + codeHtml);
+  }
 }
 
 // ── Status & errors ────────────────────────────────────────────────────────

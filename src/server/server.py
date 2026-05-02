@@ -1120,11 +1120,15 @@ async def parse_text(req: ParseRequest, session: dict = Depends(get_session)):
         ps, errors = norm.zpl_to_policy_set(raw, name=req.name)
         inferred = zpl_parser.infer_missing_classes(raw)
         inferred_zpl = zpl_parser.inferred_to_zpl(inferred) if inferred else ""
+        inferred_verbs = zpl_parser.infer_missing_verbs(raw)
+        inferred_verbs_zpl = "\n".join(f"Define {v} as a verb." for v in inferred_verbs)
     elif lang == "zpel":
         raw = zpel_parser.parse(req.text)
         ps, errors = norm.zpel_to_policy_set(raw, name=req.name)
         inferred = []
         inferred_zpl = ""
+        inferred_verbs = []
+        inferred_verbs_zpl = ""
     else:
         raise HTTPException(400, f"Unknown language: {req.language!r}")
 
@@ -1142,6 +1146,8 @@ async def parse_text(req: ParseRequest, session: dict = Depends(get_session)):
         "errors": [e.model_dump() for e in errors],
         "inferred_classes": inferred,
         "inferred_zpl": inferred_zpl,
+        "inferred_verbs": inferred_verbs,
+        "inferred_verbs_zpl": inferred_verbs_zpl,
         "serialized_zpl": serialized_zpl,
     }
 
