@@ -162,8 +162,16 @@ async def get_session_or_token(request: Request) -> dict:
         token = auth[7:].strip()
         user = await db.get_user_by_token(token)
         if user:
-            return _make_session(user["id"], user["username"], user["display_name"],
-                                 user["id"], user["username"], user["display_name"])
+            dn = user.get("display_name") or user["username"]
+            return {
+                "authenticated": True,
+                "login_user_id": user["id"],
+                "login_username": user["username"],
+                "login_display_name": dn,
+                "active_user_id": user["id"],
+                "active_username": user["username"],
+                "active_display_name": dn,
+            }
     raise HTTPException(status_code=401, detail="Not authenticated")
 
 
