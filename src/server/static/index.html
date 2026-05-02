@@ -1138,7 +1138,8 @@ function dismissInferBar() { clearInferBar(); }
 
 function insertInferredClasses() {
   if (!S.inferredZpl) return;
-  const ta = document.getElementById('zpl-editor');
+  const id = S.assist?.active ? 'assist-top' : 'zpl-editor';
+  const ta = document.getElementById(id);
   ta.value = S.inferredZpl + '\n\n' + ta.value;
   clearInferBar();
   markDirty();
@@ -1205,6 +1206,8 @@ async function explainErrors() {
 S.assist = { active: false, history: [] };
 const _ASSIST_GENS = {};
 let _assistGenId = 0;
+const _ASSIST_MODS = {};
+let _assistModId = 0;
 
 function toggleAssist() {
   if (S.assist.active) closeAssist();
@@ -1307,6 +1310,16 @@ async function assistSend() {
           `</div>`;
       }
       _assistAppendMsg('assistant', reply, extra);
+    } else if (res.action === 'modify') {
+      const mid = ++_assistModId;
+      _ASSIST_MODS[mid] = res.new_zpl || '';
+      const extra = `<div id="assist-mod-btns-${mid}" style="margin-top:0.4rem;display:flex;gap:0.4rem">` +
+        `<button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistConfirmMod(${mid})">Yes</button>` +
+        `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistRejectMod(${mid})">No</button>` +
+        `</div>`;
+      _assistAppendMsg('assistant', res.reply || 'Apply this change?', extra);
+    } else if (res.action === 'answer') {
+      _assistAppendMsg('assistant', res.reply || '');
     } else {
       _assistAppendMsg('assistant', res.reply || 'Something went wrong — please try again.');
     }
@@ -1321,6 +1334,25 @@ async function assistSend() {
   }
 }
 
+
+function assistConfirmMod(mid) {
+  const newZpl = _ASSIST_MODS[mid];
+  if (newZpl == null) return;
+  const row = document.getElementById(`assist-mod-btns-${mid}`);
+  if (row) row.querySelectorAll('button').forEach(b => { b.disabled = true; b.style.opacity = '0.4'; });
+  delete _ASSIST_MODS[mid];
+  document.getElementById('assist-top').value = newZpl;
+  scheduleAutoParse();
+  _assistAppendMsg('system', 'Done. Anything else?');
+}
+
+function assistRejectMod(mid) {
+  if (_ASSIST_MODS[mid] == null) return;
+  const row = document.getElementById(`assist-mod-btns-${mid}`);
+  if (row) row.querySelectorAll('button').forEach(b => { b.disabled = true; b.style.opacity = '0.4'; });
+  delete _ASSIST_MODS[mid];
+  _assistAppendMsg('system', 'OK, no change. Anything else?');
+}
 
 function _assistDisableGenBtns(gid) {
   const row = document.getElementById(`assist-gen-btns-${gid}`);

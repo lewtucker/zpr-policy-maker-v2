@@ -830,7 +830,7 @@ async def zpl_assist(req: ZplAssistRequest, session: dict = Depends(get_session)
                     "reply": "There's a syntax error — please check your ZPL statement.",
                     "suggested_fix": ""}
 
-    # Natural language → generate ZPL
+    # Natural language → classify intent then act
     classes_ctx = "Built-in roots: users, endpoints, services, servers"
     if req.zpl_so_far.strip():
         try:
@@ -840,37 +840,56 @@ async def zpl_assist(req: ZplAssistRequest, session: dict = Depends(get_session)
         except Exception:
             pass
 
-    gen_prompt = (
-        "You are a ZPL (Zero-trust Policy Language) writer. The user wants to add to their policy.\n\n"
+    nl_prompt = (
+        "You are a ZPL (Zero-trust Policy Language) assistant. Determine what the user wants:\n"
+        "- 'generate': add one or more new ZPL statements\n"
+        "- 'modify': change or delete existing ZPL (e.g. remove a rule, rename a class)\n"
+        "- 'answer': answer a question about the policy without changing it\n\n"
         f"Known classes:\n{classes_ctx}\n\n"
         f"Current ZPL:\n---\n{req.zpl_so_far or '(empty)'}\n---\n\n"
-        f"User request: {msg}\n\n"
-        "ZPL syntax:\n"
+        f"User: {msg}\n\n"
+        "ZPL syntax reference:\n"
         "- Define: `Define <Name> as a <parent> with <attrs>.` (parent: users, endpoints, services, servers)\n"
         "  attrs: `optional tags <n>, <n>`, `multiple <n>`, `optional <n>`, `<n>:<v>`\n"
         "- Allow: `Allow [<tag>...] <Class> [on [<tag>...] <End>] to <verb> [<tag>...] <Obj>.`\n"
         "- Never allow: same shape, starts with `Never allow`\n"
         "- Every statement ends with a period.\n\n"
-        "Generate one or more ZPL statement(s) that fulfill the user's request.\n"
-        'Return JSON only: {"statement": "ZPL here", "reply": "brief explanation"}'
+        "Return JSON only — one of:\n"
+        '  {"intent":"generate","statement":"ZPL statement(s)","reply":"brief explanation"}\n'
+        '  {"intent":"modify","new_zpl":"complete updated ZPL text","reply":"what you changed"}\n'
+        '  {"intent":"answer","reply":"your answer"}'
     )
     try:
         raw_ai = ai_client.complete(
-            system="You are a ZPL policy writer. Return only valid JSON.",
-            messages=[{"role": "user", "content": gen_prompt}],
+            system="You are a ZPL policy assistant. Return only valid JSON.",
+            messages=[{"role": "user", "content": nl_prompt}],
             max_tokens=1024,
             temperature=0.3,
         )
         text = _re.sub(r"^```(?:json)?\s*|\s*```$", "", raw_ai.strip(), flags=_re.DOTALL).strip()
         result = _json.loads(text)
+        intent = result.get("intent", "generate")
+
+        if intent == "answer":
+            return {"action": "answer", "reply": result.get("reply", "I'm not sure.")}
+
+        if intent == "modify":
+            return {
+                "action": "modify",
+                "new_zpl": result.get("new_zpl", req.zpl_so_far),
+                "reply": result.get("reply", "Here's the modified ZPL."),
+            }
+
+        # generate (default)
         stmt = result.get("statement", "")
         reply = result.get("reply", "Generated.")
         if stmt and zpl_parser.parse(stmt).get("errors"):
             reply += " (Note: please review the generated ZPL)"
         return {"action": "generate", "statement": stmt, "reply": reply}
+
     except Exception:
         return {"action": "error",
-                "reply": "Could not generate ZPL. Try again or write the statement directly."}
+                "reply": "Could not process your request. Try again or write the ZPL directly."}
 
 
 # ── Adversarial test generation ───────────────────────────────────────────────
