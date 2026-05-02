@@ -1297,6 +1297,7 @@ async function assistSend() {
       if (res.statement) {
         const cur = top.value.trimEnd();
         top.value = cur ? cur + '\n' + res.statement : res.statement;
+        scheduleAutoParse();
       }
       const reply = res.reply || (res.action === 'add' ? 'Added.' : 'Generated and added.');
       const codeHtml = (res.action === 'generate' && res.statement)
@@ -1333,6 +1334,7 @@ function assistApplyFix(fid) {
   const top = document.getElementById('assist-top');
   const cur = top.value.trimEnd();
   top.value = cur ? cur + '\n' + fix : fix;
+  scheduleAutoParse();
   _assistAppendMsg('system', 'Fix applied. Anything else?');
 }
 
