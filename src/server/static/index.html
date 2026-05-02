@@ -208,14 +208,45 @@
     .assist-split {
       flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden;
     }
-    #assist-top {
-      flex: 0 0 38%; width: 100%; resize: none; outline: none; min-height: 0;
-      background: var(--bg); color: var(--text);
-      font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
-      padding: 1rem; border: none; tab-size: 2;
-      border-top: 3px solid var(--border);
+    .assist-stmts-wrap {
+      flex: 0 0 38%; display: flex; flex-direction: column; min-height: 0;
+      border-top: 3px solid var(--border); background: var(--bg);
     }
-    #assist-top:focus { border-top-color: var(--accent); }
+    .assist-stmts-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.3rem 0.5rem; background: var(--surface2);
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .assist-stmts-title {
+      font-size: 0.72rem; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    #assist-stmts { overflow-y: auto; flex: 1 1 0; }
+    .assist-stmt-empty {
+      padding: 0.75rem 0.5rem; color: var(--muted); font-size: 0.75rem;
+      font-style: italic; text-align: center;
+    }
+    .assist-stmt-item {
+      display: flex; align-items: flex-start; gap: 0.3rem;
+      padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border);
+    }
+    .assist-stmt-item:last-child { border-bottom: none; }
+    .assist-stmt-text {
+      flex: 1; font-family: var(--font-mono); font-size: 0.74rem;
+      color: var(--accent); word-break: break-all; line-height: 1.5; padding-top: 0.05rem;
+    }
+    .assist-stmt-edit-ta {
+      flex: 1; font-family: var(--font-mono); font-size: 0.74rem;
+      border: 1px solid var(--accent); border-radius: 3px; padding: 0.2rem 0.3rem;
+      background: var(--surface2); color: var(--text); resize: none; min-height: 2.5rem;
+    }
+    .assist-stmt-btns { display: flex; gap: 0.2rem; flex-shrink: 0; padding-top: 0.1rem; }
+    .assist-stmt-btn {
+      background: none; border: 1px solid var(--border); border-radius: 3px;
+      cursor: pointer; padding: 0.15rem 0.3rem; font-size: 0.7rem; color: var(--muted);
+      line-height: 1;
+    }
+    .assist-stmt-btn:hover { border-color: var(--accent); color: var(--accent); }
     .assist-pane-sep { height: 3px; background: var(--border); flex-shrink: 0; }
     .assist-bottom {
       flex: 1 1 62%; display: flex; flex-direction: column; min-height: 0;
@@ -557,11 +588,17 @@
         <div class="assist-history" id="assist-history"></div>
       </div>
       <div class="assist-pane-sep"></div>
-      <textarea id="assist-top"
-        placeholder="ZPL definitions and rules"
-        spellcheck="false"
-        oninput="scheduleAutoParse()"
-        onkeydown="handleTabKey(event)"></textarea>
+      <div class="assist-stmts-wrap">
+        <div class="assist-stmts-header">
+          <span class="assist-stmts-title">Staged ZPL</span>
+          <div style="display:flex;gap:0.3rem">
+            <button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.45rem" onclick="assistSaveAll()">✓ Save All</button>
+            <button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.45rem" onclick="assistDeleteAll()">✕ Delete All</button>
+          </div>
+        </div>
+        <div id="assist-stmts"></div>
+      </div>
+      <textarea id="assist-top" style="display:none" spellcheck="false" oninput="scheduleAutoParse()" onkeydown="handleTabKey(event)"></textarea>
     </div>
     <div class="error-bar" id="error-bar"></div>
   </main>
@@ -1170,7 +1207,7 @@ function askAssistantAboutInferred() {
     const extra =
       `<code style="display:block;font-size:0.7rem;color:var(--accent);margin-top:0.1rem;word-break:break-all">${esc(stmt)}</code>` +
       `<div id="assist-gen-btns-${gid}" style="margin-top:0.4rem;display:flex;gap:0.4rem">` +
-      `<button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistSaveGen(${gid})">Save</button>` +
+      `<button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistSaveGen(${gid})">Stage</button>` +
       `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistDeleteGen(${gid})">Delete</button>` +
       `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistEditGen(${gid})">Edit</button>` +
       `</div>`;
@@ -1182,18 +1219,20 @@ function askAssistantAboutInferred() {
 
 function insertInferredClasses() {
   if (!S.inferredZpl) return;
-  const id = S.assist?.active ? 'assist-top' : 'zpl-editor';
-  const ta = document.getElementById(id);
-  ta.value = S.inferredZpl + '\n\n' + ta.value;
-  ta.scrollTop = 0;
-  clearInferBar();
-  markDirty();
-  autoParse();
   if (S.assist?.active) {
+    S.assist.original = (S.inferredZpl.trimEnd() + '\n\n' + (S.assist.original || '')).trim();
+    _syncAssistTop();
     const lines = S.inferredZpl.trim().split('\n');
     const codeHtml = lines.map(l => `<code style="display:block;font-size:0.7rem;color:var(--accent);word-break:break-all">${esc(l)}</code>`).join('');
-    _assistAppendMsg('system', `Added ${lines.length} definition${lines.length > 1 ? 's' : ''} to your ZPL:` + '<br>' + codeHtml);
+    _assistAppendMsg('system', `Added ${lines.length} definition${lines.length > 1 ? 's' : ''} to your ZPL:<br>` + codeHtml);
+  } else {
+    const ta = document.getElementById('zpl-editor');
+    ta.value = S.inferredZpl + '\n\n' + ta.value;
+    ta.scrollTop = 0;
+    markDirty();
+    autoParse();
   }
+  clearInferBar();
 }
 
 // ── Status & errors ────────────────────────────────────────────────────────
@@ -1253,9 +1292,10 @@ async function explainErrors() {
 
 // ── ZPL Assistant ──────────────────────────────────────────────────────────
 
-S.assist = { active: false, history: [] };
+S.assist = { active: false, history: [], original: '', staged: [], editingId: null };
 const _ASSIST_GENS = {};
 let _assistGenId = 0;
+let _assistStmtId = 0;
 const _ASSIST_MODS = {};
 let _assistModId = 0;
 
@@ -1266,7 +1306,10 @@ function toggleAssist() {
 
 function openAssist() {
   const editorText = document.getElementById('zpl-editor').value;
-  document.getElementById('assist-top').value = editorText;
+  S.assist.original = editorText;
+  S.assist.staged = [];
+  S.assist.editingId = null;
+  _syncAssistTop();
   S.assist.history = [];
   document.getElementById('assist-history').innerHTML = '';
   document.getElementById('zpl-editor').style.display = 'none';
@@ -1354,7 +1397,7 @@ async function assistSend() {
         _ASSIST_GENS[gid] = stmt;
         extra = `<br><code style="display:block;font-size:0.7rem;color:var(--accent);margin-top:0.25rem;word-break:break-all">${esc(stmt)}</code>` +
           `<div id="assist-gen-btns-${gid}" style="margin-top:0.4rem;display:flex;gap:0.4rem">` +
-          `<button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistSaveGen(${gid})">Save</button>` +
+          `<button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistSaveGen(${gid})">Stage</button>` +
           `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistDeleteGen(${gid})">Delete</button>` +
           `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistEditGen(${gid})">Edit</button>` +
           `</div>`;
@@ -1391,8 +1434,9 @@ function assistConfirmMod(mid) {
   const row = document.getElementById(`assist-mod-btns-${mid}`);
   if (row) row.querySelectorAll('button').forEach(b => { b.disabled = true; b.style.opacity = '0.4'; });
   delete _ASSIST_MODS[mid];
-  document.getElementById('assist-top').value = newZpl;
-  scheduleAutoParse();
+  S.assist.original = newZpl;
+  S.assist.staged = [];
+  _syncAssistTop();
   _assistAppendMsg('system', 'Done. Anything else?');
 }
 
@@ -1414,11 +1458,10 @@ function assistSaveGen(gid) {
   if (stmt == null) return;
   _assistDisableGenBtns(gid);
   delete _ASSIST_GENS[gid];
-  const top = document.getElementById('assist-top');
-  const cur = top.value.trimEnd();
-  top.value = cur ? cur + '\n' + stmt : stmt;
-  scheduleAutoParse();
-  _assistAppendMsg('system', 'Saved. Anything else?');
+  const sid = ++_assistStmtId;
+  S.assist.staged.push({id: sid, text: stmt.trim()});
+  _syncAssistTop();
+  _assistAppendMsg('system', 'Staged. Anything else?');
 }
 
 function assistDeleteGen(gid) {
@@ -1436,6 +1479,95 @@ function assistEditGen(gid) {
   const input = document.getElementById('assist-input');
   if (input) { input.value = stmt; input.focus(); }
   _assistAppendMsg('system', 'Loaded into input for editing.');
+}
+
+function _syncAssistTop() {
+  const top = document.getElementById('assist-top');
+  if (!top) return;
+  const orig = (S.assist.original || '').trimEnd();
+  const staged = S.assist.staged.map(s => s.text).join('\n');
+  top.value = orig && staged ? orig + '\n' + staged : orig || staged;
+  scheduleAutoParse();
+  renderAssistStmts();
+}
+
+function renderAssistStmts() {
+  const container = document.getElementById('assist-stmts');
+  if (!container) return;
+  const items = S.assist.staged;
+  if (!items.length) {
+    container.innerHTML = '<div class="assist-stmt-empty">No staged ZPL yet.</div>';
+    return;
+  }
+  container.innerHTML = items.map(item => {
+    if (item.id === S.assist.editingId) {
+      return `<div class="assist-stmt-item">` +
+        `<textarea class="assist-stmt-edit-ta" id="assist-edit-${item.id}" rows="2">${esc(item.text)}</textarea>` +
+        `<div class="assist-stmt-btns">` +
+        `<button class="assist-stmt-btn" onclick="assistStmtConfirmEdit(${item.id})" title="Confirm">✓</button>` +
+        `<button class="assist-stmt-btn" onclick="assistStmtCancelEdit()" title="Cancel">✕</button>` +
+        `</div></div>`;
+    }
+    return `<div class="assist-stmt-item">` +
+      `<span class="assist-stmt-text">${esc(item.text)}</span>` +
+      `<div class="assist-stmt-btns">` +
+      `<button class="assist-stmt-btn" onclick="assistStmtEdit(${item.id})" title="Edit">✎</button>` +
+      `<button class="assist-stmt-btn" onclick="assistStmtAccept(${item.id})" title="Accept">✓</button>` +
+      `<button class="assist-stmt-btn" onclick="assistStmtDelete(${item.id})" title="Delete">✕</button>` +
+      `</div></div>`;
+  }).join('');
+}
+
+function assistStmtEdit(id) {
+  S.assist.editingId = id;
+  renderAssistStmts();
+  setTimeout(() => {
+    const ta = document.getElementById(`assist-edit-${id}`);
+    if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+  }, 30);
+}
+
+function assistStmtConfirmEdit(id) {
+  const ta = document.getElementById(`assist-edit-${id}`);
+  const newText = ta ? ta.value.trim() : '';
+  if (newText) {
+    const item = S.assist.staged.find(s => s.id === id);
+    if (item) item.text = newText;
+  }
+  S.assist.editingId = null;
+  _syncAssistTop();
+}
+
+function assistStmtCancelEdit() {
+  S.assist.editingId = null;
+  renderAssistStmts();
+}
+
+function assistStmtAccept(id) {
+  const item = S.assist.staged.find(s => s.id === id);
+  if (!item) return;
+  S.assist.staged = S.assist.staged.filter(s => s.id !== id);
+  S.assist.original = ((S.assist.original || '').trimEnd() + '\n' + item.text).trim();
+  _syncAssistTop();
+}
+
+function assistStmtDelete(id) {
+  S.assist.staged = S.assist.staged.filter(s => s.id !== id);
+  _syncAssistTop();
+}
+
+function assistSaveAll() {
+  S.assist.staged.forEach(item => {
+    S.assist.original = ((S.assist.original || '').trimEnd() + '\n' + item.text).trim();
+  });
+  S.assist.staged = [];
+  _syncAssistTop();
+  closeAssist();
+}
+
+function assistDeleteAll() {
+  S.assist.staged = [];
+  _syncAssistTop();
 }
 
 // ── Schema panel ───────────────────────────────────────────────────────────
