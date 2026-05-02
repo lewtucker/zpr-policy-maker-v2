@@ -1084,6 +1084,23 @@ async def get_namespace_zpl(session: dict = Depends(get_session)):
     return {"text": text}
 
 
+@app.get("/api/namespace/zpl/all")
+async def get_namespace_zpl_all(session: dict = Depends(get_session)):
+    """Return combined ZPL for the active namespace and all its descendants."""
+    tree = await db.get_owner_tree(session["active_user_id"])
+    nodes = _flatten_tree_nodes(tree)
+    user_ids = [n["id"] for n in nodes]
+    dn_map = {n["id"]: n["display_name"] for n in nodes}
+    zpl_map = await db.get_namespace_zpl_batch(user_ids)
+    sections = []
+    for uid in user_ids:
+        text = (zpl_map.get(uid) or "").strip()
+        if text:
+            label = dn_map.get(uid, uid)
+            sections.append(f"# {label}\n{text}")
+    return {"text": "\n\n".join(sections)}
+
+
 class SaveNamespaceZplRequest(BaseModel):
     text: str
 

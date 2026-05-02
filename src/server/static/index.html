@@ -542,6 +542,7 @@
       <button class="tool-btn" onclick="doParse()">Check ZPL</button>
       <button class="tool-btn primary" id="save-btn" onclick="doSave()">Save</button>
       <button class="tool-btn" onclick="doReset()">Reset</button>
+      <button class="tool-btn" id="show-all-btn" onclick="toggleShowAll()" title="Show ZPL for this namespace and all sub-namespaces">Show All</button>
       <span class="status-pill idle" id="status-pill"></span>
       <div class="toolbar-right">
         <button class="tool-btn" id="assist-btn" onclick="toggleAssist()" title="ZPL writing assistant">⊕ Assist</button>
@@ -706,6 +707,7 @@ const S = {
   inferredVerbs: [],
   serializedZpl: '',
   profile: null,
+  showAll: false,
   panelOpen: true,
   panelExpanded: false,
   sidebarWidth: 220,
@@ -908,6 +910,7 @@ async function switchToOwner(userId) {
       await api('POST', '/api/context/switch', { user_id: userId });
     }
     await loadContext();
+    _exitShowAll();
     await Promise.all([loadSubOwners(), loadNamespaceZpl()]);
   } catch(e) { alert('Could not switch namespace: ' + e.message); }
 }
@@ -1155,6 +1158,47 @@ function doReset() {
   clearInferBar();
   setStatus('idle');
   renderSchemaBody();
+}
+
+function _exitShowAll() {
+  if (!S.showAll) return;
+  S.showAll = false;
+  const btn = document.getElementById('show-all-btn');
+  if (btn) { btn.textContent = 'Show All'; btn.classList.remove('primary'); }
+  const editor = document.getElementById('zpl-editor');
+  if (editor) { editor.readOnly = false; editor.style.opacity = ''; }
+  const saveBtn = document.getElementById('save-btn');
+  if (saveBtn) saveBtn.disabled = false;
+}
+
+async function toggleShowAll() {
+  const btn = document.getElementById('show-all-btn');
+  const editor = document.getElementById('zpl-editor');
+  if (S.showAll) {
+    // Return to normal: reload the namespace's own ZPL
+    S.showAll = false;
+    btn.textContent = 'Show All';
+    btn.classList.remove('primary');
+    editor.readOnly = false;
+    editor.style.opacity = '';
+    await loadNamespaceZpl();
+  } else {
+    try {
+      const res = await api('GET', '/api/namespace/zpl/all');
+      S.showAll = true;
+      btn.textContent = 'Show Own';
+      btn.classList.add('primary');
+      editor.value = res.text || '';
+      editor.readOnly = true;
+      editor.style.opacity = '0.85';
+      document.getElementById('save-btn').disabled = true;
+      setStatus('idle', 'read-only view');
+      autoParse();
+    } catch(e) {
+      setStatus('error', 'Failed to load all ZPL');
+    }
+  }
+  document.getElementById('save-btn').disabled = !!S.showAll;
 }
 
 // ── Infer bar ──────────────────────────────────────────────────────────────
