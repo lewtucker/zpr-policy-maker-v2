@@ -1465,7 +1465,7 @@ function renderZpl(body) {
     body.innerHTML = '<div class="empty-state">No ZPL to display.</div>';
     return;
   }
-  const comment = '# ALL Entities are namespaced to avoid collision between delegated sets.  For user convenience the current namespace is not shown in the edit.\n\n';
+  const comment = '# Entities are namespaced to avoid collisions.\n\n';
   body.innerHTML = `<pre class="zpl-canon">${esc(comment + S.serializedZpl)}</pre>`;
 }
 
