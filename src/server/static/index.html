@@ -1434,10 +1434,20 @@ function assistConfirmMod(mid) {
   const row = document.getElementById(`assist-mod-btns-${mid}`);
   if (row) row.querySelectorAll('button').forEach(b => { b.disabled = true; b.style.opacity = '0.4'; });
   delete _ASSIST_MODS[mid];
-  S.assist.original = newZpl;
-  S.assist.staged = [];
+  // Diff old vs new: added lines go to staged for review, retained lines become the new original
+  const oldSet = new Set((S.assist.original || '').split('\n').map(l => l.trim()).filter(Boolean));
+  const newLines = (newZpl || '').split('\n').map(l => l.trim()).filter(Boolean);
+  const added = newLines.filter(l => !oldSet.has(l));
+  const retained = newLines.filter(l => oldSet.has(l));
+  S.assist.original = retained.join('\n');
+  added.forEach(line => {
+    S.assist.staged.push({id: ++_assistStmtId, text: line});
+  });
   _syncAssistTop();
-  _assistAppendMsg('system', 'Done. Anything else?');
+  const msg = added.length
+    ? `Applied. ${added.length} new statement${added.length > 1 ? 's' : ''} added to staged for review.`
+    : 'Applied. Anything else?';
+  _assistAppendMsg('system', msg);
 }
 
 function assistRejectMod(mid) {
