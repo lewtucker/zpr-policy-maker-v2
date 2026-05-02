@@ -8,13 +8,21 @@ from __future__ import annotations
 def _serialize_spec(spec: dict | None, fallback: str = "any") -> str:
     if not spec:
         return fallback
-    class_name = spec.get("class")
+    class_name = spec.get("class") or spec.get("cls")
     name = spec.get("name")
     attrs = spec.get("attrs") or {}
 
     attr_parts: list[str] = []
     for k, v in attrs.items():
-        if v == "*":
+        if k == "tags":
+            # Tag values serialize as bare names before the class name.
+            # e.g. attrs["tags"] = ["hr"] → "hr WS.employee"
+            tag_vals = v if isinstance(v, list) else ([v] if v != "*" else [])
+            for tag in tag_vals:
+                attr_parts.append(str(tag))
+            if not tag_vals:
+                attr_parts.append("tags:")  # presence-only check fallback
+        elif v == "*":
             attr_parts.append(k)
         elif isinstance(v, list):
             attr_parts.append(f"{k}:{{{', '.join(str(x) for x in v)}}}")
@@ -31,14 +39,14 @@ def _serialize_spec(spec: dict | None, fallback: str = "any") -> str:
 
 def rule_to_zpl(rule: dict) -> str | None:
     """Convert a rule dict to a ZPL Allow/Never statement, or None if unrepresentable."""
-    result = rule.get("result", "allow")
-    verb = rule.get("verb") or "access"
+    result = rule.get("result") or rule.get("effect", "allow")
+    verb = rule.get("verb") or rule.get("action") or "access"
     subject = rule.get("subject")
     accessor = rule.get("accessor_endpoint")
     obj = rule.get("object")
     server = rule.get("server_endpoint")
 
-    prefix = "Never allow" if result == "never" else "Allow"
+    prefix = "Never allow" if result in ("never", "deny") else "Allow"
     subj_str = _serialize_spec(subject, fallback="users")
     obj_str = _serialize_spec(obj, fallback="services")
 
@@ -113,6 +121,8 @@ def class_to_zpl(cls: dict) -> str | None:
     """Convert a class dict to a ZPL Define statement. Returns None for builtins."""
     if cls.get("builtin"):
         return None
+    if cls.get("is_verb") or cls.get("parent") == "verb":
+        return f"Define {cls.get('name', '')} as a verb."
     name = cls.get("name", "")
     aka = cls.get("aka")
     parent = cls.get("parent", "")

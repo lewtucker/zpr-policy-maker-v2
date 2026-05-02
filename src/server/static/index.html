@@ -171,21 +171,22 @@
     .zpl-editor::placeholder { color: #cbd5e1; }
 
     .infer-bar {
-      padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(37,99,235,0.2);
-      background: rgba(37,99,235,0.05);
-      display: none; align-items: center; gap: 0.6rem; flex-wrap: wrap;
-      font-size: 0.78rem; color: var(--accent);
+      padding: 0.75rem 1rem; border-bottom: 2px solid rgba(37,99,235,0.25);
+      background: rgba(37,99,235,0.08);
+      display: none; flex-direction: column; gap: 0.6rem;
+      font-size: 0.875rem; color: var(--accent);
     }
     .infer-bar.visible { display: flex; }
     .infer-bar strong { font-weight: 600; }
+    .infer-actions { display: flex; align-items: center; gap: 0.5rem; }
     .infer-insert {
-      padding: 0.2rem 0.65rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer;
+      padding: 0.3rem 0.85rem; border-radius: 4px; font-size: 0.82rem; cursor: pointer;
       border: 1px solid var(--accent); background: transparent; color: var(--accent);
       transition: all 0.15s;
     }
     .infer-insert:hover { background: var(--accent); color: white; }
     .infer-dismiss {
-      margin-left: auto; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem;
+      margin-left: auto; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.82rem;
       cursor: pointer; border: none; background: transparent; color: var(--muted);
     }
     .infer-dismiss:hover { color: var(--text); }
@@ -202,6 +203,7 @@
     aside.schema-pane {
       background: var(--surface); border-left: none;
       display: flex; flex-direction: column; overflow: hidden;
+      position: relative;
     }
     .schema-pane-header {
       padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);
@@ -321,6 +323,52 @@
     .match-result.allow { background: rgba(34,197,94,0.12); color: #166534; }
     .match-result.deny  { background: rgba(239,68,68,0.1);  color: var(--red); }
 
+    /* ── Test runner ─────────────────────────────────────────── */
+    .tr-toolbar { display:flex;gap:0.4rem;padding:0.5rem 0.6rem;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap; }
+    .tr-meta { font-size:0.72rem;color:var(--muted);padding:0.35rem 0.75rem;border-bottom:1px solid var(--border);flex-shrink:0; }
+    .tr-summary { font-size:0.75rem;padding:0.3rem 0.75rem;font-weight:600;min-height:1.2rem; }
+    .tr-progress { font-size:0.72rem;color:var(--muted);padding:0.25rem 0.75rem; }
+    .tr-body { flex:1;overflow-y:auto; }
+    .tr-test-item { border-bottom:1px solid var(--border); }
+    .tr-test-item:last-child { border-bottom:none; }
+    .tr-test-row { display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:0.78rem;cursor:pointer; }
+    .tr-test-row:hover { background:var(--surface2); }
+    .tr-test-num { font-family:var(--mono);font-size:0.68rem;color:var(--muted);min-width:16px;text-align:right;flex-shrink:0; }
+    .tr-test-title { flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .tr-test-detail { padding:5px 10px 7px 25px;font-family:var(--mono);font-size:0.68rem;color:var(--muted);white-space:pre-wrap;border-top:1px solid var(--border);background:var(--surface2);overflow-x:auto;display:none; }
+    .tr-test-detail.open { display:block; }
+    .tr-manual-check { flex-shrink:0;cursor:pointer;accent-color:var(--blue);width:13px;height:13px; }
+    .tr-expected { font-size:0.62rem;font-weight:700;padding:1px 5px;border-radius:3px;flex-shrink:0; }
+    .tr-expected.allow { background:rgba(34,197,94,0.12);color:#166534; }
+    .tr-expected.deny  { background:rgba(239,68,68,0.1);color:var(--red); }
+    .tr-result { font-size:0.62rem;font-weight:700;padding:1px 5px;border-radius:3px;flex-shrink:0;min-width:28px;text-align:center; }
+    .tr-result.pass { background:rgba(34,197,94,0.2);color:#166534; }
+    .tr-result.fail { background:rgba(239,68,68,0.15);color:var(--red); }
+    .tr-result.skip { background:var(--surface2);color:var(--muted);border:1px solid var(--border); }
+    .tr-empty-state { padding:2.5rem 1rem;text-align:center;color:var(--muted);font-size:0.8rem;line-height:1.7; }
+    .tr-manual { padding:0.6rem 0.75rem;border-bottom:2px solid var(--border);background:var(--surface2); }
+    .tr-m-input { font-size:0.75rem;padding:0.25rem 0.4rem;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);min-width:0; }
+    .tr-m-input:focus { outline:none;border-color:var(--blue); }
+    @keyframes _tr-spin { to { transform: rotate(360deg); } }
+    .tr-busy-overlay { position:absolute;inset:0;background:rgba(var(--bg-rgb,255,255,255),0.75);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.75rem;z-index:10; }
+    .tr-spinner { width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--blue);
+      border-radius:50%;animation:_tr-spin 0.7s linear infinite;flex-shrink:0; }
+    .tr-busy-msg { font-size:0.78rem;color:var(--muted);text-align:center;max-width:180px;line-height:1.5; }
+    .tr-prompt-section { border-top:1px solid var(--border);flex-shrink:0; }
+    .tr-prompt-header { display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.6rem;cursor:pointer;user-select:none; }
+    .tr-prompt-header:hover { background:var(--surface2); }
+    .tr-prompt-label { font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);flex:1; }
+    .tr-prompt-body { padding:0.5rem 0.6rem;display:flex;flex-direction:column;gap:0.4rem; }
+    .tr-prompt-textarea { font-family:var(--mono);font-size:0.7rem;resize:vertical;min-height:120px;width:100%;box-sizing:border-box;
+      padding:0.4rem;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);line-height:1.5; }
+    .tr-prompt-textarea:focus { outline:none;border-color:var(--blue); }
+    .tr-prompt-actions { display:flex;gap:0.4rem;align-items:center; }
+    .tr-prompt-msg { font-size:0.7rem;color:var(--muted); }
+    .tr-prompt-view { font-family:var(--mono);font-size:0.7rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;
+      overflow-y:auto;max-height:320px;min-height:120px;width:100%;box-sizing:border-box;
+      padding:0.4rem;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--fg); }
+
     /* ── New owner modal ─────────────────────────────────────── */
     .modal-backdrop {
       display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.4);
@@ -391,7 +439,7 @@
 
     <div class="sidebar-owners-sep"></div>
     <div class="sidebar-owners-header">
-      <span class="sidebar-owners-label">Namespace Owners</span>
+      <span class="sidebar-owners-label">Namespace Management</span>
       <button class="new-btn" onclick="toggleOwnersPanel()">Edit</button>
     </div>
     <div class="sidebar-owners-panel" id="owners-panel" style="display:none"></div>
@@ -402,12 +450,11 @@
   <!-- Editor pane -->
   <main class="editor-pane">
     <div class="editor-toolbar">
-      <span class="tool-btn" style="cursor:default;font-weight:600;color:var(--muted)">ZPL Editor</span>
+      <span style="font-size:0.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">ZPL Editor</span>
       <div class="toolbar-sep"></div>
       <span class="ns-editor-label" id="ns-editor-label"></span>
       <div class="toolbar-sep"></div>
-      <button class="tool-btn" onclick="doParse()">Parse</button>
-      <button class="tool-btn" onclick="doValidate()">Validate</button>
+      <button class="tool-btn" onclick="doParse()">Check ZPL</button>
       <button class="tool-btn primary" id="save-btn" onclick="doSave()">Save</button>
       <button class="tool-btn" onclick="doReset()">Reset</button>
       <span class="status-pill idle" id="status-pill"></span>
@@ -417,28 +464,26 @@
           <div class="io-menu" id="io-menu">
             <div class="io-menu-item" onclick="doUploadZpl()">↑ Upload ZPL file</div>
             <div class="io-menu-item" onclick="doDownloadZpl()">↓ Download ZPL file</div>
+            <div class="io-menu-item" onclick="doUploadZplc()">↑ Import .zplc definitions</div>
           </div>
         </div>
         <button class="panel-toggle" id="panel-toggle" onclick="togglePanel()" title="Toggle schema panel">⊟</button>
       </div>
     </div>
+    <div class="infer-bar" id="infer-bar">
+      <span id="infer-msg"></span>
+      <div class="infer-actions">
+        <button class="infer-insert" onclick="insertInferredClasses()">Insert definitions</button>
+        <button class="infer-dismiss" onclick="dismissInferBar()" title="Dismiss">✕</button>
+      </div>
+    </div>
     <input type="file" id="zpl-file-input" accept=".zpl,.txt" style="display:none" onchange="onZplFileSelected(event)">
+    <input type="file" id="zplc-file-input" accept=".zplc,.toml" style="display:none" onchange="onZplcFileSelected(event)">
     <textarea class="zpl-editor" id="zpl-editor"
-      placeholder="define adapter as an endpoint with zpr.adapter.cn
-
-define A1 as adapter with zpr.adapter.cn:adapter1
-define A2 as adapter with zpr.adapter.cn:adapter2
-
-allow A1 to access A2
-allow A2 to access A1"
+      placeholder="Add ZPL definitions and rules here"
       spellcheck="false"
       oninput="onEditorInput()"
       onkeydown="handleTabKey(event)"></textarea>
-    <div class="infer-bar" id="infer-bar">
-      <span id="infer-msg"></span>
-      <button class="infer-insert" onclick="insertInferredClasses()">Insert definitions</button>
-      <button class="infer-dismiss" onclick="dismissInferBar()" title="Dismiss">✕</button>
-    </div>
     <div class="error-bar" id="error-bar"></div>
   </main>
 
@@ -448,7 +493,8 @@ allow A2 to access A1"
   <aside class="schema-pane" id="schema-pane">
     <div class="schema-pane-header">
       <div class="schema-tabs">
-        <button class="schema-tab active" onclick="setSchemaTab('classes',this)">Classes</button>
+        <button class="schema-tab active" onclick="setSchemaTab('tests',this)">Tests</button>
+        <button class="schema-tab" onclick="setSchemaTab('classes',this)">Classes</button>
         <button class="schema-tab" onclick="setSchemaTab('rules',this)">Rules</button>
         <button class="schema-tab" onclick="setSchemaTab('zpl',this)">ZPL</button>
       </div>
@@ -457,8 +503,38 @@ allow A2 to access A1"
     <div class="schema-body" id="schema-body">
       <div class="empty-state">Parse ZPL to see<br>classes and rules here.</div>
     </div>
+    <div class="tr-busy-overlay" id="tr-busy" style="display:none">
+      <div class="tr-spinner"></div>
+      <div id="tr-busy-msg" class="tr-busy-msg"></div>
+      <button id="tr-stop-btn" class="tool-btn" onclick="trStop()" style="display:none;margin-top:0.5rem;font-size:0.72rem">⏹ Stop</button>
+    </div>
   </aside>
 
+</div>
+
+<!-- ── Test generate modal ──────────────────────────────────────────── -->
+<div class="modal-backdrop" id="tr-gen-modal">
+  <div class="modal" style="max-width:340px">
+    <h3 style="margin-bottom:1rem">Generate tests</h3>
+    <div style="display:flex;gap:1rem;margin-bottom:1rem">
+      <div style="flex:1">
+        <label style="font-size:0.72rem;font-weight:600;display:block;margin-bottom:0.25rem">Positive tests</label>
+        <input type="number" id="tr-gen-positive" min="1" value="8"
+               style="width:100%;font-size:0.8rem;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--fg)">
+        <div style="font-size:0.68rem;color:var(--muted);margin-top:0.2rem">One per allow rule (max)</div>
+      </div>
+      <div style="flex:1">
+        <label style="font-size:0.72rem;font-weight:600;display:block;margin-bottom:0.25rem">Adversarial tests</label>
+        <input type="number" id="tr-gen-adversarial" min="0" value="8"
+               style="width:100%;font-size:0.8rem;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--fg)">
+        <div style="font-size:0.68rem;color:var(--muted);margin-top:0.2rem">Near-miss cases (AI)</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeTrGenModal()">Cancel</button>
+      <button class="btn primary" onclick="trStartGenerate()">⚡ Generate</button>
+    </div>
+  </div>
 </div>
 
 <!-- ── New namespace modal ──────────────────────────────────────────── -->
@@ -507,7 +583,7 @@ const S = {
   context: null,
   subOwners: [],
   dirty: false,
-  schemaTab: 'classes',
+  schemaTab: 'tests',
   lastParsed: null,
   inferredZpl: '',
   serializedZpl: '',
@@ -521,12 +597,13 @@ const S = {
 
 // ── API ────────────────────────────────────────────────────────────────────
 
-async function api(method, path, body) {
+async function api(method, path, body, signal) {
   const opts = { method, headers: {} };
   if (body !== undefined) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
   }
+  if (signal) opts.signal = signal;
   const res = await fetch(path, opts);
   if (res.status === 401) { location.href = '/login'; throw new Error('Not authenticated'); }
   if (!res.ok) {
@@ -565,7 +642,7 @@ function renderHeader() {
   const ctx = S.context;
   if (!ctx) return;
   const isDefault = ctx.active_user_id === ctx.login_user_id;
-  const nsLabel = isDefault ? '(default)' : (ctx.active_display_name || ctx.active_username);
+  const nsLabel = ctx.active_display_name || ctx.active_username;
   document.getElementById('hdr-user').textContent = ctx.login_username;
   document.getElementById('ns-editor-label').textContent = nsLabel;
 }
@@ -605,8 +682,16 @@ function renderOwnersPanel(profile, tree) {
     <div class="cfg-ns-tree">
       <div class="cfg-ns-node">
         <div class="cfg-ns-item" style="border-color:var(--blue)">
-          <div class="cfg-ns-name">${esc(profile.display_name)} <span style="font-weight:400;color:var(--muted)">(you)</span></div>
-          <div class="cfg-ns-meta">login: ${esc(profile.username)}${profile.email ? ' · ' + esc(profile.email) : ''}</div>
+          <div class="cfg-ns-hdr">
+            <div class="cfg-ns-hdr-text">
+              <div class="cfg-ns-name">${esc(profile.display_name)} <span style="font-weight:400;color:var(--muted)">(you)</span></div>
+              <div class="cfg-ns-meta">login: ${esc(profile.username)}${profile.email ? ' · ' + esc(profile.email) : ''}</div>
+            </div>
+            <div class="cfg-ns-actions">
+              <button class="cfg-ns-btn" onclick="toggleRootNsEdit()">Edit</button>
+            </div>
+          </div>
+          <div id="ns-root-edit"></div>
         </div>
         ${childNodes ? `<div class="cfg-ns-children">${childNodes}</div>` : ''}
       </div>
@@ -614,6 +699,38 @@ function renderOwnersPanel(profile, tree) {
     <div id="profile-top-new"></div>
     <button class="cfg-btn" style="margin-top:0.4rem" onclick="toggleProfileTopNew()">+ New sub-namespace</button>
   </div>`;
+}
+
+function toggleRootNsEdit() {
+  const wrap = document.getElementById('ns-root-edit');
+  if (!wrap) return;
+  if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
+  const p = S.profile;
+  wrap.innerHTML = `<div class="cfg-ns-edit-form" style="padding-top:0.4rem">
+    <div class="cfg-row"><label>Namespace name</label>
+      <input id="ns-root-name" value="${esc(p.display_name)}" placeholder="Namespace name"></div>
+    <div style="display:flex;gap:0.4rem;margin-top:0.4rem">
+      <button class="cfg-btn" onclick="doSaveRootNs()">Save</button>
+      <button class="cfg-btn" onclick="document.getElementById('ns-root-edit').innerHTML=''">Cancel</button>
+    </div>
+    <div id="ns-root-msg" class="cfg-msg"></div>
+  </div>`;
+}
+
+async function doSaveRootNs() {
+  const name = document.getElementById('ns-root-name')?.value.trim();
+  const msg  = document.getElementById('ns-root-msg');
+  if (!name) { msg.className = 'cfg-msg err'; msg.textContent = 'Name required.'; return; }
+  try {
+    await api('POST', '/api/profile', { display_name: name, email: S.profile.email || '' });
+    S.profile.display_name = name;
+    msg.className = 'cfg-msg ok'; msg.textContent = 'Saved.';
+    setTimeout(async () => {
+      await loadSubOwners();
+    }, 600);
+  } catch(e) {
+    msg.className = 'cfg-msg err'; msg.textContent = e.message || 'Save failed.';
+  }
 }
 
 function flattenTree(nodes, depth = 0) {
@@ -634,12 +751,12 @@ function renderNsTree() {
 
   let html = '';
 
-  // Root namespace — always shown as "(default)"
   const rootActive = ctx.active_user_id === ctx.login_user_id;
+  const rootName = ctx.login_display_name || ctx.login_username;
   html += `<div class="ns-tree-item${rootActive ? ' active' : ''}"
                onclick="switchToOwner('${esc(ctx.login_user_id)}')">
     <span class="ns-tree-dot${rootActive ? ' active' : ''}"></span>
-    <span class="ns-tree-name${rootActive ? ' active' : ''}">(default)</span>
+    <span class="ns-tree-name${rootActive ? ' active' : ''}">${esc(rootName)}</span>
     ${rootActive ? '<span class="ns-tree-badge">active</span>' : ''}
   </div>`;
 
@@ -880,6 +997,29 @@ function doDownloadZpl() {
   URL.revokeObjectURL(url);
 }
 
+function doUploadZplc() {
+  document.getElementById('io-menu').classList.remove('open');
+  document.getElementById('zplc-file-input').click();
+}
+
+async function onZplcFileSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = '';
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await fetch('/api/zplc/import', { method: 'POST', body: fd, credentials: 'include' });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    const data = await res.json();
+    const n = (data.inferred_classes || []).length;
+    const label = `${n} service${n !== 1 ? 's' : ''} from .zplc`;
+    showInferBar(data.inferred_classes || [], data.inferred_zpl || '', label);
+  } catch(e) {
+    setStatus('error', 'Failed to read .zplc: ' + e.message);
+  }
+}
+
 function doReset() {
   if (S.dirty && !confirm('Clear the editor and discard unsaved changes?')) return;
   if (!S.dirty && document.getElementById('zpl-editor').value.trim() &&
@@ -895,13 +1035,14 @@ function doReset() {
 
 // ── Infer bar ──────────────────────────────────────────────────────────────
 
-function showInferBar(classes, zpl) {
+function showInferBar(classes, zpl, label) {
   const bar = document.getElementById('infer-bar');
   if (!classes.length) { clearInferBar(); return; }
   S.inferredZpl = zpl;
   const names = classes.map(c => c.class).join(', ');
+  const prefix = label || `${classes.length} undefined class${classes.length > 1 ? 'es' : ''}`;
   document.getElementById('infer-msg').innerHTML =
-    `<strong>${classes.length} undefined class${classes.length > 1 ? 'es' : ''}:</strong> ${esc(names)}`;
+    `<strong>${prefix}:</strong> ${esc(names)}`;
   bar.classList.add('visible');
 }
 
@@ -955,6 +1096,7 @@ function setSchemaTab(tab, btn) {
 function renderSchemaBody() {
   const body = document.getElementById('schema-body');
   const ps = S.lastParsed;
+  if (S.schemaTab === 'tests') { renderTests(body); return; }
   if (!ps) {
     body.innerHTML = '<div class="empty-state">Parse ZPL to see<br>classes and rules here.</div>';
     return;
@@ -969,7 +1111,8 @@ function renderZpl(body) {
     body.innerHTML = '<div class="empty-state">No ZPL to display.</div>';
     return;
   }
-  body.innerHTML = `<pre class="zpl-canon">${esc(S.serializedZpl)}</pre>`;
+  const comment = '# ALL Entities are namespaced to avoid collision between delegated sets.  For user convenience the current namespace is not shown in the edit.\n\n';
+  body.innerHTML = `<pre class="zpl-canon">${esc(comment + S.serializedZpl)}</pre>`;
 }
 
 // ── Profile tab ────────────────────────────────────────────────────────────
@@ -1016,6 +1159,7 @@ function renderOwnerTree(node, depth) {
         <div class="cfg-ns-actions">
           <button class="cfg-ns-btn" onclick="toggleNsNew('${uid}')">+ New</button>
           <button class="cfg-ns-btn" onclick="toggleNsEdit('${uid}',${esc(JSON.stringify(nodeData))})">Edit</button>
+          <button class="cfg-ns-btn danger" onclick="doDeleteOwner('${uid}','${esc(node.display_name)}')" title="Delete namespace">✕</button>
         </div>
       </div>
       <div id="ns-new-${uid}"></div>
@@ -1251,7 +1395,6 @@ function toggleNsEdit(uid, nodeDataJson) {
       <div style="display:flex;gap:0.4rem;flex-wrap:wrap">
         <button class="cfg-btn" onclick="doSaveOwner('${uid}')">Save</button>
         <button class="cfg-btn" onclick="document.getElementById('ns-edit-${uid}').innerHTML=''">Cancel</button>
-        <button class="cfg-btn danger" style="margin-left:auto" onclick="doDeleteOwner('${uid}','${esc(node.display_name)}')">Delete</button>
       </div>
       <div id="ed-msg-${uid}"></div>
     </div>`;
@@ -1293,9 +1436,24 @@ function renderClasses(body, classes) {
     return;
   }
   let html = '<div class="schema-section">';
+
+  // ── Verbs section ──
+  const verbs = classes.filter(c => c.is_verb || c.parent === 'verb');
+  if (verbs.length) {
+    html += `<div class="schema-section-title">verbs</div>`;
+    for (const v of verbs) {
+      const json = esc(JSON.stringify(v, null, 2));
+      html += `<div class="class-node" onclick="toggleJsonDetail(this)" data-json="${json}">
+        <span class="indent"></span>
+        <div style="flex:1;min-width:0"><span class="cn-name">${esc(v.name)}</span></div>
+      </div>`;
+    }
+  }
+
   const roots = ['users', 'endpoints', 'services'];
+  const nonVerb = classes.filter(c => !c.is_verb && c.parent !== 'verb');
   const byParent = {};
-  for (const c of classes) {
+  for (const c of nonVerb) {
     const p = c.parent || 'root';
     (byParent[p] = byParent[p] || []).push(c);
   }
@@ -1325,12 +1483,21 @@ function renderClasses(body, classes) {
       renderSubtree(root, 0);
     }
   }
-  const knownParents = new Set([...roots, ...classes.map(c => c.name)]);
-  const orphans = classes.filter(c => !knownParents.has(c.parent) && !roots.includes(c.parent));
+  const knownParents = new Set([...roots, ...nonVerb.map(c => c.name)]);
+  const orphans = nonVerb.filter(c => !knownParents.has(c.parent) && !roots.includes(c.parent));
   if (orphans.length) {
-    html += `<div class="schema-section-title">other</div>`;
+    html += `<div class="schema-section-title">external parent</div>`;
     for (const c of orphans) {
-      html += `<div class="class-node"><span class="cn-name">${esc(c.name)}</span><span class="cn-parent">← ${esc(c.parent)}</span></div>`;
+      const attrs = Object.entries(c.attributes || {});
+      const json = esc(JSON.stringify(c, null, 2));
+      html += `<div class="class-node" onclick="toggleJsonDetail(this)" data-json="${json}">
+        <span class="indent"></span>
+        <div style="flex:1;min-width:0">
+          <span class="cn-name">${esc(c.name)}</span>
+          <span class="cn-parent">← ${esc(c.parent)}</span>
+          ${attrs.length ? `<div class="cn-attrs">${attrs.map(([k,v]) => `${esc(k)}: ${esc(v.type)}`).join('  ')}</div>` : ''}
+        </div>
+      </div>`;
     }
   }
   html += '</div>';
@@ -1469,6 +1636,514 @@ function setupResizer(id, onDrag) {
 async function doLogout() {
   await fetch('/logout', { method: 'POST' });
   location.href = '/login';
+}
+
+// ── Test Runner ────────────────────────────────────────────────────────────
+
+const TR = { tests: [], manualActive: null };
+
+const _TR_BUILTINS = new Set(['user','users','service','services','endpoint','endpoints','server','servers']);
+
+function _trActiveNs() {
+  const dn = (S.context?.active_display_name || '').trim();
+  if (!dn || dn.startsWith('_ns_')) return '';
+  return dn;
+}
+
+function _trPayloadLabel(p) {
+  if (!p) return 'test';
+  const s = (p.subject_class || 'subject').split('.').pop();
+  const o = (p.object_class  || 'object').split('.').pop();
+  return `${s} ${p.action || 'access'} ${o}`;
+}
+
+function _trQualify(name) {
+  if (!name) return name;
+  const ns = _trActiveNs();
+  if (!ns || name.includes('.') || _TR_BUILTINS.has(name.toLowerCase())) return name;
+  return `${ns}.${name}`;
+}
+
+function _trFlattenAttrs(attrs) {
+  const out = {};
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === '*') out[k] = 'yes';
+    else if (Array.isArray(v)) out[k] = v[0];
+    else out[k] = v;
+  }
+  return out;
+}
+
+function _trBuildPayload(r) {
+  const payload = {
+    subject_class: _trQualify(r.subject?.cls || r.subject?.class || 'users'),
+    subject_attrs: _trFlattenAttrs(r.subject?.attrs),
+    action: r.action || 'access',
+    object_class: _trQualify(r.object?.cls || r.object?.class || 'services'),
+    object_attrs: _trFlattenAttrs(r.object?.attrs),
+  };
+  if (r.subject?.name) payload.subject_name = r.subject.name;
+  if (r.object?.name)  payload.object_name  = r.object.name;
+  const acc = r.accessor_endpoint;
+  if (acc?.cls || acc?.class) {
+    payload.accessor_class = _trQualify(acc.cls || acc.class);
+    payload.accessor_attrs = _trFlattenAttrs(acc.attrs);
+  }
+  return payload;
+}
+
+function trGenerate() {
+  document.getElementById('tr-gen-modal').classList.add('open');
+}
+
+function closeTrGenModal() {
+  document.getElementById('tr-gen-modal').classList.remove('open');
+}
+
+async function trStartGenerate() {
+  closeTrGenModal();
+  const nPositive    = Math.max(1, parseInt(document.getElementById('tr-gen-positive')?.value)    || 8);
+  const nAdversarial = Math.max(0, parseInt(document.getElementById('tr-gen-adversarial')?.value) || 8);
+
+  TR.abortController = new AbortController();
+  trBusy(`Generating ${nPositive} tests and ${nAdversarial} adversarial…`, true);
+  try {
+    const suite = await api('POST', '/api/tests/adversarial', {
+      n_positive: nPositive,
+      n_adversarial: nAdversarial,
+    }, TR.abortController.signal);
+
+    const positive = (suite.positive_tests || []).map((t, i) => ({
+      number: i + 1,
+      title: t.title || _trPayloadLabel(t.payload),
+      expected: t.expected || 'allow',
+      payload: t.payload,
+      result: null,
+      adversarial: false,
+    }));
+    const counter = (suite.counter_tests || []).map((ct, i) => ({
+      number: positive.length + i + 1,
+      title: ct.title || _trPayloadLabel(ct.payload),
+      expected: 'deny',
+      payload: ct.payload,
+      result: null,
+      adversarial: true,
+      verified: ct.verified,
+    }));
+    TR.tests = [...positive, ...counter];
+
+    const discarded = suite.discarded_adversarial || 0;
+    if (discarded > 0) toast(`${discarded} adversarial test${discarded !== 1 ? 's' : ''} discarded — mutation still allowed by policy`);
+  } catch(e) {
+    if (e.name === 'AbortError') {
+      toast('Generation stopped.');
+    } else {
+      toast(`Generation failed: ${e.message || e}`);
+    }
+  }
+  TR.abortController = null;
+  trBusy(null);
+  renderSchemaBody();
+}
+
+function _trFormatTraceHtml(trace) {
+  if (!trace || !trace.length) return '';
+  const lines = trace.map(t => {
+    const fails = Object.entries(t.slots || {}).filter(([,v]) => !v.ok);
+    if (t.matched) {
+      return `<span style="color:var(--green)">✓ [MATCH] ${esc(t.rule || '?')}</span>`;
+    }
+    let s = `<span>✗ [miss ] ${esc(t.rule || '?')}</span>`;
+    if (fails.length) {
+      s += '\n' + fails.map(([k,v]) => `         ✗ ${esc(k)}: ${esc(v.why)}`).join('\n');
+    }
+    return s;
+  });
+  return '\nTrace:\n' + lines.join('\n');
+}
+
+function _trDetailHtml(i) {
+  const t = TR.tests[i];
+  if (!t) return '';
+  const payloadStr = esc(JSON.stringify(t.payload, null, 2));
+  const traceHtml = _trFormatTraceHtml(t.trace);
+  return `<span>${payloadStr}</span>${traceHtml}`;
+}
+
+function trToggleDetail(i) {
+  const el = document.getElementById(`tr-detail-${i}`);
+  if (!el) return;
+  if (el.classList.contains('open')) {
+    el.classList.remove('open');
+  } else {
+    el.innerHTML = _trDetailHtml(i);  // always refresh — picks up trace if tests were run
+    el.classList.add('open');
+  }
+}
+
+async function trRunAll() {
+  if (!TR.tests.length) return;
+  const btn = document.getElementById('tr-run-btn');
+  const prog = document.getElementById('tr-progress');
+  if (btn) { btn.disabled = true; btn.textContent = '▶ Running…'; }
+  if (prog) { prog.style.display = ''; prog.textContent = 'Starting…'; }
+  const sumEl = document.getElementById('tr-summary');
+  if (sumEl) sumEl.textContent = '';
+
+  let passed = 0, failed = 0;
+  for (let i = 0; i < TR.tests.length; i++) {
+    const t = TR.tests[i];
+    if (prog) prog.textContent = `Running ${i + 1} / ${TR.tests.length}…`;
+    try {
+      const r = await api('POST', '/api/match', t.payload);
+      t.result = r.verdict || 'deny';
+      t.trace  = r.trace  || [];
+    } catch(e) {
+      t.result = 'error';
+      t.trace  = [];
+    }
+    const pass = t.result === t.expected;
+    if (t.result !== 'error') { if (pass) passed++; else failed++; }
+    const el = document.getElementById(`tr-res-${i}`);
+    if (el) {
+      const cls = t.result === 'error' ? 'skip' : (pass ? 'pass' : 'fail');
+      el.className = `tr-result ${cls}`;
+      el.textContent = cls === 'pass' ? 'PASS' : cls === 'fail' ? 'FAIL' : 'ERR';
+    }
+    const detEl = document.getElementById(`tr-detail-${i}`);
+    if (detEl && detEl.classList.contains('open')) detEl.innerHTML = _trDetailHtml(i);
+  }
+  if (prog) prog.style.display = 'none';
+  const metaEl = document.getElementById('tr-meta');
+  if (metaEl) metaEl.textContent = `${TR.tests.length} test${TR.tests.length !== 1 ? 's' : ''} · ${passed} passed · ${failed} failed`;
+  if (sumEl) sumEl.innerHTML =
+    `<span style="color:var(--green);font-weight:700;">${passed} passed</span>&nbsp;&nbsp;<span style="color:var(--red);font-weight:700;">${failed} failed</span>`;
+  if (btn) { btn.disabled = false; btn.textContent = '▶ Run All'; }
+}
+
+function trExport() {
+  if (!TR.tests.length) return;
+  const today = new Date().toISOString().split('T')[0];
+  const sections = TR.tests.map(t => {
+    const resultLine = t.result ? `**Result:** ${t.result.toUpperCase()}  \n` : '';
+    return `## ${t.number}. ${t.title}\n**Expected:** ${t.expected.toUpperCase()}  \n${resultLine}\n\`\`\`json\n${JSON.stringify(t.payload, null, 2)}\n\`\`\``;
+  }).join('\n\n---\n\n');
+  const md = `# ZPL Test Suite — ${today}\n\n---\n\n${sections}\n`;
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `zpl-tests-${today}.md`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function trReset() {
+  TR.tests = [];
+  renderSchemaBody();
+}
+
+// ── Busy overlay ──────────────────────────────────────────────────────────
+
+function trBusy(msg, canStop = false) {
+  const el = document.getElementById('tr-busy');
+  const msgEl = document.getElementById('tr-busy-msg');
+  const stopBtn = document.getElementById('tr-stop-btn');
+  if (!el) return;
+  if (msg) {
+    if (msgEl) msgEl.textContent = msg;
+    if (stopBtn) stopBtn.style.display = canStop ? '' : 'none';
+    el.style.display = 'flex';
+  } else {
+    el.style.display = 'none';
+    if (stopBtn) stopBtn.style.display = 'none';
+  }
+}
+
+function trStop() {
+  if (TR.abortController) TR.abortController.abort();
+}
+
+// ── Prompt management ──────────────────────────────────────────────────────
+
+const _PROMPT_KEY = 'title_polish';
+TR.promptOpen = false;
+TR.promptContent = null;
+TR.promptViewMode = false;
+TR.abortController = null;
+
+async function trLoadPrompt() {
+  if (TR.promptContent !== null) return TR.promptContent;
+  try {
+    const r = await api('GET', `/api/prompts/${_PROMPT_KEY}`);
+    TR.promptContent = r.content;
+  } catch(e) {
+    TR.promptContent = '';
+  }
+  return TR.promptContent;
+}
+
+async function trTogglePrompt() {
+  TR.promptOpen = !TR.promptOpen;
+  if (!TR.promptOpen) TR.promptViewMode = false;
+  if (TR.promptOpen && TR.promptContent === null) await trLoadPrompt();
+  renderSchemaBody();
+}
+
+function trTogglePromptView() {
+  const ta = document.getElementById('tr-prompt-ta');
+  if (ta) TR.promptContent = ta.value;
+  TR.promptViewMode = !TR.promptViewMode;
+  renderSchemaBody();
+}
+
+async function trSavePrompt() {
+  const ta = document.getElementById('tr-prompt-ta');
+  if (!ta) return;
+  const msg = document.getElementById('tr-prompt-msg');
+  try {
+    await api('PUT', `/api/prompts/${_PROMPT_KEY}`, { content: ta.value });
+    TR.promptContent = ta.value;
+    if (msg) { msg.textContent = 'Saved.'; setTimeout(() => { if (msg) msg.textContent = ''; }, 2000); }
+  } catch(e) {
+    if (msg) msg.textContent = 'Save failed.';
+  }
+}
+
+function trDownloadPrompt() {
+  const ta = document.getElementById('tr-prompt-ta');
+  const content = ta ? ta.value : (TR.promptContent || '');
+  const blob = new Blob([content], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `${_PROMPT_KEY}.md`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function trUploadPrompt() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.md,.txt';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const text = await file.text();
+    TR.promptContent = text;
+    const ta = document.getElementById('tr-prompt-ta');
+    if (ta) ta.value = text;
+  };
+  input.click();
+}
+
+function _trPromptSection() {
+  const content = TR.promptContent ?? '';
+  const editControls = TR.promptViewMode
+    ? ''
+    : `<button class="tool-btn" onclick="trSavePrompt()">Save</button>
+        <button class="tool-btn" onclick="trDownloadPrompt()">↓ Download</button>
+        <button class="tool-btn" onclick="trUploadPrompt()">↑ Upload</button>`;
+  const body = TR.promptViewMode
+    ? `<div class="tr-prompt-view">${esc(content)}</div>`
+    : `<textarea class="tr-prompt-textarea" id="tr-prompt-ta" spellcheck="false">${esc(content)}</textarea>`;
+  return `<div class="tr-prompt-section">
+    <div class="tr-prompt-body">
+      ${body}
+      <div class="tr-prompt-actions">
+        ${editControls}
+        <button class="tool-btn" onclick="trTogglePromptView()">${TR.promptViewMode ? '✎ Edit' : '👁 View'}</button>
+        <button class="tool-btn" onclick="trTogglePrompt()">✕ Close</button>
+        <span id="tr-prompt-msg" class="tr-prompt-msg"></span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function _trManualForm() {
+  return `<div class="tr-manual" id="tr-manual">
+    <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.4rem;">Manual test</div>
+    <div style="display:flex;flex-direction:column;gap:0.3rem;">
+      <div style="display:flex;gap:0.4rem;align-items:center;">
+        <input id="tr-m-subj" class="tr-m-input" placeholder="subject class" style="flex:1" onkeydown="if(event.key==='Enter')trRunManual()">
+        <input id="tr-m-action" class="tr-m-input" placeholder="action" style="width:70px" value="access" onkeydown="if(event.key==='Enter')trRunManual()">
+        <input id="tr-m-obj" class="tr-m-input" placeholder="object class" style="flex:1" onkeydown="if(event.key==='Enter')trRunManual()">
+      </div>
+      <div style="display:flex;gap:0.4rem;align-items:center;">
+        <button class="tool-btn" onclick="trRunManual()" id="tr-m-run-btn">▶ Run</button>
+        <button class="tool-btn" onclick="trAddManual()" title="Add to test list">+ Add</button>
+        <span id="tr-m-result" style="font-size:0.72rem;flex:1"></span>
+      </div>
+      <div id="tr-m-detail" style="font-family:var(--mono);font-size:0.68rem;color:var(--muted);white-space:pre;overflow-x:auto;display:none"></div>
+    </div>
+  </div>`;
+}
+
+function trSetManual(i, checked) {
+  // Uncheck whichever row was previously active
+  if (TR.manualActive !== null && TR.manualActive !== i) {
+    const prev = document.getElementById(`tr-manual-check-${TR.manualActive}`);
+    if (prev) prev.checked = false;
+  }
+  TR.manualActive = checked ? i : null;
+  if (!checked) return;
+
+  const t = TR.tests[i];
+  if (!t) return;
+  const p = t.payload;
+  const subjEl   = document.getElementById('tr-m-subj');
+  const actionEl = document.getElementById('tr-m-action');
+  const objEl    = document.getElementById('tr-m-obj');
+  if (subjEl)   subjEl.value   = p.subject_class || '';
+  if (actionEl) actionEl.value = p.action || 'access';
+  if (objEl)    objEl.value    = p.object_class || '';
+  document.getElementById('tr-manual')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  _trRunWithPayload(p);
+}
+
+async function _trRunWithPayload(payload) {
+  const btn = document.getElementById('tr-m-run-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  const resEl    = document.getElementById('tr-m-result');
+  const detailEl = document.getElementById('tr-m-detail');
+  try {
+    const r = await api('POST', '/api/match', payload);
+    const pass = r.verdict === 'allow';
+    resEl.innerHTML = `<span class="tr-result ${pass ? 'pass' : 'fail'}" style="display:inline">${r.verdict.toUpperCase()}</span> <span style="color:var(--muted)">${esc(r.reason || '')}</span>`;
+    const header = esc(
+      `rules=${r.rule_count ?? '?'} classes=${r.class_count ?? '?'}\n` +
+      `Sent: ${JSON.stringify(payload)}\nGot:  ${JSON.stringify({verdict:r.verdict,reason:r.reason})}`
+    );
+    detailEl.innerHTML =
+      `<button onclick="document.getElementById('tr-m-detail').style.display='none'"` +
+      ` style="float:right;background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.85rem;padding:0 2px" title="Close">✕</button>` +
+      `<span>${header}</span>` + _trFormatTraceHtml(r.trace || []);
+    detailEl.style.display = '';
+  } catch(e) {
+    resEl.innerHTML = `<span class="tr-result skip" style="display:inline">ERR</span> <span style="color:var(--muted)">${esc(e.message)}</span>`;
+    detailEl.innerHTML = `<span style="white-space:pre">${esc('Sent: ' + JSON.stringify(payload))}</span>`;
+    detailEl.style.display = '';
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '▶ Run'; }
+}
+
+async function trRunManual() {
+  const subj  = document.getElementById('tr-m-subj')?.value.trim();
+  const action = document.getElementById('tr-m-action')?.value.trim() || 'access';
+  const obj   = document.getElementById('tr-m-obj')?.value.trim();
+  if (!subj || !obj) { toast('Enter subject and object class'); return; }
+
+  const btn = document.getElementById('tr-m-run-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
+  const payload = {
+    subject_class: _trQualify(subj),
+    subject_attrs: {},
+    action,
+    object_class: _trQualify(obj),
+    object_attrs: {},
+  };
+
+  const resEl   = document.getElementById('tr-m-result');
+  const detailEl = document.getElementById('tr-m-detail');
+  try {
+    const r = await api('POST', '/api/match', payload);
+    const pass = r.verdict === 'allow';
+    resEl.innerHTML = `<span class="tr-result ${pass ? 'pass' : 'fail'}" style="display:inline">${r.verdict.toUpperCase()}</span> <span style="color:var(--muted)">${esc(r.reason || '')}</span>`;
+    const header = esc(
+      `rules=${r.rule_count ?? '?'} classes=${r.class_count ?? '?'}\n` +
+      `Sent: ${JSON.stringify(payload)}\nGot:  ${JSON.stringify({verdict:r.verdict,reason:r.reason})}`
+    );
+    detailEl.innerHTML =
+      `<button onclick="document.getElementById('tr-m-detail').style.display='none'"` +
+      ` style="float:right;background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.85rem;padding:0 2px" title="Close">✕</button>` +
+      `<span>${header}</span>` + _trFormatTraceHtml(r.trace || []);
+    detailEl.style.display = '';
+  } catch(e) {
+    detailEl.innerHTML =
+      `<button onclick="document.getElementById('tr-m-detail').style.display='none'"` +
+      ` style="float:right;background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.85rem;padding:0 2px" title="Close">✕</button>` +
+      `<span style="white-space:pre">${esc('Sent: ' + JSON.stringify(payload))}</span>`;
+    resEl.innerHTML = `<span class="tr-result skip" style="display:inline">ERR</span> <span style="color:var(--muted)">${esc(e.message)}</span>`;
+    detailEl.style.display = '';
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '▶ Run'; }
+}
+
+function trAddManual() {
+  const subj  = document.getElementById('tr-m-subj')?.value.trim();
+  const action = document.getElementById('tr-m-action')?.value.trim() || 'access';
+  const obj   = document.getElementById('tr-m-obj')?.value.trim();
+  if (!subj || !obj) { toast('Enter subject and object class'); return; }
+  const payload = {
+    subject_class: _trQualify(subj),
+    subject_attrs: {},
+    action,
+    object_class: _trQualify(obj),
+    object_attrs: {},
+  };
+  TR.tests.push({
+    number: TR.tests.length + 1,
+    title: `${subj} ${action} ${obj}`,
+    expected: 'allow',
+    payload,
+    result: null,
+  });
+  renderSchemaBody();
+}
+
+function renderTests(body) {
+  const manualHtml = _trManualForm();
+
+  if (!TR.tests.length) {
+    body.innerHTML = manualHtml + `<div class="tr-empty-state" style="padding-top:1rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <button class="tool-btn" onclick="trGenerate()">⚡ Generate from rules</button>
+        <button class="tool-btn" onclick="trTogglePrompt()">Prompt</button>
+      </div>
+    </div>` + (TR.promptOpen ? _trPromptSection() : '');
+    return;
+  }
+
+  const nAdv  = TR.tests.filter(t => t.adversarial).length;
+  const nUnverifiable = TR.tests.filter(t => t.adversarial && t.verified === false).length;
+  const summaryParts = [`${TR.tests.length} test${TR.tests.length !== 1 ? 's' : ''}`];
+  if (nAdv)         summaryParts.push(`${nAdv} ⚔ adversarial`);
+  if (nUnverifiable) summaryParts.push(`${nUnverifiable} ! unverifiable`);
+  const summaryLine = `<div style="font-size:0.7rem;color:var(--muted);padding:0.3rem 0.6rem 0">${summaryParts.join(' · ')}</div>`;
+
+  const listHtml = TR.tests.map((t, i) => {
+    const detail = JSON.stringify(t.payload, null, 2);
+    const resCls = t.result === null ? '' : (t.result === 'error' ? 'skip' : (t.result === t.expected ? 'pass' : 'fail'));
+    const resText = t.result === null ? '' : (t.result === 'error' ? 'ERR' : (t.result === t.expected ? 'PASS' : 'FAIL'));
+    const advBadge = t.adversarial ? `<span style="font-size:0.85rem;color:var(--muted);flex-shrink:0" title="Adversarial">⚔</span>` : '';
+    const unverified = t.adversarial && t.verified === false
+      ? `<span style="font-size:0.9rem;color:var(--yellow);flex-shrink:0;font-weight:600" title="Could not verify — engine error during generation">!</span>` : '';
+    const isActive = TR.manualActive === i;
+    return `<div class="tr-test-item">
+      <div class="tr-test-row" onclick="trToggleDetail(${i})">
+        <input type="checkbox" id="tr-manual-check-${i}" class="tr-manual-check"
+               ${isActive ? 'checked' : ''}
+               onclick="event.stopPropagation();trSetManual(${i},this.checked)"
+               title="Load into manual tester and run">
+        <span class="tr-test-num">${t.number}</span>
+        <span class="tr-test-title">${esc(t.title)}</span>
+        ${advBadge}${unverified}
+        <span class="tr-expected ${t.expected}">${t.expected.toUpperCase()}</span>
+        <span class="tr-result ${resCls}" id="tr-res-${i}">${resText}</span>
+      </div>
+      <div class="tr-test-detail" id="tr-detail-${i}">${esc(detail)}</div>
+    </div>`;
+  }).join('');
+
+  body.innerHTML = manualHtml + `
+    <div class="tr-toolbar">
+      <button class="tool-btn" onclick="trGenerate()">⚡ Generate…</button>
+      <div style="display:flex;gap:0.4rem;align-items:center;flex:1">
+        <button class="tool-btn" id="tr-run-btn" onclick="trRunAll()">▶ Run All</button>
+        <button class="tool-btn" onclick="trExport()">↓ Export</button>
+        <button class="tool-btn" onclick="trReset()" title="Clear tests">✕ Reset</button>
+      </div>
+      <button class="tool-btn" onclick="trTogglePrompt()" title="Edit adversarial prompt">Prompt</button>
+    </div>
+    ${TR.promptOpen ? _trPromptSection() : ''}
+    ${summaryLine}
+    <div id="tr-summary" class="tr-summary"></div>
+    <div id="tr-progress" class="tr-progress" style="display:none"></div>
+    <div class="tr-body">${listHtml}</div>`;
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────

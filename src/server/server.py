@@ -42,11 +42,20 @@ API (all require auth, scoped to active owner)
 from __future__ import annotations
 
 import os
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    try:
+        import tomllib
+    except ImportError:
+        import tomli as tomllib  # type: ignore[no-redef]
+
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from itsdangerous import BadSignature, URLSafeSerializer
@@ -57,6 +66,7 @@ load_dotenv()
 import agent as agent_mod
 import database as db
 import ir_normalizer as norm
+import namespace as ns_mod
 import zpl_parser
 import zpel_parser
 import zpl_serializer
@@ -73,6 +83,11 @@ from ir_schema import (
     SimScenario,
     SubjectSpec,
 )
+import json as _json
+import random as _random
+import re as _re
+
+import ai_client
 from zpl_engine import CheckRequest, Entity, Rule, ZPLEngine
 from class_schema import ClassSchema
 
@@ -280,11 +295,13 @@ async def get_profile(session: dict = Depends(get_session)):
 
 class UpdateProfileRequest(BaseModel):
     email: str = ""
+    display_name: str | None = None
 
 
 @app.post("/api/profile")
 async def update_profile(req: UpdateProfileRequest, session: dict = Depends(get_session)):
-    await db.update_profile(session["login_user_id"], req.email.strip())
+    dn = req.display_name.strip() if req.display_name and req.display_name.strip() else None
+    await db.update_profile(session["login_user_id"], req.email.strip(), display_name=dn)
     return {"ok": True}
 
 
@@ -377,14 +394,10 @@ class MatchRequest(BaseModel):
 
 @app.post("/api/match")
 async def match_rule(req: MatchRequest, session: dict = Depends(get_session_or_token)):
-    """Test whether a request matches any rule in the active namespace's ZPL."""
-    zpl_text = await db.get_namespace_zpl(session["active_user_id"])
-    if not zpl_text.strip():
-        return {"verdict": "deny", "rule": None, "reason": "No ZPL defined"}
-    raw = zpl_parser.parse(zpl_text)
-    ps, errors = norm.zpl_to_policy_set(raw)
-    if errors:
-        return {"verdict": "deny", "rule": None, "reason": f"{len(errors)} parse error(s)"}
+    """Test whether a request matches any rule in the active namespace's merged ZPL."""
+    ps = await _merged_policy_set(session["active_user_id"])
+    if not ps:
+        return {"verdict": "deny", "rule": None, "reason": "No ZPL defined", "trace": []}
     rules = []
     for s in ps.rules:
         try:
@@ -410,15 +423,380 @@ async def match_rule(req: MatchRequest, session: dict = Depends(get_session_or_t
     try:
         result = ZPLEngine(rules, schema).evaluate(check)
     except Exception as exc:
-        return {"verdict": "deny", "rule": None, "reason": f"Engine error: {exc}"}
+        return {"verdict": "deny", "rule": None, "reason": f"Engine error: {exc}", "trace": []}
+    trace_out = []
+    for rt in result.trace:
+        trace_out.append({
+            "rule": rt.rule_name or rt.rule_id,
+            "matched": rt.matched,
+            "slots": {k: {"ok": v.matched, "why": v.reason} for k, v in rt.slot_matches.items()},
+        })
     return {
         "verdict": result.verdict,
         "rule": result.rule_name,
         "reason": f"Matched rule '{result.rule_name}'" if result.rule_id else "No matching rule",
+        "trace": trace_out,
+        "zpl_loaded": True,
+        "rule_count": len(rules),
+        "class_count": len(ps.classes),
     }
 
 
 # ── Context switching ─────────────────────────────────────────────────────────
+
+_PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+
+@app.get("/api/prompts/{key}")
+async def get_prompt(key: str, _: dict = Depends(get_session)):
+    content = await db.get_prompt(key)
+    if content is None:
+        path = _PROMPTS_DIR / f"{key}.md"
+        if not path.exists():
+            raise HTTPException(404, f"Prompt '{key}' not found")
+        content = path.read_text()
+    return {"key": key, "content": content}
+
+
+class PromptSaveRequest(BaseModel):
+    content: str
+
+
+@app.put("/api/prompts/{key}")
+async def save_prompt(key: str, req: PromptSaveRequest, _: dict = Depends(get_session)):
+    await db.save_prompt(key, req.content)
+    return {"key": key, "saved": True}
+
+
+def _flatten_tree_nodes(tree: dict) -> list[dict]:
+    """Return all nodes (id + display_name) in an owner tree."""
+    if not tree or not tree.get("id"):
+        return []
+    nodes = [{"id": tree["id"], "display_name": tree.get("display_name", "")}]
+    for child in tree.get("children") or []:
+        nodes.extend(_flatten_tree_nodes(child))
+    return nodes
+
+
+async def _merged_policy_set(root_user_id: str) -> PolicySet | None:
+    """Parse and merge ZPL from root_user_id and all descendant namespaces,
+    applying each namespace's prefix via ns_mod.inject."""
+    tree = await db.get_owner_tree(root_user_id)
+    nodes = _flatten_tree_nodes(tree)
+    user_ids = [n["id"] for n in nodes]
+    dn_map = {n["id"]: n["display_name"] for n in nodes}
+    zpl_map = await db.get_namespace_zpl_batch(user_ids)
+    merged = PolicySet(name="_merged", language="zpl")
+    for uid in user_ids:
+        text = zpl_map.get(uid, "").strip()
+        if not text:
+            continue
+        try:
+            raw = zpl_parser.parse(text)
+            ps, errors = norm.zpl_to_policy_set(raw)
+            if errors:
+                continue
+            ns = (dn_map.get(uid) or "").strip()
+            if ns and not ns.startswith("_ns_"):
+                injected = ns_mod.inject(ps.model_dump(mode="json"), ns)
+                ps = PolicySet.model_validate(injected)
+            merged.classes.extend(ps.classes)
+            merged.rules.extend(ps.rules)
+        except Exception:
+            pass
+    return merged if (merged.classes or merged.rules) else None
+
+
+# ── Adversarial mutation helpers ──────────────────────────────────────────────
+
+_ADVERSARIAL_VERBS = ["read", "write", "access", "use", "execute", "delete", "create", "update"]
+
+
+def _base_payload(rule) -> dict:
+    s, o, ae = rule.subject, rule.object, rule.accessor_endpoint
+    p: dict = {
+        "subject_class": s.cls if s and s.cls else "users",
+        "subject_attrs": dict(s.attrs) if s and s.attrs else {},
+        "action": rule.action,
+        "object_class": o.cls if o and o.cls else "services",
+        "object_attrs": dict(o.attrs) if o and o.attrs else {},
+    }
+    if ae and ae.cls:
+        p["accessor_class"] = ae.cls
+        p["accessor_attrs"] = dict(ae.attrs) if ae.attrs else {}
+    return p
+
+
+def _payload_description(payload: dict) -> str:
+    subj = (payload.get("subject_class") or "users").split(".")[-1]
+    verb = payload.get("action") or "access"
+    obj  = (payload.get("object_class") or "services").split(".")[-1]
+    parts = [subj, verb, obj]
+    if payload.get("accessor_class"):
+        parts.append(f"on {payload['accessor_class'].split('.')[-1]}")
+        for k, v in (payload.get("accessor_attrs") or {}).items():
+            parts.append(f"[{k}:{v}]")
+    for k, v in (payload.get("subject_attrs") or {}).items():
+        parts.append(f"[{k}:{v}]")
+    for k, v in (payload.get("object_attrs") or {}).items():
+        parts.append(f"[{k}:{v}]")
+    return " ".join(parts)
+
+
+def _check_req_from_payload(payload: dict) -> CheckRequest:
+    p = payload
+    return CheckRequest(
+        subject=Entity(
+            class_name=p.get("subject_class", "users"),
+            name=p.get("subject_name"),
+            attrs=p.get("subject_attrs") or {},
+        ),
+        object=Entity(
+            class_name=p.get("object_class", "services"),
+            name=p.get("object_name"),
+            attrs=p.get("object_attrs") or {},
+        ),
+        verb=p.get("action", "access"),
+        accessor_endpoint=Entity(
+            class_name=p["accessor_class"],
+            attrs=p.get("accessor_attrs") or {},
+        ) if p.get("accessor_class") else None,
+    )
+
+
+def _is_deny(engine: ZPLEngine, payload: dict) -> bool:
+    try:
+        return engine.evaluate(_check_req_from_payload(payload)).verdict == "deny"
+    except Exception:
+        return False
+
+
+def _generate_mutations(
+    allow_rules: list,
+    deny_rules: list,
+    schema: ClassSchema,
+    engine: ZPLEngine,
+    n: int,
+) -> list[dict]:
+    """Programmatically generate up to n verified adversarial payloads."""
+    seen: set[str] = set()
+    results: list[dict] = []
+
+    def _try(payload: dict, hint: str) -> bool:
+        key = _json.dumps(payload, sort_keys=True)
+        if key in seen:
+            return False
+        seen.add(key)
+        if _is_deny(engine, payload):
+            results.append({"payload": payload, "mutation_hint": hint})
+            return True
+        return False
+
+    shuffled = list(allow_rules)
+    _random.shuffle(shuffled)
+    target = n * 4  # over-generate then truncate
+
+    # D — wrong verb
+    for rule in shuffled:
+        if len(results) >= target:
+            break
+        base = _base_payload(rule)
+        for v in _ADVERSARIAL_VERBS:
+            if v != rule.action:
+                if _try({**base, "action": v},
+                        f"wrong verb: {v!r} instead of {rule.action!r}"):
+                    break
+
+    # A — wrong subject class (sibling in hierarchy)
+    for rule in shuffled:
+        if len(results) >= target:
+            break
+        base = _base_payload(rule)
+        try:
+            parent = schema.parent(base["subject_class"])
+            if parent:
+                siblings = [c for c in schema.children(parent)
+                            if c != base["subject_class"]
+                            and not schema.is_subclass(c, base["subject_class"])]
+                for sib in siblings:
+                    if _try({**base, "subject_class": sib},
+                            f"wrong subject: {sib.split('.')[-1]!r} not permitted to {rule.action} {base['object_class'].split('.')[-1]!r}"):
+                        break
+        except Exception:
+            pass
+
+    # A — wrong object class (sibling in hierarchy)
+    for rule in shuffled:
+        if len(results) >= target:
+            break
+        base = _base_payload(rule)
+        try:
+            parent = schema.parent(base["object_class"])
+            if parent:
+                siblings = [c for c in schema.children(parent)
+                            if c != base["object_class"]
+                            and not schema.is_subclass(c, base["object_class"])]
+                for sib in siblings:
+                    if _try({**base, "object_class": sib},
+                            f"wrong object: {base['subject_class'].split('.')[-1]!r} has no access to {sib.split('.')[-1]!r}"):
+                        break
+        except Exception:
+            pass
+
+    # E — trigger a never rule
+    for deny_rule in deny_rules:
+        if len(results) >= target:
+            break
+        ds, do_ = deny_rule.subject, deny_rule.object
+        if not ds or not do_ or not ds.cls or not do_.cls:
+            continue
+        for allow_rule in shuffled:
+            base = _base_payload(allow_rule)
+            try:
+                if not schema.is_subclass(base["subject_class"], ds.cls):
+                    continue
+            except Exception:
+                continue
+            _try({**base, "action": deny_rule.action,
+                  "object_class": do_.cls, "object_attrs": {}},
+                 f"blocked by never rule: {ds.cls.split('.')[-1]} cannot {deny_rule.action} {do_.cls.split('.')[-1]}")
+            break
+
+    # B — wrong attribute value
+    for rule in shuffled:
+        if len(results) >= target:
+            break
+        base = _base_payload(rule)
+        for scope, key in [("subject_attrs", "subject_attrs"), ("object_attrs", "object_attrs")]:
+            if base[scope]:
+                for k, v in base[scope].items():
+                    bad = f"not-{v}" if isinstance(v, str) else "invalid"
+                    if _try({**base, scope: {**base[scope], k: bad}},
+                            f"wrong {scope.split('_')[0]} attr {k}={bad!r}"):
+                        break
+
+    return results[:n]
+
+
+# ── Adversarial test generation ───────────────────────────────────────────────
+
+class AdversarialRequest(BaseModel):
+    n_positive: int = 8
+    n_adversarial: int = 8
+
+
+@app.post("/api/tests/adversarial")
+async def generate_adversarial(req: AdversarialRequest, session: dict = Depends(get_session)):
+    if not ai_client.available():
+        raise HTTPException(503, "ANTHROPIC_API_KEY not set")
+
+    # Merge ZPL from active namespace + all descendants → engine + schema
+    ps_parsed = await _merged_policy_set(session["active_user_id"])
+    if not ps_parsed:
+        raise HTTPException(422, "No rules found in this namespace or its descendants")
+
+    schema = _build_schema(ps_parsed)
+    rules_compiled = []
+    for s in ps_parsed.rules:
+        try:
+            rules_compiled.append(Rule.from_dict({
+                "id": s.id, "name": s.name,
+                "result": "never" if s.effect == "deny" else "allow",
+                "priority": s.priority, "verb": s.action,
+                "subject": _subject_to_zpl_dict(s.subject),
+                "object": _object_to_zpl_dict(s.object),
+                "accessor_endpoint": _subject_to_zpl_dict(s.accessor_endpoint),
+                "server_endpoint": _object_to_zpl_dict(s.server_endpoint),
+            }))
+        except Exception:
+            continue
+    engine = ZPLEngine(rules_compiled, schema)
+
+    # Build positive tests from merged policy
+    allow_rules = [r for r in ps_parsed.rules if r.effect == "allow"]
+    deny_rules  = [r for r in ps_parsed.rules if r.effect == "deny"]
+    _random.shuffle(allow_rules)
+    selected = allow_rules[:req.n_positive]
+
+    positive_tests: list[dict] = []
+    for i, rule in enumerate(selected):
+        positive_tests.append({
+            "number": i + 1,
+            "expected": "allow",
+            "payload": _base_payload(rule),
+        })
+    for i, rule in enumerate(deny_rules):
+        positive_tests.append({
+            "number": len(selected) + i + 1,
+            "expected": "deny",
+            "payload": _base_payload(rule),
+        })
+
+    # Generate adversarial mutations programmatically
+    mutations: list[dict] = []
+    if req.n_adversarial > 0:
+        mutations = _generate_mutations(allow_rules, deny_rules, schema, engine, req.n_adversarial)
+
+    # Build title-polishing input for AI
+    title_input = [
+        {"number": t["number"], "type": t["expected"],
+         "description": _payload_description(t["payload"])}
+        for t in positive_tests
+    ] + [
+        {"number": 1000 + i, "type": "adversarial",
+         "description": _payload_description(m["payload"]),
+         "mutation_hint": m["mutation_hint"]}
+        for i, m in enumerate(mutations)
+    ]
+
+    prompt_content = await db.get_prompt("title_polish")
+    if prompt_content is None:
+        path = _PROMPTS_DIR / "title_polish.md"
+        prompt_content = path.read_text() if path.exists() else (
+            "Return JSON: {\"tests\":[{\"number\":1,\"title\":\"polished title\"}]}\n\n{tests_json}"
+        )
+    prompt = prompt_content.replace("{tests_json}", _json.dumps(title_input, indent=2))
+
+    try:
+        raw_text = ai_client.complete(
+            system="You are a ZPL policy test title writer. Return only valid JSON.",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=2048,
+            temperature=0.4,
+        )
+    except Exception as exc:
+        raise HTTPException(500, f"AI call failed: {exc}")
+
+    text = raw_text.strip()
+    text = _re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=_re.DOTALL).strip()
+    try:
+        ai_result = _json.loads(text)
+    except Exception as exc:
+        raise HTTPException(500, f"Could not parse AI response: {exc}")
+
+    title_map = {t["number"]: t["title"] for t in (ai_result.get("tests") or [])}
+
+    positive_out = [
+        {**t, "title": title_map.get(t["number"], _payload_description(t["payload"]))}
+        for t in positive_tests
+    ]
+    counter_out = [
+        {
+            "payload": m["payload"],
+            "title": title_map.get(1000 + i, _payload_description(m["payload"])),
+            "mutation_hint": m["mutation_hint"],
+            "verified": True,
+            "actual_verdict": "deny",
+        }
+        for i, m in enumerate(mutations)
+    ]
+
+    return {
+        "positive_tests": positive_out,
+        "counter_tests": counter_out,
+        "discarded_adversarial": 0,
+    }
+
 
 @app.get("/api/context")
 async def get_context(session: dict = Depends(get_session)):
@@ -472,7 +850,19 @@ async def reset_context(request: Request, session: dict = Depends(get_session)):
 
 @app.get("/api/namespace/zpl")
 async def get_namespace_zpl(session: dict = Depends(get_session)):
-    text = await db.get_namespace_zpl(session["active_user_id"])
+    text = await db.get_namespace_zpl(session["active_user_id"]) or ""
+    ns = ns_mod.active_ns(session)
+    if text and ns:
+        try:
+            raw = zpl_parser.parse(text)
+            ps, _ = norm.zpl_to_policy_set(raw, name="ns")
+            pd = ns_mod.strip(ps.model_dump(mode="json"), ns)
+            text = (
+                zpl_serializer.classes_to_zpl(pd.get("classes", [])) + "\n\n" +
+                zpl_serializer.rules_to_zpl(pd.get("rules", []))
+            ).strip()
+        except Exception:
+            pass  # return raw text if stripping fails
     return {"text": text}
 
 
@@ -482,7 +872,21 @@ class SaveNamespaceZplRequest(BaseModel):
 
 @app.put("/api/namespace/zpl")
 async def save_namespace_zpl(req: SaveNamespaceZplRequest, session: dict = Depends(get_session)):
-    await db.save_namespace_zpl(session["active_user_id"], req.text)
+    text = req.text
+    ns = ns_mod.active_ns(session)
+    if text.strip() and ns:
+        try:
+            raw = zpl_parser.parse(text)
+            ps, errors = norm.zpl_to_policy_set(raw, name="ns")
+            if not errors:
+                pd = ns_mod.inject(ps.model_dump(mode="json"), ns)
+                text = (
+                    zpl_serializer.classes_to_zpl(pd.get("classes", [])) + "\n\n" +
+                    zpl_serializer.rules_to_zpl(pd.get("rules", []))
+                ).strip()
+        except Exception:
+            pass  # store raw text if injection fails
+    await db.save_namespace_zpl(session["active_user_id"], text)
     return {"ok": True}
 
 
@@ -495,7 +899,7 @@ class ParseRequest(BaseModel):
 
 
 @app.post("/api/parse")
-async def parse_text(req: ParseRequest, _: dict = Depends(get_session)):
+async def parse_text(req: ParseRequest, session: dict = Depends(get_session)):
     lang = req.language.lower()
     if lang == "zpl":
         raw = zpl_parser.parse(req.text)
@@ -510,16 +914,17 @@ async def parse_text(req: ParseRequest, _: dict = Depends(get_session)):
     else:
         raise HTTPException(400, f"Unknown language: {req.language!r}")
 
-    raw_classes = ps.model_dump(mode="json").get("classes", [])
-    raw_rules = ps.model_dump(mode="json").get("rules", [])
+    pd = ps.model_dump(mode="json")
+    ns = ns_mod.active_ns(session)
+    ns_pd = ns_mod.inject(pd, ns) if ns else pd
     serialized_zpl = (
-        zpl_serializer.classes_to_zpl(raw_classes) + "\n\n" +
-        zpl_serializer.rules_to_zpl(raw_rules)
+        zpl_serializer.classes_to_zpl(ns_pd.get("classes", [])) + "\n\n" +
+        zpl_serializer.rules_to_zpl(ns_pd.get("rules", []))
     ).strip()
 
     return {
         "language": lang,
-        "policy_set": ps.model_dump(mode="json"),
+        "policy_set": pd,
         "errors": [e.model_dump() for e in errors],
         "inferred_classes": inferred,
         "inferred_zpl": inferred_zpl,
@@ -539,6 +944,31 @@ async def validate_text(req: ParseRequest, _: dict = Depends(get_session)):
     else:
         raise HTTPException(400, f"Unknown language: {req.language!r}")
     return {"language": lang, "errors": errors, "valid": len(errors) == 0}
+
+
+# ── .zplc import ─────────────────────────────────────────────────────────────
+
+@app.post("/api/zplc/import")
+async def import_zplc(file: UploadFile = File(...), _: dict = Depends(get_session)):
+    content = await file.read()
+    try:
+        data = tomllib.loads(content.decode())
+    except Exception as exc:
+        raise HTTPException(400, f"Invalid .zplc file: {exc}")
+
+    services = list(data.get("services", {}).keys())
+    trusted = list(data.get("trusted_services", {}).keys())
+    all_names = sorted(set(services + trusted))
+
+    inferred_classes = [{"class": name} for name in all_names]
+    inferred_zpl = "\n".join(f"define {name} as a service." for name in all_names)
+
+    return {
+        "inferred_classes": inferred_classes,
+        "inferred_zpl": inferred_zpl,
+        "services": services,
+        "trusted_services": trusted,
+    }
 
 
 # ── Translate ─────────────────────────────────────────────────────────────────
@@ -680,7 +1110,7 @@ def _build_schema(ps: PolicySet) -> ClassSchema:
     import yaml
     system = yaml.safe_load(_SYSTEM_CLASSES_PATH.read_text())
     system_classes = system.get("classes", [])
-    user_classes = [
+    user_classes_raw = [
         {
             "class": c.name,
             "parent": c.parent,
@@ -691,8 +1121,24 @@ def _build_schema(ps: PolicySet) -> ClassSchema:
         for c in ps.classes
     ]
     system_names = {c["class"] for c in system_classes}
-    merged = system_classes + [c for c in user_classes if c["class"] not in system_names]
-    return ClassSchema(merged)
+    # Iteratively add user classes whose parents are already known, skipping orphans.
+    known: set[str] = set(system_names)
+    candidates = [c for c in user_classes_raw if c["class"] not in system_names]
+    valid: list[dict] = []
+    changed = True
+    while changed:
+        changed = False
+        remaining = []
+        for c in candidates:
+            parent = c.get("parent")
+            if not parent or parent in known:
+                valid.append(c)
+                known.add(c["class"])
+                changed = True
+            else:
+                remaining.append(c)
+        candidates = remaining
+    return ClassSchema(system_classes + valid)
 
 
 def _simulate_zpl(ps: PolicySet, scenario: SimScenario) -> SimResult:

@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import zpl_parser as _zpl_parser_mod
+
 from ir_schema import (
     AttributeSpec,
     ClassDefinition,
@@ -41,8 +43,9 @@ def zpl_to_policy_set(raw: dict[str, Any], name: str = "Untitled") -> tuple[Poli
     errors = [ParseError(line=e["line"], message=e["message"], source=e.get("source", ""))
               for e in raw.get("errors", [])]
 
+    alias_map = _zpl_parser_mod.build_alias_map(raw)
     classes = [_zpl_class(c) for c in raw.get("classes", [])]
-    rules = [_zpl_rule(r) for r in raw.get("rules", [])]
+    rules = [_zpl_rule(r, alias_map) for r in raw.get("rules", [])]
 
     ps = PolicySet(
         name=name,
@@ -71,10 +74,17 @@ def _zpl_class(c: dict) -> ClassDefinition:
         aka=c.get("aka"),
         attributes=attributes,
         builtin=c.get("builtin", False),
+        is_verb=c.get("verb", False),
     )
 
 
-def _zpl_spec_to_subject(spec: dict | None) -> SubjectSpec | None:
+def _resolve(cls: str | None, alias_map: dict[str, str]) -> str | None:
+    if not cls:
+        return cls
+    return alias_map.get(cls, cls)
+
+
+def _zpl_spec_to_subject(spec: dict | None, alias_map: dict[str, str]) -> SubjectSpec | None:
     if not spec:
         return None
     attrs: dict[str, Any] = {}
@@ -82,13 +92,13 @@ def _zpl_spec_to_subject(spec: dict | None) -> SubjectSpec | None:
     for k, v in raw_attrs.items():
         attrs[k] = v
     return SubjectSpec(
-        cls=spec.get("class"),
+        cls=_resolve(spec.get("class"), alias_map),
         name=spec.get("name"),
         attrs=attrs,
     )
 
 
-def _zpl_spec_to_object(spec: dict | None) -> ObjectSpec | None:
+def _zpl_spec_to_object(spec: dict | None, alias_map: dict[str, str]) -> ObjectSpec | None:
     if not spec:
         return None
     attrs: dict[str, Any] = {}
@@ -96,18 +106,19 @@ def _zpl_spec_to_object(spec: dict | None) -> ObjectSpec | None:
     for k, v in raw_attrs.items():
         attrs[k] = v
     return ObjectSpec(
-        cls=spec.get("class"),
+        cls=_resolve(spec.get("class"), alias_map),
         name=spec.get("name"),
         attrs=attrs,
     )
 
 
-def _zpl_rule(r: dict) -> PolicyStatement:
+def _zpl_rule(r: dict, alias_map: dict[str, str] | None = None) -> PolicyStatement:
+    alias_map = alias_map or {}
     effect = "deny" if r.get("result") == "never" else "allow"
-    subject = _zpl_spec_to_subject(r.get("subject"))
-    accessor = _zpl_spec_to_subject(r.get("accessor_endpoint"))
-    obj = _zpl_spec_to_object(r.get("object"))
-    server = _zpl_spec_to_object(r.get("server_endpoint"))
+    subject = _zpl_spec_to_subject(r.get("subject"), alias_map)
+    accessor = _zpl_spec_to_subject(r.get("accessor_endpoint"), alias_map)
+    obj = _zpl_spec_to_object(r.get("object"), alias_map)
+    server = _zpl_spec_to_object(r.get("server_endpoint"), alias_map)
     return PolicyStatement(
         id=r.get("id") or PolicyStatement.__fields__["id"].default_factory(),
         name=r.get("name", ""),

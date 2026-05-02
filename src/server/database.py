@@ -88,6 +88,13 @@ async def init_db() -> None:
                 updated_at TEXT NOT NULL
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS prompts (
+                key        TEXT PRIMARY KEY,
+                content    TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
         # Migrations for older schemas
         if not await _column_exists(db, "policy_sets", "user_id"):
             await db.execute("ALTER TABLE policy_sets ADD COLUMN user_id TEXT NOT NULL DEFAULT 'legacy'")
@@ -134,9 +141,15 @@ async def create_user(username: str, password: str, display_name: str | None = N
             "delegated": delegated, "created_by_id": created_by_id, "created_at": now}
 
 
-async def update_profile(user_id: str, email: str) -> None:
+async def update_profile(user_id: str, email: str, display_name: str | None = None) -> None:
     async with aiosqlite.connect(_DB_PATH) as db:
-        await db.execute("UPDATE users SET email = ? WHERE id = ?", (email, user_id))
+        if display_name is not None:
+            await db.execute(
+                "UPDATE users SET email = ?, display_name = ? WHERE id = ?",
+                (email, display_name, user_id),
+            )
+        else:
+            await db.execute("UPDATE users SET email = ? WHERE id = ?", (email, user_id))
         await db.commit()
 
 
@@ -315,6 +328,20 @@ async def get_namespace_zpl(user_id: str) -> str:
     return row[0] if row else ""
 
 
+async def get_namespace_zpl_batch(user_ids: list[str]) -> dict[str, str]:
+    """Return {user_id: zpl_text} for all given IDs that have ZPL stored."""
+    if not user_ids:
+        return {}
+    placeholders = ",".join("?" * len(user_ids))
+    async with aiosqlite.connect(_DB_PATH) as db:
+        async with db.execute(
+            f"SELECT user_id, zpl_text FROM namespace_zpl WHERE user_id IN ({placeholders})",
+            user_ids,
+        ) as cur:
+            rows = await cur.fetchall()
+    return {row[0]: row[1] for row in rows}
+
+
 async def save_namespace_zpl(user_id: str, text: str) -> None:
     now = datetime.now(timezone.utc).isoformat()
     async with aiosqlite.connect(_DB_PATH) as db:
@@ -335,6 +362,29 @@ async def list_all_namespace_zpl() -> list[tuple[str, str]]:
         async with db.execute("SELECT user_id, zpl_text FROM namespace_zpl") as cur:
             rows = await cur.fetchall()
     return [(r[0], r[1]) for r in rows]
+
+
+# ── Prompts ───────────────────────────────────────────────────────────────────
+
+async def get_prompt(key: str) -> str | None:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        async with db.execute("SELECT content FROM prompts WHERE key = ?", (key,)) as cur:
+            row = await cur.fetchone()
+    return row[0] if row else None
+
+
+async def save_prompt(key: str, content: str) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    async with aiosqlite.connect(_DB_PATH) as db:
+        await db.execute(
+            """INSERT INTO prompts (key, content, updated_at)
+               VALUES (?, ?, ?)
+               ON CONFLICT(key) DO UPDATE SET
+                   content = excluded.content,
+                   updated_at = excluded.updated_at""",
+            (key, content, now),
+        )
+        await db.commit()
 
 
 # ── Policy sets ───────────────────────────────────────────────────────────────

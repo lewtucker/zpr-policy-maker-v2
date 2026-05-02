@@ -167,6 +167,7 @@ class ClassDefinition(BaseModel):
     aka: str | None = None
     attributes: dict[str, AttributeSpec] = {}
     builtin: bool = False
+    is_verb: bool = False
     description: str = ""
 
 

@@ -152,6 +152,7 @@ def parse(text: str) -> dict:
     text_lines = text.splitlines()
     p = _P(_tokenize(text))
     classes: list[dict] = []
+    class_index: dict[str, int] = {}
     rules: list[dict] = []
     errors: list[dict] = []
 
@@ -166,7 +167,18 @@ def parse(text: str) -> dict:
         start_line = t[2]
         try:
             if head == "define":
-                classes.append(_parse_define(p))
+                new_cls = _parse_define(p)
+                name = new_cls["class"]
+                if new_cls.get("parent", "").lower() == "verb":
+                    new_cls["verb"] = True
+                    if name not in class_index:
+                        class_index[name] = len(classes)
+                        classes.append(new_cls)
+                elif name in class_index:
+                    _merge_class(classes[class_index[name]], new_cls)
+                else:
+                    class_index[name] = len(classes)
+                    classes.append(new_cls)
             elif head == "never":
                 rules.append(_parse_denial(p))
             elif head == "allow":
@@ -190,6 +202,25 @@ def parse(text: str) -> dict:
 
 
 # ── Define ──────────────────────────────────────────────────────────────────
+
+
+def _merge_class(existing: dict, new: dict) -> None:
+    """Merge attributes from a second define into an existing class dict.
+
+    Multi-valued attributes (e.g. tags) have their values unioned.
+    New single-valued attributes that don't already exist are added.
+    """
+    for key, new_attr in new.get("attributes", {}).items():
+        if key in existing["attributes"]:
+            ex_attr = existing["attributes"][key]
+            if ex_attr.get("type") == "multi" and new_attr.get("type") == "multi":
+                seen = set(ex_attr.get("values", []))
+                for v in new_attr.get("values", []):
+                    if v not in seen:
+                        ex_attr.setdefault("values", []).append(v)
+                        seen.add(v)
+        else:
+            existing["attributes"][key] = new_attr
 
 
 def _parse_define(p: _P) -> dict:
@@ -334,8 +365,8 @@ def _parse_permission(p: _P, result: str) -> dict:
             p.advance()
             verb = "connect-to"
 
-    if verb not in _VERBS and verb != "connect-to":
-        verb = "access"
+    # Unknown verbs are preserved — user may declare them with "define X as a verb."
+    # access remains the built-in default when no verb is written.
 
     object_spec = _parse_spec(p)
     server_endpoint: dict | None = None
@@ -411,8 +442,13 @@ def _parse_spec(p: _P) -> dict:
         # Terminator if the next token is a separator, period, or EOF.
         if _is_terminator_position(p):
             break
-        # Otherwise: bare name = tag (existence check)
-        attrs[p.advance()[1]] = "*"
+        # Bare name before class = tag qualifier; strip namespace prefix and
+        # accumulate under the "tags" key so it aligns with `optional tags`
+        # class definitions.  e.g. "hr employee" → attrs["tags"] = ["hr"]
+        #                          "WS.hr WS.employee" → attrs["tags"] = ["hr"]
+        tag_token = p.advance()[1]
+        tag_val = tag_token.split(".")[-1]
+        attrs.setdefault("tags", []).append(tag_val)
 
     # Now the class or named-entity token
     t = p.peek()
@@ -424,8 +460,8 @@ def _parse_spec(p: _P) -> dict:
     key = class_or_name.lower()
     if key in _BUILTIN_ALIASES:
         out["class"] = _BUILTIN_ALIASES[key]
-    elif class_or_name[:1].isupper():
-        # Capitalized by convention → named entity
+    elif class_or_name.split(".")[-1][:1].isupper():
+        # Capitalized last component → named entity (handles ns.Alice and bare Alice)
         out["name"] = class_or_name
     else:
         out["class"] = class_or_name
@@ -483,16 +519,40 @@ _BUILTIN_CLASSES = {"users", "endpoints", "services", "servers"}
 _PARENT_SINGULAR = {"users": "user", "endpoints": "endpoint", "services": "service", "servers": "server"}
 
 
+def build_alias_map(parsed: dict) -> dict[str, str]:
+    """Return a map of alias/plural → canonical class name.
+
+    Sources:
+      - Explicit aka:  define cat aka cats as an employee.  → {"cats": "cat"}
+      - Auto-plural:   define cat …                         → {"cats": "cat"}
+      - Auto-es plural for names ending in s/x/z/ch/sh     → {"foxes": "fox"}
+    """
+    alias_map: dict[str, str] = {}
+    for c in parsed.get("classes", []):
+        if c.get("verb"):
+            continue
+        name = c.get("class", "")
+        if not name:
+            continue
+        if c.get("aka"):
+            alias_map[c["aka"]] = name
+        alias_map[name + "s"] = name
+        if name[-1:] in "sxz" or name[-2:] in ("ch", "sh"):
+            alias_map[name + "es"] = name
+    return alias_map
+
+
 def infer_missing_classes(parsed: dict) -> list[dict]:
     """Return define-dicts for classes used in rules but not defined in the document."""
     defined = {c["class"] for c in parsed.get("classes", [])} | _BUILTIN_CLASSES
-    inferred: dict[str, dict] = {}  # name → {parent, tags: set, attrs: set}
+    resolvable = defined | set(build_alias_map(parsed).keys())
+    inferred: dict[str, dict] = {}
 
     for rule in parsed.get("rules", []):
-        _collect_spec(rule.get("subject"),           "users",     inferred, defined)
-        _collect_spec(rule.get("accessor_endpoint"), "endpoints", inferred, defined)
-        _collect_spec(rule.get("object"),            "services",  inferred, defined)
-        _collect_spec(rule.get("server_endpoint"),   "endpoints", inferred, defined)
+        _collect_spec(rule.get("subject"),           "users",     inferred, resolvable)
+        _collect_spec(rule.get("accessor_endpoint"), "endpoints", inferred, resolvable)
+        _collect_spec(rule.get("object"),            "services",  inferred, resolvable)
+        _collect_spec(rule.get("server_endpoint"),   "endpoints", inferred, resolvable)
 
     return [_build_inferred(name, info) for name, info in inferred.items()]
 
@@ -506,8 +566,11 @@ def _collect_spec(spec: dict | None, parent: str, inferred: dict, defined: set) 
     if cls not in inferred:
         inferred[cls] = {"parent": parent, "tags": set(), "attrs": set()}
     for k, v in spec.get("attrs", {}).items():
-        if v == "*":
-            inferred[cls]["tags"].add(k)
+        if k == "tags":
+            vals = v if isinstance(v, list) else ([v] if v != "*" else [])
+            inferred[cls]["tags"].update(vals)
+        elif v == "*":
+            inferred[cls]["tags"].add(k)  # legacy: bare-name stored as key
         else:
             inferred[cls]["attrs"].add(k)
 
