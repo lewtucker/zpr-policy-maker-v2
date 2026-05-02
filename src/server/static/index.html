@@ -193,11 +193,65 @@
 
     .error-bar {
       border-top: 1px solid var(--border); background: rgba(239,68,68,0.06);
-      max-height: 100px; overflow-y: auto; display: none;
+      max-height: 160px; overflow-y: auto; display: none;
     }
     .error-bar.visible { display: block; }
+    .error-bar-toolbar { display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.75rem;border-bottom:1px solid rgba(239,68,68,0.12); }
     .error-line { padding: 0.3rem 0.75rem; font-size: 0.78rem; color: var(--red);
                   font-family: var(--font-mono); border-bottom: 1px solid rgba(239,68,68,0.1); }
+    .error-explained { padding:0.35rem 0.75rem; border-bottom:1px solid rgba(239,68,68,0.1); }
+    .error-explained-header { font-size:0.75rem;font-family:var(--mono);color:var(--red); }
+    .error-explained-body { font-size:0.75rem;color:var(--fg);margin-top:0.2rem; }
+    .error-explained-fix { font-size:0.72rem;font-family:var(--mono);color:var(--green);margin-top:0.15rem;white-space:pre-wrap; }
+
+    /* ── ZPL Assistant split-editor ─────────────────────────── */
+    .assist-split {
+      flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+    }
+    #assist-top {
+      flex: 0 0 50%; width: 100%; resize: none; outline: none; min-height: 0;
+      background: var(--bg); color: var(--text);
+      font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
+      padding: 1rem; border: none; tab-size: 2;
+      border-bottom: 3px solid var(--border);
+    }
+    #assist-top:focus { border-bottom-color: var(--accent); }
+    .assist-pane-sep { height: 3px; background: var(--border); flex-shrink: 0; }
+    .assist-bottom {
+      flex: 1; display: flex; flex-direction: column; min-height: 0;
+      background: var(--surface);
+    }
+    .assist-bottom-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.3rem 0.75rem; border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .assist-bottom-title {
+      font-size: 0.72rem; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .assist-history {
+      flex: 1; overflow-y: auto; padding: 0.5rem 0.75rem;
+      display: flex; flex-direction: column; gap: 0.45rem; min-height: 0;
+    }
+    .assist-msg {
+      padding: 0.35rem 0.6rem; border-radius: 6px;
+      font-size: 0.82rem; line-height: 1.5; word-break: break-word;
+    }
+    .assist-msg.user      { background: var(--surface2); color: var(--text); align-self: flex-end; max-width: 85%; }
+    .assist-msg.assistant { background: rgba(37,99,235,0.07); color: var(--text); align-self: flex-start; max-width: 85%; }
+    .assist-msg.system    { color: var(--muted); font-size: 0.74rem; font-style: italic; align-self: center; }
+    .assist-input-row {
+      display: flex; gap: 0.4rem; padding: 0.4rem 0.5rem;
+      border-top: 1px solid var(--border); flex-shrink: 0; align-items: flex-end;
+    }
+    .assist-input {
+      flex: 1; resize: none; border: 1px solid var(--border); border-radius: 5px;
+      padding: 0.4rem 0.55rem; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.5;
+      background: var(--surface2); color: var(--text); outline: none;
+      min-height: 2rem; max-height: 80px; overflow-y: auto;
+    }
+    .assist-input:focus { border-color: var(--accent); }
 
     /* ── Schema pane ─────────────────────────────────────────── */
     aside.schema-pane {
@@ -459,6 +513,7 @@
       <button class="tool-btn" onclick="doReset()">Reset</button>
       <span class="status-pill idle" id="status-pill"></span>
       <div class="toolbar-right">
+        <button class="tool-btn" id="assist-btn" onclick="toggleAssist()" title="ZPL writing assistant">⊕ Assist</button>
         <div class="io-dropdown" id="io-dropdown">
           <button class="tool-btn" onclick="toggleIoMenu(event)" title="Upload / Download ZPL">↑↓</button>
           <div class="io-menu" id="io-menu">
@@ -484,6 +539,28 @@
       spellcheck="false"
       oninput="onEditorInput()"
       onkeydown="handleTabKey(event)"></textarea>
+    <!-- ZPL Assistant split editor (hidden until toggled) -->
+    <div class="assist-split" id="assist-split" style="display:none">
+      <textarea id="assist-top"
+        placeholder="ZPL definitions and rules"
+        spellcheck="false"
+        onkeydown="handleTabKey(event)"></textarea>
+      <div class="assist-pane-sep"></div>
+      <div class="assist-bottom">
+        <div class="assist-bottom-header">
+          <span class="assist-bottom-title">ZPL Assistant</span>
+          <button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="closeAssist()">✓ Done</button>
+        </div>
+        <div class="assist-history" id="assist-history"></div>
+        <div class="assist-input-row">
+          <textarea class="assist-input" id="assist-input"
+            placeholder="Type ZPL or describe what you want… (Enter to send, Shift+Enter for newline)"
+            onkeydown="assistKeydown(event)"
+            spellcheck="false" rows="2"></textarea>
+          <button class="tool-btn primary" onclick="assistSend()" id="assist-send-btn">Send</button>
+        </div>
+      </div>
+    </div>
     <div class="error-bar" id="error-bar"></div>
   </main>
 
@@ -1072,16 +1149,171 @@ function setStatus(type, msg) {
 
 function showErrors(errors) {
   const bar = document.getElementById('error-bar');
-  bar.innerHTML = errors.map(e =>
-    `<div class="error-line">Line ${esc(e.line)}: ${esc(e.message)}</div>`
+  const lines = errors.map(e =>
+    `<div class="error-line">Line ${esc(String(e.line))}: ${esc(e.message)}</div>`
   ).join('');
+  const btn = `<button class="tool-btn" onclick="explainErrors()" id="explain-btn" style="font-size:0.7rem;padding:0.15rem 0.5rem">✨ Explain</button>`;
+  bar.innerHTML = `<div class="error-bar-toolbar"><span style="font-size:0.7rem;color:var(--red);font-weight:600">${errors.length} error${errors.length>1?'s':''}</span>${btn}</div>${lines}`;
   bar.classList.add('visible');
+  bar._errors = errors;
 }
 
 function clearErrors() {
   const bar = document.getElementById('error-bar');
   bar.innerHTML = '';
+  bar._errors = null;
   bar.classList.remove('visible');
+}
+
+async function explainErrors() {
+  const bar = document.getElementById('error-bar');
+  const errors = bar._errors;
+  if (!errors || !errors.length) return;
+  const text = document.getElementById('zpl-editor').value;
+  const btn = document.getElementById('explain-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const res = await api('POST', '/api/explain-errors', { text, errors });
+    const expMap = {};
+    for (const x of (res.explanations || [])) expMap[x.index] = x;
+    const lines = errors.map((e, i) => {
+      const x = expMap[i + 1];
+      if (!x) return `<div class="error-line">Line ${esc(String(e.line))}: ${esc(e.message)}</div>`;
+      return `<div class="error-explained">
+        <div class="error-explained-header">Line ${esc(String(e.line))}: ${esc(e.message)}</div>
+        <div class="error-explained-body">${esc(x.explanation || '')}</div>
+        ${x.fix ? `<div class="error-explained-fix">→ ${esc(x.fix)}</div>` : ''}
+      </div>`;
+    }).join('');
+    const dismissBtn = `<button class="tool-btn" onclick="clearErrors()" style="font-size:0.7rem;padding:0.15rem 0.5rem">✕</button>`;
+    bar.innerHTML = `<div class="error-bar-toolbar"><span style="font-size:0.7rem;color:var(--red);font-weight:600">${errors.length} error${errors.length>1?'s':''}</span>${dismissBtn}</div>${lines}`;
+    bar.style.maxHeight = '260px';
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = '✨ Explain'; }
+    toast('Could not get explanation');
+  }
+}
+
+// ── ZPL Assistant ──────────────────────────────────────────────────────────
+
+S.assist = { active: false, history: [] };
+const _ASSIST_FIXES = {};
+let _assistFixId = 0;
+
+function toggleAssist() {
+  if (S.assist.active) closeAssist();
+  else openAssist();
+}
+
+function openAssist() {
+  const editorText = document.getElementById('zpl-editor').value;
+  document.getElementById('assist-top').value = editorText;
+  S.assist.history = [];
+  document.getElementById('assist-history').innerHTML = '';
+  document.getElementById('zpl-editor').style.display = 'none';
+  document.getElementById('assist-split').style.display = 'flex';
+  S.assist.active = true;
+  const btn = document.getElementById('assist-btn');
+  if (btn) btn.textContent = '⊠ Assist';
+  _assistAppendMsg('system', 'Type a ZPL statement or describe what you want. Say "done" or "stop" when finished.');
+  setTimeout(() => document.getElementById('assist-input')?.focus(), 50);
+}
+
+function closeAssist() {
+  const topText = document.getElementById('assist-top').value;
+  document.getElementById('zpl-editor').value = topText;
+  document.getElementById('assist-split').style.display = 'none';
+  document.getElementById('zpl-editor').style.display = '';
+  S.assist.active = false;
+  const btn = document.getElementById('assist-btn');
+  if (btn) btn.textContent = '⊕ Assist';
+  if (topText.trim()) { markDirty(); autoParse(); }
+}
+
+function _assistAppendMsg(role, text, extraHtml = '') {
+  const history = document.getElementById('assist-history');
+  if (!history) return;
+  const div = document.createElement('div');
+  div.className = `assist-msg ${role}`;
+  div.innerHTML = esc(text) + extraHtml;
+  history.appendChild(div);
+  history.scrollTop = history.scrollHeight;
+}
+
+function assistKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); assistSend(); }
+}
+
+async function assistSend() {
+  const input = document.getElementById('assist-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  _assistAppendMsg('user', msg);
+
+  const zpl_so_far = document.getElementById('assist-top').value;
+  const sendBtn = document.getElementById('assist-send-btn');
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '…'; }
+
+  const thinking = document.createElement('div');
+  thinking.className = 'assist-msg system';
+  thinking.textContent = 'Thinking…';
+  const histEl = document.getElementById('assist-history');
+  if (histEl) { histEl.appendChild(thinking); histEl.scrollTop = histEl.scrollHeight; }
+
+  try {
+    const res = await api('POST', '/api/zpl-assist', {
+      message: msg,
+      zpl_so_far,
+      history: S.assist.history.slice(-6),
+    });
+    thinking.remove();
+
+    if (res.action === 'stop') {
+      _assistAppendMsg('assistant', res.reply || 'Done!');
+      setTimeout(closeAssist, 900);
+    } else if (res.action === 'add' || res.action === 'generate') {
+      const top = document.getElementById('assist-top');
+      if (res.statement) {
+        const cur = top.value.trimEnd();
+        top.value = cur ? cur + '\n' + res.statement : res.statement;
+      }
+      const reply = res.reply || (res.action === 'add' ? 'Added.' : 'Generated and added.');
+      const codeHtml = (res.action === 'generate' && res.statement)
+        ? `<br><code style="display:block;font-size:0.7rem;color:var(--accent);margin-top:0.25rem;word-break:break-all">${esc(res.statement)}</code>`
+        : '';
+      _assistAppendMsg('assistant', reply, codeHtml);
+    } else if (res.action === 'explain') {
+      let extra = '';
+      if (res.suggested_fix) {
+        const fid = ++_assistFixId;
+        _ASSIST_FIXES[fid] = res.suggested_fix;
+        extra = `<div style="margin-top:0.35rem;display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">` +
+          `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.45rem" onclick="assistApplyFix(${fid})">Apply fix</button>` +
+          `<code style="font-size:0.7rem;color:var(--accent)">${esc(res.suggested_fix)}</code></div>`;
+      }
+      _assistAppendMsg('assistant', res.reply || 'There is a syntax error.', extra);
+    } else {
+      _assistAppendMsg('assistant', res.reply || 'Something went wrong — please try again.');
+    }
+
+    S.assist.history.push({ role: 'user', content: msg });
+    S.assist.history.push({ role: 'assistant', content: res.reply || '' });
+  } catch(e) {
+    thinking.remove();
+    _assistAppendMsg('system', 'Error: ' + (e.message || String(e)));
+  } finally {
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+  }
+}
+
+function assistApplyFix(fid) {
+  const fix = _ASSIST_FIXES[fid];
+  if (!fix) return;
+  const top = document.getElementById('assist-top');
+  const cur = top.value.trimEnd();
+  top.value = cur ? cur + '\n' + fix : fix;
+  _assistAppendMsg('system', 'Fix applied. Anything else?');
 }
 
 // ── Schema panel ───────────────────────────────────────────────────────────

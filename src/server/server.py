@@ -678,6 +678,180 @@ def _generate_mutations(
     return results[:n]
 
 
+# ── ZPL error explanation ────────────────────────────────────────────────────
+
+class ExplainErrorsRequest(BaseModel):
+    text: str
+    errors: list[dict]
+
+
+@app.post("/api/explain-errors")
+async def explain_errors(req: ExplainErrorsRequest, session: dict = Depends(get_session)):
+    if not ai_client.available():
+        raise HTTPException(503, "ANTHROPIC_API_KEY not set")
+    if not req.errors:
+        return {"explanations": []}
+
+    errors_text = "\n".join(
+        f"  [{i+1}] Line {e.get('line','?')}: {e.get('message','')} — source: {e.get('source','')!r}"
+        for i, e in enumerate(req.errors)
+    )
+    prompt = f"""You are a ZPL (Zero-trust Policy Language) syntax assistant.
+
+A user has written this ZPL policy:
+
+```
+{req.text}
+```
+
+The parser reported these errors:
+{errors_text}
+
+ZPL syntax rules:
+- Define statements: `Define <name> as a <parent> with <attrs>.`
+- Allow statements: `Allow [<tag>...] <subject-class> [on [<tag>...] <endpoint-class>] to <verb> [<tag>...] <object-class>.`
+- Never statements: `Never allow ...` (same shape as Allow)
+- Attribute modifiers: `optional tags <name>, <name>`, `multiple <name>`, `optional <name>`
+- Tag qualifiers in rules are bare names before the class: `hr employee` means employee with hr tag
+- Every statement ends with a period.
+
+For each numbered error return:
+- explanation: one plain-English sentence describing what is wrong and why
+- fix: the corrected version of ONLY the offending source line (complete, valid ZPL — no placeholders or ellipsis)
+
+Return JSON only — no other text:
+{{"explanations": [{{"index": 1, "explanation": "plain English reason", "fix": "corrected ZPL line"}}]}}"""
+
+    try:
+        raw = ai_client.complete(
+            system="You are a ZPL syntax assistant. Return only valid JSON.",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1024,
+            temperature=0.2,
+        )
+    except Exception as exc:
+        raise HTTPException(500, f"AI call failed: {exc}")
+
+    text = raw.strip()
+    text = _re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=_re.DOTALL).strip()
+    try:
+        result = _json.loads(text)
+    except Exception:
+        raise HTTPException(500, "Could not parse AI response")
+
+    return result
+
+
+# ── ZPL assistant ────────────────────────────────────────────────────────────
+
+class ZplAssistRequest(BaseModel):
+    message: str
+    zpl_so_far: str = ""
+    history: list[dict] = []
+
+
+@app.post("/api/zpl-assist")
+async def zpl_assist(req: ZplAssistRequest, session: dict = Depends(get_session)):
+    if not ai_client.available():
+        raise HTTPException(503, "ANTHROPIC_API_KEY not set")
+
+    msg = req.message.strip()
+    if not msg:
+        return {"action": "noop", "reply": ""}
+
+    # Stop intent: short message starting with a stop word
+    _STOP_RE = _re.compile(
+        r'^\s*(no|nope|stop|quit|done|exit|finish|bye|close|end)(\s.*)?$',
+        _re.IGNORECASE,
+    )
+    if _STOP_RE.match(msg):
+        return {"action": "stop", "reply": "Closing the assistant. Your ZPL is ready."}
+
+    # ZPL-like input: contains Define / Allow / Never keywords
+    if _re.search(r'\b(define|allow|never)\b', msg, _re.IGNORECASE):
+        raw = zpl_parser.parse(msg)
+        errors = raw.get("errors", [])
+        if not errors:
+            return {"action": "add", "statement": msg, "reply": "Added. Anything else?"}
+
+        # Has parse errors → AI explains and offers a fix
+        errors_text = "\n".join(
+            f"  [{e.get('line','?')}] {e.get('message','')} — {e.get('source','')!r}"
+            for e in errors
+        )
+        explain_prompt = (
+            f"The user wrote this ZPL statement:\n\n{msg}\n\n"
+            f"Parser reported:\n{errors_text}\n\n"
+            "ZPL syntax reference:\n"
+            "- Define: `Define <Name> as a <parent> with <attrs>.`  parents: users, endpoints, services, servers\n"
+            "  attrs: `optional tags <n>, <n>`, `multiple <n>`, `optional <n>`, `<n>:<v>`\n"
+            "- Allow: `Allow [<tag>...] <Class> [on [<tag>...] <End>] to <verb> [<tag>...] <Obj>.`\n"
+            "- Never allow: same shape, starts with `Never allow`\n"
+            "- Every statement ends with a period.\n\n"
+            'Return JSON only: {"explanation": "one plain-English sentence", "fix": "corrected ZPL"}'
+        )
+        try:
+            raw_ai = ai_client.complete(
+                system="You are a ZPL syntax assistant. Return only valid JSON.",
+                messages=[{"role": "user", "content": explain_prompt}],
+                max_tokens=512,
+                temperature=0.1,
+            )
+            text = _re.sub(r"^```(?:json)?\s*|\s*```$", "", raw_ai.strip(), flags=_re.DOTALL).strip()
+            result = _json.loads(text)
+            return {
+                "action": "explain",
+                "reply": result.get("explanation", "There's a syntax error in your ZPL."),
+                "suggested_fix": result.get("fix", ""),
+            }
+        except Exception:
+            return {"action": "explain",
+                    "reply": "There's a syntax error — please check your ZPL statement.",
+                    "suggested_fix": ""}
+
+    # Natural language → generate ZPL
+    classes_ctx = "Built-in roots: users, endpoints, services, servers"
+    if req.zpl_so_far.strip():
+        try:
+            raw_ps = zpl_parser.parse(req.zpl_so_far)
+            ps, _ = norm.zpl_to_policy_set(raw_ps)
+            classes_ctx = _classes_context(ps)
+        except Exception:
+            pass
+
+    gen_prompt = (
+        "You are a ZPL (Zero-trust Policy Language) writer. The user wants to add to their policy.\n\n"
+        f"Known classes:\n{classes_ctx}\n\n"
+        f"Current ZPL:\n---\n{req.zpl_so_far or '(empty)'}\n---\n\n"
+        f"User request: {msg}\n\n"
+        "ZPL syntax:\n"
+        "- Define: `Define <Name> as a <parent> with <attrs>.` (parent: users, endpoints, services, servers)\n"
+        "  attrs: `optional tags <n>, <n>`, `multiple <n>`, `optional <n>`, `<n>:<v>`\n"
+        "- Allow: `Allow [<tag>...] <Class> [on [<tag>...] <End>] to <verb> [<tag>...] <Obj>.`\n"
+        "- Never allow: same shape, starts with `Never allow`\n"
+        "- Every statement ends with a period.\n\n"
+        "Generate one or more ZPL statement(s) that fulfill the user's request.\n"
+        'Return JSON only: {"statement": "ZPL here", "reply": "brief explanation"}'
+    )
+    try:
+        raw_ai = ai_client.complete(
+            system="You are a ZPL policy writer. Return only valid JSON.",
+            messages=[{"role": "user", "content": gen_prompt}],
+            max_tokens=1024,
+            temperature=0.3,
+        )
+        text = _re.sub(r"^```(?:json)?\s*|\s*```$", "", raw_ai.strip(), flags=_re.DOTALL).strip()
+        result = _json.loads(text)
+        stmt = result.get("statement", "")
+        reply = result.get("reply", "Generated.")
+        if stmt and zpl_parser.parse(stmt).get("errors"):
+            reply += " (Note: please review the generated ZPL)"
+        return {"action": "generate", "statement": stmt, "reply": reply}
+    except Exception:
+        return {"action": "error",
+                "reply": "Could not generate ZPL. Try again or write the statement directly."}
+
+
 # ── Adversarial test generation ───────────────────────────────────────────────
 
 class AdversarialRequest(BaseModel):
