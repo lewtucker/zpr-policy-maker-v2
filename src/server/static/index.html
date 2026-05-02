@@ -243,7 +243,7 @@
     .assist-msg.system    { color: var(--muted); font-size: 0.74rem; font-style: italic; align-self: center; }
     .assist-input-row {
       display: flex; gap: 0.4rem; padding: 0.4rem 0.5rem;
-      border-top: 1px solid var(--border); flex-shrink: 0; align-items: flex-end;
+      border-bottom: 1px solid var(--border); flex-shrink: 0; align-items: flex-end;
     }
     .assist-input {
       flex: 1; resize: none; border: 1px solid var(--border); border-radius: 5px;
@@ -546,7 +546,6 @@
           <span class="assist-bottom-title">ZPL Assistant</span>
           <button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="closeAssist()">✓ Done</button>
         </div>
-        <div class="assist-history" id="assist-history"></div>
         <div class="assist-input-row">
           <textarea class="assist-input" id="assist-input"
             placeholder="Type ZPL or describe what you want… (Enter to send, Shift+Enter for newline)"
@@ -554,11 +553,13 @@
             spellcheck="false" rows="2"></textarea>
           <button class="tool-btn primary" onclick="assistSend()" id="assist-send-btn">Send</button>
         </div>
+        <div class="assist-history" id="assist-history"></div>
       </div>
       <div class="assist-pane-sep"></div>
       <textarea id="assist-top"
         placeholder="ZPL definitions and rules"
         spellcheck="false"
+        oninput="scheduleAutoParse()"
         onkeydown="handleTabKey(event)"></textarea>
     </div>
     <div class="error-bar" id="error-bar"></div>
@@ -946,6 +947,11 @@ function handleTabKey(e) {
   }
 }
 
+function _editorText() {
+  const id = S.assist?.active ? 'assist-top' : 'zpl-editor';
+  return document.getElementById(id)?.value || '';
+}
+
 function onEditorInput() {
   markDirty();
   scheduleAutoParse();
@@ -964,7 +970,7 @@ function scheduleAutoParse() {
 }
 
 async function autoParse() {
-  const text = document.getElementById('zpl-editor').value.trim();
+  const text = _editorText().trim();
   if (!text) { S.lastParsed = null; clearErrors(); clearInferBar(); renderSchemaBody(); return; }
   try {
     const res = await api('POST', '/api/parse', { text, language: 'zpl' });
@@ -1169,7 +1175,7 @@ async function explainErrors() {
   const bar = document.getElementById('error-bar');
   const errors = bar._errors;
   if (!errors || !errors.length) return;
-  const text = document.getElementById('zpl-editor').value;
+  const text = _editorText();
   const btn = document.getElementById('explain-btn');
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
   try {
@@ -1215,6 +1221,12 @@ function openAssist() {
   S.assist.active = true;
   const btn = document.getElementById('assist-btn');
   if (btn) btn.textContent = '⊠ Assist';
+  // Switch to Classes tab so live parse updates are visible while typing
+  S.schemaTab = 'classes';
+  document.querySelectorAll('.schema-tab').forEach(b => b.classList.remove('active'));
+  const classTab = document.querySelector('.schema-tab[onclick*="classes"]');
+  if (classTab) classTab.classList.add('active');
+  renderSchemaBody();
   _assistAppendMsg('system', 'Type a ZPL statement or describe what you want. Say "done" or "stop" when finished.');
   setTimeout(() => document.getElementById('assist-input')?.focus(), 50);
 }
