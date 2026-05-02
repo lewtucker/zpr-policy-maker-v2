@@ -528,7 +528,8 @@
     <div class="infer-bar" id="infer-bar">
       <span id="infer-msg"></span>
       <div class="infer-actions">
-        <button class="infer-insert" onclick="insertInferredClasses()">Insert definitions</button>
+        <button class="infer-insert" onclick="askAssistantAboutInferred()">Ask Assistant</button>
+        <button class="infer-insert" onclick="insertInferredClasses()" style="opacity:0.7">Insert all</button>
         <button class="infer-dismiss" onclick="dismissInferBar()" title="Dismiss">✕</button>
       </div>
     </div>
@@ -664,6 +665,8 @@ const S = {
   schemaTab: 'tests',
   lastParsed: null,
   inferredZpl: '',
+  inferredClasses: [],
+  inferredVerbs: [],
   serializedZpl: '',
   profile: null,
   panelOpen: true,
@@ -1124,12 +1127,10 @@ function showInferBar(classes, zpl, label, verbs, verbsZpl) {
   verbsZpl = verbsZpl || '';
   const bar = document.getElementById('infer-bar');
   if (!classes.length && !verbs.length) { clearInferBar(); return; }
+  S.inferredZpl = [zpl, verbsZpl].filter(Boolean).join('\n');
+  S.inferredClasses = classes;
+  S.inferredVerbs = verbs;
   const parts = [];
-  if (zpl || verbsZpl) {
-    S.inferredZpl = [zpl, verbsZpl].filter(Boolean).join('\n');
-  } else {
-    S.inferredZpl = '';
-  }
   if (classes.length) {
     const names = classes.map(c => c.class).join(', ');
     const prefix = label || `${classes.length} undefined class${classes.length > 1 ? 'es' : ''}`;
@@ -1145,9 +1146,25 @@ function showInferBar(classes, zpl, label, verbs, verbsZpl) {
 function clearInferBar() {
   document.getElementById('infer-bar').classList.remove('visible');
   S.inferredZpl = '';
+  S.inferredClasses = [];
+  S.inferredVerbs = [];
 }
 
 function dismissInferBar() { clearInferBar(); }
+
+function askAssistantAboutInferred() {
+  const classes = S.inferredClasses || [];
+  const verbs = S.inferredVerbs || [];
+  if (!classes.length && !verbs.length) return;
+  clearInferBar();
+  if (!S.assist?.active) openAssist();
+  const classParts = classes.map(c => `${c.class} (used as ${c.parent || 'unknown'})`);
+  const verbParts = verbs.map(v => `${v} (verb)`);
+  const all = [...classParts, ...verbParts];
+  const msg = `The policy references undefined ${all.length > 1 ? 'items' : 'item'}: ${all.join(', ')}. How should I define ${all.length > 1 ? 'them' : 'it'}?`;
+  document.getElementById('assist-input').value = msg;
+  assistSend();
+}
 
 function insertInferredClasses() {
   if (!S.inferredZpl) return;
