@@ -2860,6 +2860,24 @@ function _trQualify(name) {
   return `${ns}.${name}`;
 }
 
+function _trParseAttrs(str) {
+  const out = {};
+  (str || '').split(',').forEach(pair => {
+    const idx = pair.indexOf(':');
+    if (idx < 1) return;
+    const k = pair.slice(0, idx).trim();
+    const v = pair.slice(idx + 1).trim();
+    if (k) out[k] = v || 'yes';
+  });
+  return out;
+}
+
+function _trAttrsToStr(attrs) {
+  return Object.entries(attrs || {})
+    .map(([k, v]) => v === 'yes' ? k : `${k}:${v}`)
+    .join(', ');
+}
+
 function _trFlattenAttrs(attrs) {
   const out = {};
   for (const [k, v] of Object.entries(attrs || {})) {
@@ -3202,6 +3220,11 @@ function _trManualForm() {
         <input id="tr-m-obj" class="tr-m-input" placeholder="object class" style="flex:1" onkeydown="if(event.key==='Enter')trRunManual()">
       </div>
       <div style="display:flex;gap:0.4rem;align-items:center;">
+        <input id="tr-m-subj-attrs" class="tr-m-input" placeholder="subj attrs: key:val, …" style="flex:1" onkeydown="if(event.key==='Enter')trRunManual()">
+        <div style="width:70px;flex-shrink:0"></div>
+        <input id="tr-m-obj-attrs" class="tr-m-input" placeholder="obj attrs: key:val, …" style="flex:1" onkeydown="if(event.key==='Enter')trRunManual()">
+      </div>
+      <div style="display:flex;gap:0.4rem;align-items:center;">
         <button class="tool-btn" onclick="trRunManual()" id="tr-m-run-btn">▶ Run</button>
         <button class="tool-btn" onclick="trAddManual()" title="Add to test list">+ Add</button>
         <span id="tr-m-result" style="font-size:0.72rem;flex:1"></span>
@@ -3223,12 +3246,16 @@ function trSetManual(i, checked) {
   const t = TR.tests[i];
   if (!t) return;
   const p = t.payload;
-  const subjEl   = document.getElementById('tr-m-subj');
-  const actionEl = document.getElementById('tr-m-action');
-  const objEl    = document.getElementById('tr-m-obj');
-  if (subjEl)   subjEl.value   = p.subject_class || '';
-  if (actionEl) actionEl.value = p.action || 'access';
-  if (objEl)    objEl.value    = p.object_class || '';
+  const subjEl      = document.getElementById('tr-m-subj');
+  const actionEl    = document.getElementById('tr-m-action');
+  const objEl       = document.getElementById('tr-m-obj');
+  const subjAttrsEl = document.getElementById('tr-m-subj-attrs');
+  const objAttrsEl  = document.getElementById('tr-m-obj-attrs');
+  if (subjEl)      subjEl.value      = p.subject_class || '';
+  if (actionEl)    actionEl.value    = p.action || 'access';
+  if (objEl)       objEl.value       = p.object_class || '';
+  if (subjAttrsEl) subjAttrsEl.value = _trAttrsToStr(p.subject_attrs);
+  if (objAttrsEl)  objAttrsEl.value  = _trAttrsToStr(p.object_attrs);
   document.getElementById('tr-manual')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   _trRunWithPayload(p);
 }
@@ -3270,10 +3297,10 @@ async function trRunManual() {
 
   const payload = {
     subject_class: _trQualify(subj),
-    subject_attrs: {},
+    subject_attrs: _trParseAttrs(document.getElementById('tr-m-subj-attrs')?.value),
     action,
     object_class: _trQualify(obj),
-    object_attrs: {},
+    object_attrs: _trParseAttrs(document.getElementById('tr-m-obj-attrs')?.value),
   };
 
   const resEl   = document.getElementById('tr-m-result');
@@ -3309,10 +3336,10 @@ function trAddManual() {
   if (!subj || !obj) { toast('Enter subject and object class'); return; }
   const payload = {
     subject_class: _trQualify(subj),
-    subject_attrs: {},
+    subject_attrs: _trParseAttrs(document.getElementById('tr-m-subj-attrs')?.value),
     action,
     object_class: _trQualify(obj),
-    object_attrs: {},
+    object_attrs: _trParseAttrs(document.getElementById('tr-m-obj-attrs')?.value),
   };
   TR.tests.push({
     number: TR.tests.length + 1,
