@@ -1,8 +1,8 @@
-# CLAUDE.md — ZPR Policy Maker v2/v3
+# CLAUDE.md — ZPR Policy Builder (repo: zpr-policy-maker-v2)
 
-## ⚠️ PROJECT STATUS: ACTIVE (v3 — namespace refactor complete)
+## ⚠️ PROJECT STATUS: ACTIVE (v3 — UI polish phase)
 
-Active development as of 2026-05-02. The v3 ZPL-centric UI with namespace ownership model is
+Active development as of 2026-05-03. The v3 ZPL-centric UI with namespace ownership model is
 complete. Do not deploy to production until the user explicitly confirms readiness.
 
 ---
@@ -28,8 +28,8 @@ When deploying, always use full absolute paths and confirm the destination befor
 
 ## Project Overview
 
-**ZPR Policy Maker v3** is a ZPL-centric, multi-namespace policy editor. Users write ZPL directly;
-the system parses it live and displays structured classes and rules in a side panel.
+**ZPR Policy Builder** (v3) is a ZPL-centric, multi-namespace policy editor. Users write ZPL
+directly; the system parses it live and displays structured classes and rules in a side panel.
 
 ### Key characteristics
 
@@ -83,6 +83,8 @@ reference/
 scripts/
   backup-db.sh              Pull live DB from server to local backups/
   restore-db.sh             Push a backup DB back to server
+  backup-local.sh           Snapshot local dev DB to backups/ with timestamp+label
+  restore-local.sh          Restore a local backup with confirmation prompt
 
 src/server/
   zpl_engine.py             Rule evaluator (pure, no I/O) — carried from v1 unchanged
@@ -95,7 +97,9 @@ src/server/
   server.py                 FastAPI app — all HTTP endpoints
   test_helpers.py           Shared make_session() for tests
   static/
-    index.html              v3 UI (light theme, single-file SPA)
+    index.html              v3 UI (light theme, single-file SPA) — "ZPR Policy Builder"
+    help.html               User Guide served at GET /help (no auth); includes release notes
+    admin.html              Admin panel: user list, is_admin toggle, create user
     ui_v2.html              Preserved v2 UI (accessible at /v2)
   defaults/
     system_classes.yaml     Built-in ZPL class hierarchy
@@ -114,7 +118,7 @@ src/server/
 
 ```
 users:
-  id, username, password_hash, display_name, email, api_token, created_at
+  id, username, password_hash, display_name, email, api_token, is_admin, created_at
 
 namespaces:
   id, display_name, owner_user_id → users.id, parent_namespace_id → namespaces.id, created_at
@@ -130,6 +134,7 @@ conversations: (legacy agent chat history)
 - `display_name` (users): shown in profile; also seeds root namespace display_name on creation
 - `display_name` (namespaces): appears in ZPL dot notation (e.g. `Corp.Employee`)
 - `api_token`: Bearer token — `Authorization: Bearer <token>` accepted on all endpoints
+- `is_admin`: DB column (migration-safe); first user auto-promoted to admin; admins can toggle others
 - Root namespace: `parent_namespace_id IS NULL`, auto-created on first login
 
 ### Session shape
@@ -164,6 +169,10 @@ conversations: (legacy agent chat history)
 | POST | `/api/profile` | Update email/display_name |
 | POST | `/api/profile/password` | Change password |
 | POST | `/api/token/regenerate` | Regenerate bearer token |
+| GET | `/api/admin/users` | List all users (admin only) |
+| POST | `/api/admin/users` | Create user (admin only; `is_admin` flag supported) |
+| PATCH | `/api/admin/users/{id}/admin` | Set/clear admin flag (cannot self-revoke) |
+| GET | `/help` | User Guide HTML (no auth required) |
 
 ---
 
@@ -181,6 +190,14 @@ Stored ZPL always carries the full dotted prefix (e.g. `lew.Corp.Employee`).
 
 3-column CSS Grid: `{sidebarWidth}px 4px 1fr 4px {panelWidth}px`
 
+Panel resizers are window-relative (no hard pixel caps); editor textarea has `min-width:0` so it
+can shrink freely. Initial right panel width = `Math.floor((window.innerWidth - 220 - 8) / 2)`.
+
+### Header
+
+Buttons: **User Guide** (opens `/help` in new tab) | **Profile** | **Sign out**
+Release Notes content lives inside the User Guide (no separate button).
+
 ### Sidebar (left)
 
 - **NAMESPACE SELECTOR**: namespace tree; click to switch context; active namespace highlighted
@@ -190,20 +207,37 @@ Stored ZPL always carries the full dotted prefix (e.g. `lew.Corp.Employee`).
 
 ### Center (ZPL editor)
 
-- Toolbar: "ZPL Editor" | namespace name | Check ZPL | Save | Reset | Show All | ⊕ Assist | ↑↓ | ⊟
+- Toolbar: "ZPL Editor" | namespace name | Check ZPL | Save | **Delete All** | Show All | ⊕ **AI Assistant** | ↑↓ | ⊟
 - ↑↓ dropdown: upload ZPL file or download current editor content
 - Show All: loads combined ZPL for entire namespace subtree (read-only view)
 
 ### Right panel (schema)
 
-- Tabs: Tests | Classes | Rules | ZPL
-- ZPL tab: `serialized_zpl` from `/api/parse` — canonicalized round-trip output
+- Tabs: Tests | Classes | Rules | Entities | **ZPL (full)**
+- **Classes and Rules** default to **Table view** (entity-style): grouped section headers, rows with
+  always-visible **Edit** / **[x]** / **yaml** buttons. yaml toggles an inline YAML panel with [x]
+  to close. Tree/Table toggle at top of each tab.
+- ZPL (full) tab: `serialized_zpl` from `/api/parse` — canonicalized round-trip output
 - ⊞ expand: sets grid to full width
+
+### Tests tab
+
+- **Manual test card**: subject class + action + object class inputs; `+attr` button under each
+  adds key:value rows. Key is a dropdown of inherited class attributes; value is a dropdown when
+  the attribute has predefined values, otherwise free text. Pre-fills when a test row is selected.
+- **Generate tests modal**: default counts 3 positive / 3 adversarial; larger spinner arrows.
+- Rule evaluation order: never rules (priority desc) → first match → deny; then allow rules
+  (priority desc) → first match → allow; no match → deny.
 
 ### Profile modal
 
 - Opened by "Profile" button in header
 - Fields: username (read-only), namespace name (read-only), email, change password, Bearer token, test rule match
+
+### User Guide (`/help`)
+
+- Standalone styled HTML; sticky left nav; sections cover all features + ZPL Quick Reference +
+  Release Notes & ZPL Extensions. ← Back button at top of nav links to `/`.
 
 ---
 
