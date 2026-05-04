@@ -744,8 +744,8 @@ const S = {
   profile: null,
   entities: [],
   showAll: false,
-  classView: 'tree',
-  ruleView: 'tree',
+  classView: 'table',
+  ruleView: 'table',
   panelOpen: true,
   panelExpanded: false,
   sidebarWidth: 220,
@@ -2434,8 +2434,9 @@ function renderClassesTable(body, classes) {
           ${attrStr ? `<div style="color:var(--muted);font-size:0.78rem;margin-top:0.1rem">${esc(attrStr)}</div>` : ''}
         </div>
         <div style="display:flex;gap:0.25rem;flex-shrink:0;padding-top:0.1rem">
-          <button class="tool-btn" onclick="openStmtEdit(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">✏</button>
-          <button class="tool-btn" onclick="event.stopPropagation();deleteStmt(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem;color:#ef4444">✕</button>
+          <button class="tool-btn" onclick="openStmtEdit(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">Edit</button>
+          <button class="tool-btn" onclick="event.stopPropagation();deleteStmt(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem;color:#ef4444">[x]</button>
+          <button class="tool-btn" onclick="event.stopPropagation();toggleYamlDetail(this.closest('[data-json]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">yaml</button>
         </div>
       </div>`;
     }
@@ -2471,8 +2472,9 @@ function renderRulesTable(body, rules) {
         <span class="rule-effect ${effect}" style="flex-shrink:0">${badgeText}</span>
         <span style="flex:1;min-width:0;font-size:0.88rem">${esc(subj)}${onPart} <span style="color:var(--muted)">${esc(action)}</span> ${esc(obj)}</span>
         <div style="display:flex;gap:0.25rem;flex-shrink:0">
-          <button class="tool-btn" onclick="openStmtEdit(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">✏</button>
-          <button class="tool-btn" onclick="event.stopPropagation();deleteStmt(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem;color:#ef4444">✕</button>
+          <button class="tool-btn" onclick="openStmtEdit(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">Edit</button>
+          <button class="tool-btn" onclick="event.stopPropagation();deleteStmt(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem;color:#ef4444">[x]</button>
+          <button class="tool-btn" onclick="event.stopPropagation();toggleYamlDetail(this.closest('[data-json]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">yaml</button>
         </div>
       </div>`;
     }
@@ -2603,11 +2605,53 @@ function renderRules(body, rules) {
 // ── Inline statement edit / delete ────────────────────────────────────────
 
 function _stmtZpl(el) {
-  // Decode the HTML-escaped zpl stored in data-zpl
   const txt = el.dataset.zpl || '';
   const d = document.createElement('div');
   d.innerHTML = txt;
   return d.textContent;
+}
+
+function _objFromEl(el) {
+  const d = document.createElement('div');
+  d.innerHTML = el.dataset.json || '{}';
+  try { return JSON.parse(d.textContent); } catch(e) { return {}; }
+}
+
+function _toYaml(obj, depth) {
+  depth = depth || 0;
+  const pad = '  '.repeat(depth);
+  if (obj === null || obj === undefined) return 'null';
+  if (typeof obj === 'boolean' || typeof obj === 'number') return String(obj);
+  if (typeof obj === 'string') {
+    return (obj === '' || /[:#\n"'{}[\],&*?|<>=!%@`]/.test(obj)) ? JSON.stringify(obj) : obj;
+  }
+  if (Array.isArray(obj)) {
+    if (!obj.length) return '[]';
+    return obj.map(v => {
+      const s = _toYaml(v, depth + 1);
+      return s.includes('\n') ? `\n${pad}- ${s.trimStart()}` : `\n${pad}- ${s}`;
+    }).join('');
+  }
+  const entries = Object.entries(obj).filter(([,v]) => v !== null && v !== undefined);
+  if (!entries.length) return '{}';
+  return entries.map(([k, v]) => {
+    const s = _toYaml(v, depth + 1);
+    return s.startsWith('\n') ? `\n${pad}${k}:${s}` : `\n${pad}${k}: ${s}`;
+  }).join('');
+}
+
+function toggleYamlDetail(el) {
+  const existing = el.querySelector('.yaml-detail-wrap');
+  if (existing) { existing.remove(); return; }
+  document.querySelectorAll('.yaml-detail-wrap').forEach(w => w.remove());
+  const obj = _objFromEl(el);
+  const yaml = _toYaml(obj, 0).replace(/^\n/, '');
+  const wrap = document.createElement('div');
+  wrap.className = 'yaml-detail-wrap';
+  wrap.onclick = e => e.stopPropagation();
+  wrap.style.cssText = 'padding:0.5rem 0.75rem;background:var(--surface2);border-top:1px solid var(--border);font-family:var(--font-mono);font-size:0.8rem;white-space:pre;overflow-x:auto;color:var(--text);line-height:1.6';
+  wrap.textContent = yaml;
+  el.appendChild(wrap);
 }
 
 function openStmtEdit(el) {
