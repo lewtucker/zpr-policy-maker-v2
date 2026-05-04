@@ -329,6 +329,29 @@
     .class-node { cursor: pointer; }
     .class-node:hover .cn-name { color: var(--accent); }
     .rule-item:hover { background: var(--surface2); }
+
+    /* ── Inline edit/delete buttons ── */
+    .stmt-actions { display: none; gap: 0.2rem; margin-left: auto; flex-shrink: 0; }
+    .class-node:hover .stmt-actions,
+    .rule-item:hover .stmt-actions { display: flex; }
+    .stmt-btn { background: none; border: 1px solid transparent; border-radius: 3px;
+                font-size: 0.72rem; cursor: pointer; padding: 0.1rem 0.3rem; line-height: 1;
+                color: var(--muted); }
+    .stmt-btn:hover { background: var(--surface2); border-color: var(--border); color: var(--text); }
+    .stmt-btn.del:hover { color: var(--red); border-color: #fecaca; background: #fef2f2; }
+
+    /* ── Inline ZPL edit area ── */
+    .stmt-edit-wrap { margin-top: 0.4rem; width: 100%; }
+    .stmt-edit-wrap textarea {
+      width: 100%; min-height: 3.5rem; font-family: var(--font-mono); font-size: 0.78rem;
+      padding: 0.4rem 0.5rem; border: 1px solid var(--accent); border-radius: 4px;
+      background: var(--bg); color: var(--text); resize: vertical; outline: none;
+    }
+    .stmt-edit-actions { display: flex; gap: 0.35rem; margin-top: 0.3rem; }
+    .stmt-edit-actions button { font-size: 0.75rem; padding: 0.2rem 0.55rem;
+      border-radius: 4px; cursor: pointer; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text); }
+    .stmt-edit-actions button.save { background: var(--accent); color: white; border-color: var(--accent); }
     .json-detail-wrap {
       margin-top: 0.4rem; border: 1px solid var(--border); border-radius: 4px;
       background: var(--surface2); cursor: default; width: 100%;
@@ -2452,13 +2475,18 @@ function renderClasses(body, classes) {
       const prefix = depth === 0 ? '' : (depth === 1 ? '└ ' : '  └ ');
       const attrs = Object.entries(c.attributes || {});
       const json = esc(JSON.stringify(c, null, 2));
-      html += `<div class="class-node" onclick="toggleJsonDetail(this)" data-json="${json}">
+      const zpl  = esc(c.zpl || '');
+      html += `<div class="class-node" data-json="${json}" data-zpl="${zpl}" onclick="toggleJsonDetail(this)">
         <span class="indent">${esc(indent + prefix)}</span>
         <div style="flex:1;min-width:0">
           <span class="cn-name">${esc(c.name)}</span>
           <span class="cn-parent">← ${esc(c.parent)}</span>
           ${attrs.length ? `<div class="cn-attrs">${attrs.map(([k,v]) => `${esc(k)}: ${esc(v.type)}`).join('  ')}</div>` : ''}
         </div>
+        <span class="stmt-actions" onclick="event.stopPropagation()">
+          <button class="stmt-btn" title="Edit" onclick="openStmtEdit(this.closest('.class-node'))">✏</button>
+          <button class="stmt-btn del" title="Delete" onclick="deleteStmt(this.closest('.class-node'))">✕</button>
+        </span>
       </div>`;
       renderSubtree(c.name, depth + 1);
     }
@@ -2477,13 +2505,18 @@ function renderClasses(body, classes) {
     for (const c of orphans) {
       const attrs = Object.entries(c.attributes || {});
       const json = esc(JSON.stringify(c, null, 2));
-      html += `<div class="class-node" onclick="toggleJsonDetail(this)" data-json="${json}">
+      const zpl  = esc(c.zpl || '');
+      html += `<div class="class-node" data-json="${json}" data-zpl="${zpl}" onclick="toggleJsonDetail(this)">
         <span class="indent"></span>
         <div style="flex:1;min-width:0">
           <span class="cn-name">${esc(c.name)}</span>
           <span class="cn-parent">← ${esc(c.parent)}</span>
           ${attrs.length ? `<div class="cn-attrs">${attrs.map(([k,v]) => `${esc(k)}: ${esc(v.type)}`).join('  ')}</div>` : ''}
         </div>
+        <span class="stmt-actions" onclick="event.stopPropagation()">
+          <button class="stmt-btn" title="Edit" onclick="openStmtEdit(this.closest('.class-node'))">✏</button>
+          <button class="stmt-btn del" title="Delete" onclick="deleteStmt(this.closest('.class-node'))">✕</button>
+        </span>
       </div>`;
     }
   }
@@ -2505,7 +2538,7 @@ function renderRules(body, rules) {
     return attrs ? `${base} [${attrs}]` : base;
   }
 
-  body.innerHTML = rules.map(r => {
+  body.innerHTML = rules.map((r, i) => {
     const effect = r.effect || 'allow';
     const badgeText = effect === 'deny' ? 'NEVER' : 'ALLOW';
     const subj = fmtSpec(r.subject);
@@ -2513,11 +2546,83 @@ function renderRules(body, rules) {
     const obj  = fmtSpec(r.object);
     const desc = `${subj}${onPart} ${r.action || 'access'} ${obj}`;
     const json = esc(JSON.stringify(r, null, 2));
-    return `<div class="rule-item" onclick="toggleJsonDetail(this)" data-json="${json}">
+    const zpl  = esc(r.zpl || '');
+    return `<div class="rule-item" data-json="${json}" data-zpl="${zpl}" data-idx="${i}" onclick="toggleJsonDetail(this)">
       <span class="rule-effect ${effect}">${badgeText}</span>
       <span class="rule-name">${esc(desc)}</span>
+      <span class="stmt-actions" onclick="event.stopPropagation()">
+        <button class="stmt-btn" title="Edit" onclick="openStmtEdit(this.closest('.rule-item'))">✏</button>
+        <button class="stmt-btn del" title="Delete" onclick="deleteStmt(this.closest('.rule-item'))">✕</button>
+      </span>
     </div>`;
   }).join('');
+}
+
+// ── Inline statement edit / delete ────────────────────────────────────────
+
+function _stmtZpl(el) {
+  // Decode the HTML-escaped zpl stored in data-zpl
+  const txt = el.dataset.zpl || '';
+  const d = document.createElement('div');
+  d.innerHTML = txt;
+  return d.textContent;
+}
+
+function openStmtEdit(el) {
+  // Close any other open edit areas first
+  document.querySelectorAll('.stmt-edit-wrap').forEach(w => w.remove());
+  // Remove JSON detail if open
+  el.querySelector('.json-detail-wrap')?.remove();
+
+  const original = _stmtZpl(el);
+  const wrap = document.createElement('div');
+  wrap.className = 'stmt-edit-wrap';
+  wrap.onclick = e => e.stopPropagation();
+
+  const ta = document.createElement('textarea');
+  ta.value = original;
+
+  const acts = document.createElement('div');
+  acts.className = 'stmt-edit-actions';
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'save';
+  saveBtn.textContent = 'Save';
+  saveBtn.onclick = () => {
+    const newZpl = ta.value.trim();
+    if (!newZpl) return;
+    const editor = document.getElementById('zpl-editor');
+    const current = editor.value;
+    // Replace original statement text; fall back to append if not found
+    const updated = original && current.includes(original)
+      ? current.replace(original, newZpl)
+      : current + '\n' + newZpl;
+    editor.value = updated;
+    wrap.remove();
+    markDirty();
+    doParse();
+  };
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.onclick = () => wrap.remove();
+
+  acts.appendChild(saveBtn);
+  acts.appendChild(cancelBtn);
+  wrap.appendChild(ta);
+  wrap.appendChild(acts);
+  el.appendChild(wrap);
+  setTimeout(() => ta.focus(), 30);
+}
+
+function deleteStmt(el) {
+  const zpl = _stmtZpl(el);
+  if (!zpl) return;
+  const editor = document.getElementById('zpl-editor');
+  const updated = editor.value.replace(zpl, '').replace(/\n{3,}/g, '\n\n').trim();
+  editor.value = updated;
+  markDirty();
+  doParse();
 }
 
 // ── JSON detail toggle ─────────────────────────────────────────────────────

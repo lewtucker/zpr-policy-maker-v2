@@ -1866,9 +1866,22 @@ async def parse_text(req: ParseRequest, session: dict = Depends(get_session)):
         zpl_serializer.rules_to_zpl(ns_pd.get("rules", []))
     ).strip()
 
+    # Annotate each class/rule with its individual serialized ZPL (unnamespaced,
+    # matching what the editor holds) so the client can do find-and-replace edits.
+    classes_annotated = []
+    for c in pd.get("classes", []):
+        entry = dict(c)
+        entry["zpl"] = zpl_serializer.class_to_zpl(c) or ""
+        classes_annotated.append(entry)
+    rules_annotated = []
+    for r in pd.get("rules", []):
+        entry = dict(r)
+        entry["zpl"] = zpl_serializer.rule_to_zpl(r) or ""
+        rules_annotated.append(entry)
+
     return {
         "language": lang,
-        "policy_set": pd,
+        "policy_set": {**pd, "classes": classes_annotated, "rules": rules_annotated},
         "errors": [e.model_dump() for e in errors],
         "inferred_classes": inferred,
         "inferred_zpl": inferred_zpl,
