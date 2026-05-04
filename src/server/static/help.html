@@ -75,6 +75,7 @@
     <a href="#profile">Profile &amp; API Token</a>
     <a href="#admin">Admin</a>
     <a href="#zpl-reference">ZPL Quick Reference</a>
+    <a href="#release-notes">Release Notes</a>
   </div>
 </nav>
 
@@ -306,8 +307,35 @@ Define internet-gateway as a gateway with external-network-connection:public-int
   <tr><td><code>optional tags full-time, part-time</code></td><td>Allowed tag values</td></tr>
 </table>
 
+<h2 id="release-notes">Release Notes &amp; ZPL Extensions</h2>
+
+<p>ZPR Policy Builder v3 implements RFC-15.5 ZPL with the following documented extensions.</p>
+
+<h3>Extension 1 — <code>attr:value</code> filters in Allow / Never rules</h3>
+<p><strong>RFC-15.5 baseline:</strong> rule qualifiers support bare tag words only.<br>
+<strong>This extension:</strong> <code>attr:value</code> pairs are also accepted as qualifiers before the class name in Allow and Never rules.
+The value is matched against the class's attribute at rule-evaluation time — equality for single-valued attributes, containment for multi-valued ones.</p>
+<pre><code>Never allow backup:nightly servers to access backup-services.
+Allow role:engineer employees to access code-repos.
+Never allow clearance:low users to access classified services.</code></pre>
+
+<h3>Extension 2 — Cross-namespace dotted class references</h3>
+<p><strong>RFC-15.5 baseline:</strong> class names are single unqualified identifiers.<br>
+<strong>This extension:</strong> fully-qualified dotted names (e.g. <code>corp.employee</code>) are valid as class names and parent references in both Define and Allow/Never statements.
+The active namespace prefix is stripped on load and injected on save; cross-namespace references keep their full dotted path in the editor.</p>
+<pre><code>Define employee as a corp.employee with department:hr.
+Allow corp.contractors to access corp.hr.employee-db.</code></pre>
+
+<h3>Extension 3 — <code>aka</code> aliases and singular/plural class names</h3>
+<p><strong>RFC-15.5 baseline:</strong> class names are exact identifiers.<br>
+<strong>This extension:</strong> class definitions may declare an <code>aka</code> alias (typically a singular or plural variant).
+Both forms are accepted interchangeably throughout ZPL statements.
+Built-in roots: <code>users</code>/<code>user</code>, <code>endpoints</code>/<code>endpoint</code>, <code>services</code>/<code>service</code>, <code>servers</code>/<code>server</code>.</p>
+<pre><code>Define employee aka employees as a user.
+Allow employees to access gitlab.   # both forms valid</code></pre>
+
 <p style="margin-top:2.5rem;font-size:0.78rem;color:var(--muted)">
-  ZPR Policy Maker &mdash; Applied Invention, LLC &mdash; <a href="https://zpr.org" target="_blank">zpr.org</a>
+  ZPR Policy Builder &mdash; Applied Invention, LLC &mdash; <a href="https://zpr.org" target="_blank">zpr.org</a>
 </p>
 
 </main>

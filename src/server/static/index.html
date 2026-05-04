@@ -533,7 +533,6 @@
   <div class="app-title">ZPR <span>Policy Builder</span></div>
   <div class="hdr-spacer"></div>
   <span class="hdr-user" id="hdr-user"></span>
-  <button class="hdr-btn" onclick="openReleaseNotes()">Release Notes</button>
   <button class="hdr-btn" onclick="window.open('/help','_blank')">User Guide</button>
   <button class="hdr-btn" onclick="openProfilePanel()">Profile</button>
   <button class="hdr-btn" onclick="doLogout()">Sign out</button>
@@ -660,52 +659,6 @@
 
 </div>
 
-<!-- ── Test generate modal ──────────────────────────────────────────── -->
-<div class="modal-backdrop" id="release-notes-modal" onclick="if(event.target===this)closeReleaseNotes()">
-  <div class="modal" style="max-width:640px;max-height:80vh;overflow-y:auto">
-    <div class="profile-modal-header" style="margin-bottom:1rem">
-      <h3>Release Notes &amp; ZPL Extensions</h3>
-      <button class="json-close" onclick="closeReleaseNotes()">✕</button>
-    </div>
-
-    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:1.25rem">
-      ZPR Policy Builder v3 implements RFC-15.5 ZPL with the following documented extensions.
-    </p>
-
-    <h4 style="font-size:0.8rem;font-weight:600;margin-bottom:0.5rem">Extension 1 — <code>attr:value</code> filters in Allow / Never rules</h4>
-    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem">
-      <strong>RFC-15.5 baseline:</strong> rule qualifiers support bare tag words only.<br>
-      <strong>This extension:</strong> <code>attr:value</code> pairs are also accepted as qualifiers before the class name in Allow and Never rules.
-      The value is matched against the class's attribute at rule-evaluation time — equality for single-valued attributes, containment for multi-valued ones.
-    </p>
-    <pre style="font-size:0.78rem;background:var(--surface2);padding:0.6rem 0.75rem;border-radius:4px;margin-bottom:1.25rem;overflow-x:auto">Never allow backup:nightly servers to access backup-services.
-Allow role:engineer employees to access code-repos.
-Never allow clearance:low users to access classified services.</pre>
-
-    <h4 style="font-size:0.8rem;font-weight:600;margin-bottom:0.5rem">Extension 2 — Cross-namespace dotted class references</h4>
-    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem">
-      <strong>RFC-15.5 baseline:</strong> class names are single unqualified identifiers.<br>
-      <strong>This extension:</strong> fully-qualified dotted names (e.g. <code>corp.employee</code>) are valid as class names and parent references in both Define and Allow/Never statements.
-      The active namespace prefix is stripped on load and injected on save; cross-namespace references keep their full dotted path in the editor.
-    </p>
-    <pre style="font-size:0.78rem;background:var(--surface2);padding:0.6rem 0.75rem;border-radius:4px;margin-bottom:1.25rem;overflow-x:auto">Define employee as a corp.employee with department:hr.
-Allow corp.contractors to access corp.hr.employee-db.</pre>
-
-    <h4 style="font-size:0.8rem;font-weight:600;margin-bottom:0.5rem">Extension 3 — <code>aka</code> aliases and singular/plural class names</h4>
-    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem">
-      <strong>RFC-15.5 baseline:</strong> class names are exact identifiers.<br>
-      <strong>This extension:</strong> class definitions may declare an <code>aka</code> alias (typically a singular or plural variant).
-      Both forms are accepted interchangeably throughout ZPL statements.
-      Built-in roots: <code>users</code>/<code>user</code>, <code>endpoints</code>/<code>endpoint</code>, <code>services</code>/<code>service</code>, <code>servers</code>/<code>server</code>.
-    </p>
-    <pre style="font-size:0.78rem;background:var(--surface2);padding:0.6rem 0.75rem;border-radius:4px;margin-bottom:1.5rem;overflow-x:auto">Define employee aka employees as a user.
-Allow employees to access gitlab.   # both forms valid</pre>
-
-    <div class="modal-actions">
-      <button class="btn primary" onclick="closeReleaseNotes()">Close</button>
-    </div>
-  </div>
-</div>
 
 <div class="modal-backdrop" id="unsaved-modal">
   <div class="modal" style="max-width:320px">
@@ -2113,13 +2066,6 @@ function closeProfilePanel() {
   document.getElementById('profile-modal').classList.remove('open');
 }
 
-function openReleaseNotes() {
-  document.getElementById('release-notes-modal').classList.add('open');
-}
-
-function closeReleaseNotes() {
-  document.getElementById('release-notes-modal').classList.remove('open');
-}
 
 async function loadProfile() {
   const body = document.getElementById('profile-modal-body');
