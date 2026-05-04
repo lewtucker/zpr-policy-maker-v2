@@ -92,6 +92,20 @@
       text-transform: uppercase; letter-spacing: 0.05em; }
     .sidebar-owners-panel { overflow-y: auto; flex-shrink: 0; max-height: 50vh;
       border-top: 1px solid var(--border); }
+    .reports-panel { overflow-y: auto; flex-shrink: 0; max-height: 40vh;
+      border-top: 1px solid var(--border); }
+    .report-item { padding: 0.4rem 0.75rem; cursor: pointer; font-size: 0.78rem;
+      border-left: 2px solid transparent; display: flex; align-items: flex-start;
+      gap: 0.3rem; transition: background 0.1s; }
+    .report-item:hover { background: var(--surface2); }
+    .report-item-text { flex: 1; overflow: hidden; }
+    .report-item-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      color: var(--text); }
+    .report-item-meta { font-size: 0.68rem; color: var(--muted); margin-top: 0.1rem; }
+    .report-del-btn { flex-shrink: 0; font-size: 0.7rem; color: var(--muted);
+      background: none; border: none; cursor: pointer; padding: 0.1rem 0.2rem;
+      line-height: 1; border-radius: 2px; }
+    .report-del-btn:hover { background: #fee2e2; color: #ef4444; }
 
     .ns-tree-item {
       padding: 0.5rem 1rem; cursor: pointer;
@@ -555,6 +569,13 @@
       <button class="new-btn" onclick="toggleOwnersPanel()">Edit</button>
     </div>
     <div class="sidebar-owners-panel" id="owners-panel" style="display:none"></div>
+
+    <div class="sidebar-owners-sep"></div>
+    <div class="sidebar-owners-header">
+      <span class="sidebar-owners-label">Reports <span id="reports-count" style="font-weight:400;opacity:0.7"></span></span>
+      <button class="new-btn" onclick="toggleReportsPanel()">▶</button>
+    </div>
+    <div class="reports-panel" id="reports-panel" style="display:none"></div>
   </aside>
 
   <div class="resizer" id="resizer-left"></div>
@@ -570,6 +591,7 @@
       <button class="tool-btn primary" id="save-btn" onclick="doSave()">Save</button>
       <button class="tool-btn" onclick="doReset()">Delete All</button>
       <button class="tool-btn" id="show-all-btn" onclick="toggleShowAll()" title="Show ZPL for this namespace and all sub-namespaces">Show All</button>
+      <button class="tool-btn" onclick="trRunAnalyst()" title="AI policy analysis">🔍 Rule Analyst</button>
       <span class="status-pill idle" id="status-pill"></span>
       <div class="toolbar-right">
         <button class="tool-btn" id="assist-btn" onclick="toggleAssist()" title="ZPL AI Assistant">⊕ AI Assistant</button>
@@ -699,6 +721,26 @@
   </div>
 </div>
 
+<!-- ── Rule Analyst modal ──────────────────────────────────────────── -->
+<div class="modal-backdrop" id="analyst-modal" onclick="if(event.target===this)closeAnalystModal()">
+  <div class="modal" style="max-width:680px;width:100%;max-height:88vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0.9rem 1rem 0.5rem;flex-shrink:0">
+      <div>
+        <h3 style="margin:0;font-size:1rem">🔍 Rule Analyst</h3>
+        <div id="analyst-ns-label" style="font-size:0.72rem;color:var(--muted);margin-top:0.1rem"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.4rem">
+        <button id="analyst-save-btn" class="tool-btn" onclick="analystSaveReport()"
+            title="Save this report" style="font-size:0.75rem;display:none">💾 Save</button>
+        <button id="analyst-deep-btn" class="tool-btn" onclick="trRunAnalyst(true)"
+            title="Re-run with full Sonnet model for deeper analysis" style="font-size:0.75rem">Deep ▶</button>
+        <button class="tool-btn" onclick="closeAnalystModal()" style="font-size:1rem;padding:0.1rem 0.4rem">✕</button>
+      </div>
+    </div>
+    <div id="analyst-body" style="flex:1;overflow-y:auto;padding:0 1rem 1rem"></div>
+  </div>
+</div>
+
 <!-- ── New namespace modal ──────────────────────────────────────────── -->
 <div class="modal-backdrop" id="new-owner-modal">
   <div class="modal">
@@ -749,6 +791,7 @@ const S = {
   panelOpen: true,
   panelExpanded: false,
   sidebarWidth: 220,
+  analyst: null,
   panelWidth: Math.floor((window.innerWidth - 220 - 8) / 2),
   parseTimer: null,
 };
@@ -815,6 +858,7 @@ async function loadSubOwners() {
     : [];
   S.subOwners = [...flattenTree(tree ? tree.children || [] : []), ...external];
   renderNsTree();
+  loadReports();
   refreshOwnersPanel();
 }
 
@@ -3185,6 +3229,213 @@ function trExport() {
 function trReset() {
   TR.tests = [];
   renderSchemaBody();
+}
+
+// ── Rule Analyst ──────────────────────────────────────────────────────────
+
+const _SEVERITY_COLOR = { HIGH: '#ef4444', MEDIUM: '#f59e0b', LOW: '#6b7280' };
+const _SEVERITY_BG    = { HIGH: '#fef2f2', MEDIUM: '#fffbeb', LOW: '#f9fafb' };
+
+function _analystRender(ns, data) {
+  const issues = data.issues || [];
+  const counts = { HIGH: 0, MEDIUM: 0, LOW: 0 };
+  issues.forEach(i => { if (counts[i.severity] !== undefined) counts[i.severity]++; });
+
+  const chips = Object.entries(counts)
+    .filter(([,n]) => n > 0)
+    .map(([sev, n]) =>
+      `<span style="display:inline-block;padding:0.15rem 0.5rem;border-radius:999px;font-size:0.72rem;font-weight:600;
+        color:${_SEVERITY_COLOR[sev]};background:${_SEVERITY_BG[sev]};border:1px solid ${_SEVERITY_COLOR[sev]}30;margin-right:0.3rem">${sev}: ${n}</span>`
+    ).join('');
+
+  const issueHtml = issues.map((issue, idx) => {
+    const col = _SEVERITY_COLOR[issue.severity] || '#6b7280';
+    const bg  = _SEVERITY_BG[issue.severity]    || '#f9fafb';
+    const rulesHtml = (issue.rules || [])
+      .map(r => `<code style="display:block;background:var(--surface2);padding:0.3rem 0.5rem;border-radius:4px;font-size:0.78rem;
+        margin:0.3rem 0;white-space:pre-wrap;word-break:break-word">${esc(r)}</code>`).join('');
+    const fixHtml = (issue.fix_zpl || []).map(zpl => {
+      const encoded = encodeURIComponent(zpl);
+      return `<div style="display:flex;align-items:flex-start;gap:0.4rem;margin-top:0.35rem">
+        <code style="flex:1;background:#f0fdf4;border:1px solid #86efac;padding:0.3rem 0.5rem;border-radius:4px;
+          font-size:0.78rem;white-space:pre-wrap;word-break:break-word;color:#166534">${esc(zpl)}</code>
+        <button onclick="analystApplyFix(decodeURIComponent('${encoded}'),this)"
+            style="flex-shrink:0;font-size:0.72rem;padding:0.25rem 0.55rem;background:#22c55e;color:white;
+              border:none;border-radius:4px;cursor:pointer;align-self:center" title="Append to ZPL editor">+ Add</button>
+      </div>`;
+    }).join('');
+    return `
+      <div style="border:1px solid ${col}30;border-left:3px solid ${col};border-radius:4px;
+          margin-bottom:0.6rem;background:${bg};overflow:hidden">
+        <div style="display:flex;align-items:flex-start;gap:0.5rem;padding:0.5rem 0.7rem;cursor:pointer"
+             onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
+          <span style="flex-shrink:0;font-size:0.68rem;font-weight:700;color:${col};
+              background:${col}18;border-radius:3px;padding:0.1rem 0.35rem;margin-top:0.1rem">${esc(issue.severity)}</span>
+          <span style="flex-shrink:0;font-size:0.72rem;color:var(--muted);margin-top:0.15rem">${esc(issue.category)}</span>
+          <span style="font-size:0.83rem;font-weight:500;flex:1">${esc(issue.title)}</span>
+          <span style="font-size:0.75rem;color:var(--muted);flex-shrink:0">▾</span>
+        </div>
+        <div style="padding:0 0.7rem 0.6rem;border-top:1px solid ${col}20">
+          ${rulesHtml}
+          <div style="font-size:0.8rem;margin-top:0.35rem;line-height:1.5"><strong>Finding:</strong> ${esc(issue.finding)}</div>
+          <div style="font-size:0.8rem;margin-top:0.25rem;line-height:1.5"><strong>Fix:</strong> ${esc(issue.recommendation)}</div>
+          ${fixHtml}
+        </div>
+      </div>`;
+  }).join('');
+
+  const cleanHtml = (data.clean || []).length
+    ? `<div style="font-size:0.75rem;color:var(--muted);margin-top:0.75rem">
+        <strong>No issues in:</strong> ${data.clean.map(c => esc(c)).join(' · ')}
+       </div>` : '';
+
+  return `
+    <div style="font-size:0.82rem;color:var(--muted);margin-bottom:0.5rem">${chips}</div>
+    <div style="font-size:0.83rem;line-height:1.6;margin-bottom:0.8rem;color:var(--text)">${esc(data.summary || '')}</div>
+    ${issueHtml}
+    ${cleanHtml}`;
+}
+
+async function trRunAnalyst(deep = false) {
+  const modal    = document.getElementById('analyst-modal');
+  const body     = document.getElementById('analyst-body');
+  const label    = document.getElementById('analyst-ns-label');
+  const deepBtn  = document.getElementById('analyst-deep-btn');
+  if (!modal || !body) return;
+
+  const msg = deep ? 'Deep analysis (Sonnet)…' : 'Analyzing policy…';
+  body.innerHTML = `<div style="padding:1rem;color:var(--muted);font-size:0.83rem">${msg}</div>`;
+  label.textContent = '';
+  modal.classList.add('open');
+  if (deepBtn) { deepBtn.disabled = true; deepBtn.textContent = deep ? 'Running…' : 'Deep ▶'; }
+
+  const saveBtn = document.getElementById('analyst-save-btn');
+  if (saveBtn) saveBtn.style.display = 'none';
+  try {
+    const resp = await api('POST', '/api/namespace/analyze', { deep });
+    label.textContent = `Namespace: ${resp.namespace}${deep ? ' · deep' : ''}`;
+    body.innerHTML = _analystRender(resp.namespace, resp.result || {});
+    S.analyst = {
+      ns: resp.namespace,
+      nsId: S.context?.active_namespace_id || S.context?.active_user_id,
+      mode: deep ? 'deep' : 'fast',
+      result: resp.result || {},
+    };
+    if (saveBtn) { saveBtn.style.display = ''; saveBtn.textContent = '💾 Save'; saveBtn.disabled = false; }
+  } catch (e) {
+    body.innerHTML = `<div style="padding:1rem;color:#ef4444;font-size:0.83rem">Analysis failed: ${esc(String(e.message || e))}</div>`;
+    S.analyst = null;
+  } finally {
+    if (deepBtn) { deepBtn.disabled = false; deepBtn.textContent = 'Deep ▶'; }
+  }
+}
+
+function closeAnalystModal() {
+  document.getElementById('analyst-modal')?.classList.remove('open');
+}
+
+async function analystSaveReport() {
+  const a = S.analyst;
+  if (!a) return;
+  const btn = document.getElementById('analyst-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    await api('POST', '/api/reports', {
+      namespace_id: a.nsId,
+      namespace_name: a.ns,
+      mode: a.mode,
+      result: a.result,
+    });
+    if (btn) { btn.textContent = '✓ Saved'; }
+    await loadReports();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = '💾 Save'; }
+    toast(`Save failed: ${e.message || e}`);
+  }
+}
+
+async function loadReports() {
+  try {
+    const reports = await api('GET', '/api/reports');
+    S._reports = reports || [];
+    renderReportsList();
+  } catch (_) {
+    S._reports = [];
+  }
+}
+
+function renderReportsList() {
+  const panel = document.getElementById('reports-panel');
+  const countEl = document.getElementById('reports-count');
+  const reports = S._reports || [];
+  if (countEl) countEl.textContent = reports.length ? `(${reports.length})` : '';
+  if (!panel) return;
+  if (!reports.length) {
+    panel.innerHTML = '<div style="padding:0.5rem 0.75rem;font-size:0.78rem;color:var(--muted)">No saved reports</div>';
+    return;
+  }
+  panel.innerHTML = reports.map(r => {
+    const date = r.created_at ? r.created_at.slice(0, 10) : '';
+    const modeBadge = r.mode === 'deep'
+      ? `<span style="font-size:0.65rem;color:#7c3aed;background:#ede9fe;border-radius:3px;padding:0.05rem 0.25rem;margin-left:0.2rem">deep</span>` : '';
+    return `<div class="report-item" onclick="openReport('${esc(r.id)}')">
+      <div class="report-item-text">
+        <div class="report-item-title" title="${esc(r.title)}">${esc(r.title)}</div>
+        <div class="report-item-meta">${esc(r.namespace_name)} · ${date}${modeBadge}</div>
+      </div>
+      <button class="report-del-btn" onclick="event.stopPropagation();deleteReport('${esc(r.id)}')" title="Delete">✕</button>
+    </div>`;
+  }).join('');
+}
+
+async function openReport(reportId) {
+  const modal = document.getElementById('analyst-modal');
+  const body  = document.getElementById('analyst-body');
+  const label = document.getElementById('analyst-ns-label');
+  const saveBtn = document.getElementById('analyst-save-btn');
+  if (!modal || !body) return;
+  body.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.83rem">Loading…</div>';
+  if (saveBtn) saveBtn.style.display = 'none';
+  modal.classList.add('open');
+  try {
+    const r = await api('GET', `/api/reports/${reportId}`);
+    const modeLabel = r.mode === 'deep' ? ' · deep' : '';
+    label.textContent = `${r.title}${modeLabel}`;
+    body.innerHTML = _analystRender(r.namespace_name, r.result || {});
+    S.analyst = null;
+  } catch (e) {
+    body.innerHTML = `<div style="padding:1rem;color:#ef4444;font-size:0.83rem">Load failed: ${esc(String(e.message || e))}</div>`;
+  }
+}
+
+async function deleteReport(reportId) {
+  if (!confirm('Delete this report?')) return;
+  try {
+    await api('DELETE', `/api/reports/${reportId}`);
+    await loadReports();
+  } catch (e) {
+    toast(`Delete failed: ${e.message || e}`);
+  }
+}
+
+function toggleReportsPanel() {
+  const panel = document.getElementById('reports-panel');
+  const btn = event.target;
+  if (!panel) return;
+  const open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : '';
+  btn.textContent = open ? '▶' : '▼';
+}
+
+function analystApplyFix(zpl, btn) {
+  const ta = document.getElementById('zpl-editor');
+  if (!ta) return;
+  const cur = ta.value.trimEnd();
+  ta.value = cur ? cur + '\n' + zpl : zpl;
+  btn.textContent = '✓ Added';
+  btn.style.background = '#16a34a';
+  btn.disabled = true;
+  doParse();
 }
 
 // ── Busy overlay ──────────────────────────────────────────────────────────

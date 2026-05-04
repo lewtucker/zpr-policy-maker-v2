@@ -115,6 +115,18 @@ async def init_db() -> None:
                 created_at   TEXT NOT NULL
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS reports (
+                id             TEXT PRIMARY KEY,
+                user_id        TEXT NOT NULL,
+                namespace_id   TEXT NOT NULL,
+                namespace_name TEXT NOT NULL,
+                mode           TEXT NOT NULL DEFAULT 'fast',
+                result_json    TEXT NOT NULL,
+                title          TEXT NOT NULL,
+                created_at     TEXT NOT NULL
+            )
+        """)
         # Migrations for older schemas
         if not await _column_exists(db, "policy_sets", "user_id"):
             await db.execute("ALTER TABLE policy_sets ADD COLUMN user_id TEXT NOT NULL DEFAULT 'legacy'")
@@ -721,3 +733,69 @@ async def delete_all_entities(namespace_id: str) -> int:
         )
         await db.commit()
         return cur.rowcount
+
+
+# ── Reports ───────────────────────────────────────────────────────────────────
+
+async def count_reports_for_ns(user_id: str, namespace_id: str) -> int:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        async with db.execute(
+            "SELECT COUNT(*) FROM reports WHERE user_id = ? AND namespace_id = ?",
+            (user_id, namespace_id),
+        ) as cur:
+            row = await cur.fetchone()
+    return row[0] if row else 0
+
+
+async def save_report(user_id: str, namespace_id: str, namespace_name: str,
+                      mode: str, result: dict, title: str) -> dict:
+    import uuid as _uuid
+    rid = _uuid.uuid4().hex
+    now = datetime.now(timezone.utc).isoformat()
+    async with aiosqlite.connect(_DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO reports (id, user_id, namespace_id, namespace_name, mode, result_json, title, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (rid, user_id, namespace_id, namespace_name, mode, json.dumps(result), title, now),
+        )
+        await db.commit()
+    return {"id": rid, "user_id": user_id, "namespace_id": namespace_id,
+            "namespace_name": namespace_name, "mode": mode, "result": result,
+            "title": title, "created_at": now}
+
+
+async def list_reports(user_id: str) -> list[dict]:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT id, namespace_id, namespace_name, mode, title, created_at "
+            "FROM reports WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,),
+        ) as cur:
+            rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_report(report_id: str, user_id: str) -> dict | None:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT id, namespace_id, namespace_name, mode, result_json, title, created_at "
+            "FROM reports WHERE id = ? AND user_id = ?",
+            (report_id, user_id),
+        ) as cur:
+            row = await cur.fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    d["result"] = json.loads(d.pop("result_json"))
+    return d
+
+
+async def delete_report(report_id: str, user_id: str) -> bool:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        cur = await db.execute(
+            "DELETE FROM reports WHERE id = ? AND user_id = ?", (report_id, user_id)
+        )
+        await db.commit()
+        return cur.rowcount > 0

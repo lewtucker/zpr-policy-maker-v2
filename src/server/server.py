@@ -1374,6 +1374,99 @@ async def generate_adversarial(req: AdversarialRequest, session: dict = Depends(
     }
 
 
+class AnalyzeRequest(BaseModel):
+    deep: bool = False
+
+
+@app.post("/api/namespace/analyze")
+async def analyze_namespace(req: AnalyzeRequest, session: dict = Depends(get_session)):
+    """Run AI policy analyst on active namespace + all descendants.
+
+    deep=False uses Haiku (~5s); deep=True uses Sonnet for thorough analysis.
+    """
+    if not ai_client.available():
+        raise HTTPException(503, "ANTHROPIC_API_KEY not set")
+
+    ns_id = session.get("active_namespace_id") or session["active_user_id"]
+    ns_row = await db.get_namespace(ns_id)
+    ns_name = ns_row["display_name"] if ns_row else ns_id
+
+    tree = await db.get_namespace_tree(ns_id)
+    nodes = _flatten_tree_nodes(tree)
+    zpl_map = await db.get_namespace_zpl_batch([n["id"] for n in nodes])
+    combined_zpl = "\n\n".join(z.strip() for z in zpl_map.values() if z and z.strip())
+
+    if not combined_zpl:
+        raise HTTPException(422, "No ZPL found in this namespace or its descendants")
+
+    prompt_path = _PROMPTS_DIR / "policy_analyst.md"
+    if not prompt_path.exists():
+        raise HTTPException(500, "Analyst prompt not found")
+    user_message = prompt_path.read_text().replace("{zpl_text}", combined_zpl)
+
+    model = ai_client.ANTHROPIC_MODEL if req.deep else "claude-haiku-4-5-20251001"
+    max_tokens = 4096 if req.deep else 2048
+
+    try:
+        raw = ai_client.complete(
+            system="You are a ZPL policy analyst. Return only valid JSON — no prose, no fences.",
+            messages=[{"role": "user", "content": user_message}],
+            model=model,
+            max_tokens=max_tokens,
+            temperature=0.1,
+        )
+    except Exception as exc:
+        raise HTTPException(500, f"AI call failed: {exc}")
+
+    text = raw.strip()
+    text = _re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=_re.DOTALL).strip()
+    try:
+        result = _json.loads(text)
+    except Exception:
+        raise HTTPException(500, "AI returned invalid JSON")
+
+    return {"namespace": ns_name, "result": result}
+
+
+class SaveReportRequest(BaseModel):
+    namespace_id: str
+    namespace_name: str
+    mode: str = "fast"
+    result: dict
+
+
+@app.post("/api/reports")
+async def create_report(req: SaveReportRequest, session: dict = Depends(get_session)):
+    from datetime import date as _date
+    user_id = session["login_user_id"]
+    n = await db.count_reports_for_ns(user_id, req.namespace_id)
+    today = _date.today().strftime("%Y-%m-%d")
+    title = f"Policy Audit — {req.namespace_name} — {today} v{n + 1}"
+    return await db.save_report(user_id, req.namespace_id, req.namespace_name,
+                                req.mode, req.result, title)
+
+
+@app.get("/api/reports")
+async def list_reports_endpoint(session: dict = Depends(get_session)):
+    return await db.list_reports(session["login_user_id"])
+
+
+@app.get("/api/reports/{report_id}")
+async def get_report_endpoint(report_id: str, session: dict = Depends(get_session)):
+    r = await db.get_report(report_id, session["login_user_id"])
+    if not r:
+        raise HTTPException(404, "Report not found")
+    return r
+
+
+@app.delete("/api/reports/{report_id}")
+async def delete_report_endpoint(report_id: str, session: dict = Depends(get_session)):
+    ok = await db.delete_report(report_id, session["login_user_id"])
+    if not ok:
+        raise HTTPException(404, "Report not found")
+    return {"ok": True}
+
+
 @app.get("/api/context")
 async def get_context(session: dict = Depends(get_session)):
     ns_id = session.get("active_namespace_id") or session["active_user_id"]
