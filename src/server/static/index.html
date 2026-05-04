@@ -2649,8 +2649,20 @@ function toggleYamlDetail(el) {
   const wrap = document.createElement('div');
   wrap.className = 'yaml-detail-wrap';
   wrap.onclick = e => e.stopPropagation();
-  wrap.style.cssText = 'padding:0.5rem 0.75rem;background:var(--surface2);border-top:1px solid var(--border);font-family:var(--font-mono);font-size:0.8rem;white-space:pre;overflow-x:auto;color:var(--text);line-height:1.6';
-  wrap.textContent = yaml;
+  wrap.style.cssText = 'background:var(--surface2);border-top:1px solid var(--border);';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '[x]';
+  closeBtn.className = 'tool-btn';
+  closeBtn.style.cssText = 'font-size:0.72rem;padding:0.1rem 0.35rem;margin:0.4rem 0.75rem 0;display:block';
+  closeBtn.onclick = () => wrap.remove();
+
+  const pre = document.createElement('pre');
+  pre.style.cssText = 'margin:0.25rem 0 0;padding:0.4rem 0.75rem 0.6rem;font-size:0.8rem;white-space:pre;overflow-x:auto;color:var(--text);line-height:1.6;background:none;border:none';
+  pre.textContent = yaml;
+
+  wrap.appendChild(closeBtn);
+  wrap.appendChild(pre);
   el.appendChild(wrap);
 }
 
