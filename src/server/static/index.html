@@ -2860,22 +2860,112 @@ function _trQualify(name) {
   return `${ns}.${name}`;
 }
 
-function _trParseAttrs(str) {
+function _trGetInheritedAttrs(className) {
+  const classes = S.lastParsed?.classes || [];
+  const byName = {};
+  for (const c of classes) byName[c.name.toLowerCase()] = c;
+  const allAttrs = {};
+  let name = (className || '').trim().split('.').pop().toLowerCase();
+  const visited = new Set();
+  while (name && !visited.has(name)) {
+    visited.add(name);
+    const cls = byName[name];
+    if (!cls) break;
+    for (const [k, v] of Object.entries(cls.attributes || {})) {
+      if (!allAttrs[k]) allAttrs[k] = v;
+    }
+    name = cls.parent?.toLowerCase();
+  }
+  return allAttrs;
+}
+
+function _trAttrRowHtml(side, key, value) {
+  const className = document.getElementById(`tr-m-${side}`)?.value.trim() || '';
+  const attrDefs = _trGetInheritedAttrs(className);
+  const attrKeys = Object.keys(attrDefs);
+  const safeKey = key || '';
+  const safeVal = value || '';
+
+  let keyHtml;
+  if (attrKeys.length) {
+    const opts = attrKeys.map(k =>
+      `<option value="${esc(k)}" ${k===safeKey?'selected':''}>${esc(k)}</option>`
+    ).join('');
+    keyHtml = `<select class="tr-m-input tr-attr-key" style="flex:1;min-width:0"
+        onchange="trRefreshAttrValue(this,'${side}')">${opts}</select>`;
+  } else {
+    keyHtml = `<input type="text" class="tr-m-input tr-attr-key" placeholder="key"
+        value="${esc(safeKey)}" style="flex:1;min-width:0">`;
+  }
+
+  const resolvedKey = safeKey || (attrKeys[0] || '');
+  const predefined = attrDefs[resolvedKey]?.values || [];
+  let valHtml;
+  if (predefined.length) {
+    const opts = predefined.map(v =>
+      `<option value="${esc(v)}" ${v===safeVal?'selected':''}>${esc(v)}</option>`
+    ).join('');
+    valHtml = `<select class="tr-m-input tr-attr-val" style="flex:1;min-width:0">${opts}</select>`;
+  } else {
+    valHtml = `<input type="text" class="tr-m-input tr-attr-val" placeholder="value"
+        value="${esc(safeVal)}" style="flex:1;min-width:0">`;
+  }
+
+  return `<div class="tr-attr-row" style="display:flex;gap:0.25rem;align-items:center;margin-bottom:0.2rem">
+    ${keyHtml}
+    <span style="color:var(--muted);font-size:0.85rem;flex-shrink:0;padding:0 0.1rem">:</span>
+    ${valHtml}
+    <button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.95rem;padding:0 0.15rem;flex-shrink:0;line-height:1"
+        onclick="this.closest('.tr-attr-row').remove()">×</button>
+  </div>`;
+}
+
+function trAddAttrRow(side) {
+  const container = document.getElementById(`tr-m-${side}-attr-rows`);
+  if (!container) return;
+  container.insertAdjacentHTML('beforeend', _trAttrRowHtml(side, '', ''));
+}
+
+function trRefreshAttrValue(keySelect, side) {
+  const row = keySelect.closest('.tr-attr-row');
+  if (!row) return;
+  const key = keySelect.value;
+  const className = document.getElementById(`tr-m-${side}`)?.value.trim() || '';
+  const predefined = _trGetInheritedAttrs(className)[key]?.values || [];
+  const valEl = row.querySelector('.tr-attr-val');
+  if (!valEl) return;
+  if (predefined.length) {
+    const sel = document.createElement('select');
+    sel.className = 'tr-m-input tr-attr-val';
+    sel.style.cssText = 'flex:1;min-width:0';
+    predefined.forEach(v => { const o = document.createElement('option'); o.value = o.textContent = v; sel.appendChild(o); });
+    valEl.replaceWith(sel);
+  } else if (valEl.tagName === 'SELECT') {
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.className = 'tr-m-input tr-attr-val';
+    inp.placeholder = 'value'; inp.style.cssText = 'flex:1;min-width:0';
+    valEl.replaceWith(inp);
+  }
+}
+
+function _trBuildAttrsFromRows(side) {
   const out = {};
-  (str || '').split(',').forEach(pair => {
-    const idx = pair.indexOf(':');
-    if (idx < 1) return;
-    const k = pair.slice(0, idx).trim();
-    const v = pair.slice(idx + 1).trim();
-    if (k) out[k] = v || 'yes';
-  });
+  document.getElementById(`tr-m-${side}-attr-rows`)
+    ?.querySelectorAll('.tr-attr-row').forEach(row => {
+      const k = row.querySelector('.tr-attr-key')?.value?.trim();
+      const v = row.querySelector('.tr-attr-val')?.value?.trim();
+      if (k) out[k] = v || 'yes';
+    });
   return out;
 }
 
-function _trAttrsToStr(attrs) {
-  return Object.entries(attrs || {})
-    .map(([k, v]) => v === 'yes' ? k : `${k}:${v}`)
-    .join(', ');
+function _trSetAttrRows(side, attrs) {
+  const container = document.getElementById(`tr-m-${side}-attr-rows`);
+  if (!container) return;
+  container.innerHTML = '';
+  for (const [k, v] of Object.entries(attrs || {})) {
+    container.insertAdjacentHTML('beforeend', _trAttrRowHtml(side, k, v));
+  }
 }
 
 function _trFlattenAttrs(attrs) {
@@ -3219,10 +3309,16 @@ function _trManualForm() {
         <input id="tr-m-action" class="tr-m-input" placeholder="action" style="width:70px" value="access" onkeydown="if(event.key==='Enter')trRunManual()">
         <input id="tr-m-obj" class="tr-m-input" placeholder="object class" style="flex:1" onkeydown="if(event.key==='Enter')trRunManual()">
       </div>
-      <div style="display:flex;gap:0.4rem;align-items:center;">
-        <input id="tr-m-subj-attrs" class="tr-m-input" placeholder="subj attrs: key:val, …" style="flex:1" onkeydown="if(event.key==='Enter')trRunManual()">
+      <div style="display:flex;gap:0.4rem;align-items:flex-start;">
+        <div style="flex:1;min-width:0">
+          <div id="tr-m-subj-attr-rows"></div>
+          <button class="tool-btn" onclick="trAddAttrRow('subj')" style="font-size:0.72rem;margin-top:0.15rem">+attr</button>
+        </div>
         <div style="width:70px;flex-shrink:0"></div>
-        <input id="tr-m-obj-attrs" class="tr-m-input" placeholder="obj attrs: key:val, …" style="flex:1" onkeydown="if(event.key==='Enter')trRunManual()">
+        <div style="flex:1;min-width:0">
+          <div id="tr-m-obj-attr-rows"></div>
+          <button class="tool-btn" onclick="trAddAttrRow('obj')" style="font-size:0.72rem;margin-top:0.15rem">+attr</button>
+        </div>
       </div>
       <div style="display:flex;gap:0.4rem;align-items:center;">
         <button class="tool-btn" onclick="trRunManual()" id="tr-m-run-btn">▶ Run</button>
@@ -3246,16 +3342,14 @@ function trSetManual(i, checked) {
   const t = TR.tests[i];
   if (!t) return;
   const p = t.payload;
-  const subjEl      = document.getElementById('tr-m-subj');
-  const actionEl    = document.getElementById('tr-m-action');
-  const objEl       = document.getElementById('tr-m-obj');
-  const subjAttrsEl = document.getElementById('tr-m-subj-attrs');
-  const objAttrsEl  = document.getElementById('tr-m-obj-attrs');
-  if (subjEl)      subjEl.value      = p.subject_class || '';
-  if (actionEl)    actionEl.value    = p.action || 'access';
-  if (objEl)       objEl.value       = p.object_class || '';
-  if (subjAttrsEl) subjAttrsEl.value = _trAttrsToStr(p.subject_attrs);
-  if (objAttrsEl)  objAttrsEl.value  = _trAttrsToStr(p.object_attrs);
+  const subjEl   = document.getElementById('tr-m-subj');
+  const actionEl = document.getElementById('tr-m-action');
+  const objEl    = document.getElementById('tr-m-obj');
+  if (subjEl)   subjEl.value   = p.subject_class || '';
+  if (actionEl) actionEl.value = p.action || 'access';
+  if (objEl)    objEl.value    = p.object_class || '';
+  _trSetAttrRows('subj', p.subject_attrs);
+  _trSetAttrRows('obj',  p.object_attrs);
   document.getElementById('tr-manual')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   _trRunWithPayload(p);
 }
@@ -3297,10 +3391,10 @@ async function trRunManual() {
 
   const payload = {
     subject_class: _trQualify(subj),
-    subject_attrs: _trParseAttrs(document.getElementById('tr-m-subj-attrs')?.value),
+    subject_attrs: _trBuildAttrsFromRows('subj'),
     action,
     object_class: _trQualify(obj),
-    object_attrs: _trParseAttrs(document.getElementById('tr-m-obj-attrs')?.value),
+    object_attrs: _trBuildAttrsFromRows('obj'),
   };
 
   const resEl   = document.getElementById('tr-m-result');
@@ -3336,10 +3430,10 @@ function trAddManual() {
   if (!subj || !obj) { toast('Enter subject and object class'); return; }
   const payload = {
     subject_class: _trQualify(subj),
-    subject_attrs: _trParseAttrs(document.getElementById('tr-m-subj-attrs')?.value),
+    subject_attrs: _trBuildAttrsFromRows('subj'),
     action,
     object_class: _trQualify(obj),
-    object_attrs: _trParseAttrs(document.getElementById('tr-m-obj-attrs')?.value),
+    object_attrs: _trBuildAttrsFromRows('obj'),
   };
   TR.tests.push({
     number: TR.tests.length + 1,
