@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ZPR Policy Maker</title>
+  <title>ZPR Policy Builder</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -530,7 +530,7 @@
 
 <!-- ── Header ──────────────────────────────────────────────────────── -->
 <header>
-  <div class="app-title">ZPR <span>Policy Maker</span></div>
+  <div class="app-title">ZPR <span>Policy Builder</span></div>
   <div class="hdr-spacer"></div>
   <span class="hdr-user" id="hdr-user"></span>
   <button class="hdr-btn" onclick="openReleaseNotes()">Release Notes</button>
@@ -669,7 +669,7 @@
     </div>
 
     <p style="font-size:0.8rem;color:var(--muted);margin-bottom:1.25rem">
-      ZPR Policy Maker v3 implements RFC-15.5 ZPL with the following documented extensions.
+      ZPR Policy Builder v3 implements RFC-15.5 ZPL with the following documented extensions.
     </p>
 
     <h4 style="font-size:0.8rem;font-weight:600;margin-bottom:0.5rem">Extension 1 — <code>attr:value</code> filters in Allow / Never rules</h4>
@@ -794,7 +794,7 @@ const S = {
   panelOpen: true,
   panelExpanded: false,
   sidebarWidth: 220,
-  panelWidth: 300,
+  panelWidth: Math.floor((window.innerWidth - 220 - 8) / 2),
   parseTimer: null,
 };
 
