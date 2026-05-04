@@ -744,6 +744,8 @@ const S = {
   profile: null,
   entities: [],
   showAll: false,
+  classView: 'tree',
+  ruleView: 'tree',
   panelOpen: true,
   panelExpanded: false,
   sidebarWidth: 220,
@@ -2386,12 +2388,105 @@ async function doDeleteOwner(uid, displayName) {
   }
 }
 
+// ── Table-view helpers (entity-style) ────────────────────────────────────
+
+function _viewToggleHtml(which, current) {
+  const s = active => active
+    ? 'font-size:0.75rem;background:#dbeafe;border-color:#93c5fd;color:#1d4ed8;font-weight:600'
+    : 'font-size:0.75rem';
+  return `<div style="padding:0.4rem 0.75rem 0.35rem;display:flex;gap:0.4rem;align-items:center;border-bottom:1px solid var(--border)">
+    <span style="font-size:0.72rem;color:var(--muted);margin-right:0.25rem">View:</span>
+    <button class="tool-btn" style="${s(current!=='table')}" onclick="S.${which}View='tree';renderSchemaBody()">Tree</button>
+    <button class="tool-btn" style="${s(current==='table')}" onclick="S.${which}View='table';renderSchemaBody()">Table</button>
+  </div>`;
+}
+
+function renderClassesTable(body, classes) {
+  const verbs = classes.filter(c => c.is_verb || c.parent === 'verb');
+  const nonVerb = classes.filter(c => !c.is_verb && c.parent !== 'verb');
+  const roots = ['users', 'endpoints', 'services'];
+  const byParent = {};
+  for (const c of nonVerb) { const p = c.parent || 'root'; (byParent[p] = byParent[p] || []).push(c); }
+  function flattenSubtree(parent, depth) {
+    const result = [];
+    for (const c of (byParent[parent] || [])) { result.push({ c, depth }); result.push(...flattenSubtree(c.name, depth + 1)); }
+    return result;
+  }
+  const sections = [];
+  if (verbs.length) sections.push({ title: 'verbs', items: verbs.map(c => ({ c, depth: 0 })) });
+  for (const root of roots) { const items = flattenSubtree(root, 0); if (items.length) sections.push({ title: root, items }); }
+  const knownParents = new Set([...roots, ...nonVerb.map(c => c.name)]);
+  const orphans = nonVerb.filter(c => !knownParents.has(c.parent) && !roots.includes(c.parent));
+  if (orphans.length) sections.push({ title: 'external parent', items: orphans.map(c => ({ c, depth: 0 })) });
+
+  let html = _viewToggleHtml('class', 'table');
+  for (const { title, items } of sections) {
+    html += `<div style="padding:0.3rem 0.75rem 0;font-size:0.72rem;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em">${esc(title)}</div>`;
+    for (const { c, depth } of items) {
+      const attrs = Object.entries(c.attributes || {});
+      const attrStr = attrs.map(([k,v]) => `${k}: ${v.type}`).join('  ·  ');
+      const indent = depth ? `<span style="color:#cbd5e1;font-family:var(--font-mono)">${'  '.repeat(depth)}└ </span>` : '';
+      const zpl = esc(c.zpl || '');
+      const json = esc(JSON.stringify(c, null, 2));
+      html += `<div data-json="${json}" data-zpl="${zpl}" style="display:flex;align-items:flex-start;padding:0.35rem 0.75rem;border-bottom:1px solid var(--border);gap:0.5rem">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:500;font-family:var(--font-mono);font-size:0.88rem">${indent}${esc(c.name)}<span style="color:var(--muted);font-size:0.8rem;font-family:sans-serif;margin-left:0.5rem">← ${esc(c.parent||'')}</span></div>
+          ${attrStr ? `<div style="color:var(--muted);font-size:0.78rem;margin-top:0.1rem">${esc(attrStr)}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:0.25rem;flex-shrink:0;padding-top:0.1rem">
+          <button class="tool-btn" onclick="openStmtEdit(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">✏</button>
+          <button class="tool-btn" onclick="event.stopPropagation();deleteStmt(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem;color:#ef4444">✕</button>
+        </div>
+      </div>`;
+    }
+  }
+  body.innerHTML = html;
+}
+
+function renderRulesTable(body, rules) {
+  function fmtSpec(s) {
+    if (!s) return '—';
+    const base = s.cls || s.name || '?';
+    const attrs = Object.entries(s.attrs || {}).map(([k,v]) => v==='*' ? k : `${k}:${v}`).join(', ');
+    return attrs ? `${base} [${attrs}]` : base;
+  }
+  const allows = rules.filter(r => (r.effect||'allow') !== 'deny');
+  const denies = rules.filter(r => (r.effect||'allow') === 'deny');
+  const sections = [];
+  if (allows.length) sections.push({ title: 'allow', effect: 'allow', items: allows });
+  if (denies.length) sections.push({ title: 'never allow', effect: 'deny', items: denies });
+
+  let html = _viewToggleHtml('rule', 'table');
+  for (const { title, effect, items } of sections) {
+    html += `<div style="padding:0.3rem 0.75rem 0;font-size:0.72rem;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em">${esc(title)}</div>`;
+    for (const r of items) {
+      const subj = fmtSpec(r.subject);
+      const onPart = r.accessor_endpoint ? ` on ${esc(fmtSpec(r.accessor_endpoint))}` : '';
+      const obj = fmtSpec(r.object);
+      const action = r.action || 'access';
+      const badgeText = effect === 'deny' ? 'NEVER' : 'ALLOW';
+      const zpl = esc(r.zpl || '');
+      const json = esc(JSON.stringify(r, null, 2));
+      html += `<div data-json="${json}" data-zpl="${zpl}" style="display:flex;align-items:center;padding:0.4rem 0.75rem;border-bottom:1px solid var(--border);gap:0.5rem">
+        <span class="rule-effect ${effect}" style="flex-shrink:0">${badgeText}</span>
+        <span style="flex:1;min-width:0;font-size:0.88rem">${esc(subj)}${onPart} <span style="color:var(--muted)">${esc(action)}</span> ${esc(obj)}</span>
+        <div style="display:flex;gap:0.25rem;flex-shrink:0">
+          <button class="tool-btn" onclick="openStmtEdit(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">✏</button>
+          <button class="tool-btn" onclick="event.stopPropagation();deleteStmt(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem;color:#ef4444">✕</button>
+        </div>
+      </div>`;
+    }
+  }
+  body.innerHTML = html;
+}
+
 function renderClasses(body, classes) {
   if (!classes.length) {
-    body.innerHTML = '<div class="empty-state">No classes defined.</div>';
+    body.innerHTML = _viewToggleHtml('class', S.classView) + '<div class="empty-state">No classes defined.</div>';
     return;
   }
-  let html = '<div class="schema-section">';
+  if (S.classView === 'table') { renderClassesTable(body, classes); return; }
+  let html = _viewToggleHtml('class', S.classView) + '<div class="schema-section">';
 
   // ── Verbs section ──
   const verbs = classes.filter(c => c.is_verb || c.parent === 'verb');
@@ -2472,9 +2567,10 @@ function renderClasses(body, classes) {
 
 function renderRules(body, rules) {
   if (!rules.length) {
-    body.innerHTML = '<div class="empty-state">No rules defined.</div>';
+    body.innerHTML = _viewToggleHtml('rule', S.ruleView) + '<div class="empty-state">No rules defined.</div>';
     return;
   }
+  if (S.ruleView === 'table') { renderRulesTable(body, rules); return; }
 
   function fmtSpec(s) {
     if (!s) return '—';
@@ -2484,7 +2580,7 @@ function renderRules(body, rules) {
     return attrs ? `${base} [${attrs}]` : base;
   }
 
-  body.innerHTML = rules.map((r, i) => {
+  body.innerHTML = _viewToggleHtml('rule', S.ruleView) + rules.map((r, i) => {
     const effect = r.effect || 'allow';
     const badgeText = effect === 'deny' ? 'NEVER' : 'ALLOW';
     const subj = fmtSpec(r.subject);
