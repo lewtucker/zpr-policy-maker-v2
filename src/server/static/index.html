@@ -165,7 +165,7 @@
     .io-menu-item:hover { background: var(--surface2); }
 
     .zpl-editor {
-      flex: 1; width: 100%; resize: none; outline: none;
+      flex: 1; width: 100%; min-width: 0; resize: none; outline: none;
       background: var(--bg); color: var(--text);
       font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
       padding: 1rem; border: none;
@@ -2791,10 +2791,12 @@ function toggleSchemaExpand() {
 
 function initResizers() {
   setupResizer('resizer-left', (dx) => {
-    S.sidebarWidth = Math.max(60, Math.min(480, S.sidebarWidth + dx));
+    const maxSidebar = window.innerWidth - 8 - 60;
+    S.sidebarWidth = Math.max(60, Math.min(maxSidebar, S.sidebarWidth + dx));
   });
   setupResizer('resizer-right', (dx) => {
-    S.panelWidth = Math.max(60, Math.min(600, S.panelWidth - dx));
+    const maxPanel = window.innerWidth - S.sidebarWidth - 8 - 60;
+    S.panelWidth = Math.max(60, Math.min(maxPanel, S.panelWidth - dx));
   });
 }
 
