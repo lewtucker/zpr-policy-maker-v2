@@ -678,14 +678,14 @@
     <div style="display:flex;gap:1rem;margin-bottom:1rem">
       <div style="flex:1">
         <label style="font-size:0.72rem;font-weight:600;display:block;margin-bottom:0.25rem">Positive tests</label>
-        <input type="number" id="tr-gen-positive" min="1" value="8"
-               style="width:100%;font-size:0.8rem;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--fg)">
+        <input type="number" id="tr-gen-positive" min="1" value="3"
+               style="width:100%;font-size:1.1rem;padding:0.4rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--fg)">
         <div style="font-size:0.68rem;color:var(--muted);margin-top:0.2rem">One per allow rule (max)</div>
       </div>
       <div style="flex:1">
         <label style="font-size:0.72rem;font-weight:600;display:block;margin-bottom:0.25rem">Adversarial tests</label>
-        <input type="number" id="tr-gen-adversarial" min="0" value="8"
-               style="width:100%;font-size:0.8rem;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--fg)">
+        <input type="number" id="tr-gen-adversarial" min="0" value="3"
+               style="width:100%;font-size:1.1rem;padding:0.4rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--fg)">
         <div style="font-size:0.68rem;color:var(--muted);margin-top:0.2rem">Near-miss cases (AI)</div>
       </div>
     </div>
@@ -2916,8 +2916,8 @@ function closeTrGenModal() {
 
 async function trStartGenerate() {
   closeTrGenModal();
-  const nPositive    = Math.max(1, parseInt(document.getElementById('tr-gen-positive')?.value)    || 8);
-  const nAdversarial = Math.max(0, parseInt(document.getElementById('tr-gen-adversarial')?.value) || 8);
+  const nPositive    = Math.max(1, parseInt(document.getElementById('tr-gen-positive')?.value)    || 3);
+  const nAdversarial = Math.max(0, parseInt(document.getElementById('tr-gen-adversarial')?.value) || 3);
 
   TR.abortController = new AbortController();
   trBusy(`Generating ${nPositive} tests and ${nAdversarial} adversarial…`, true);
@@ -2961,8 +2961,8 @@ async function trStartGenerate() {
 }
 
 async function trGenerateWithEntities() {
-  const nPositive    = Math.max(1, parseInt(document.getElementById('tr-gen-positive')?.value)    || 8);
-  const nAdversarial = Math.max(0, parseInt(document.getElementById('tr-gen-adversarial')?.value) || 8);
+  const nPositive    = Math.max(1, parseInt(document.getElementById('tr-gen-positive')?.value)    || 3);
+  const nAdversarial = Math.max(0, parseInt(document.getElementById('tr-gen-adversarial')?.value) || 3);
   closeTrGenModal();
 
   TR.abortController = new AbortController();
