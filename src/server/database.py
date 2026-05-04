@@ -418,6 +418,29 @@ async def get_namespace_tree(root_id: str) -> dict:
     return by_id.get(root_id, {})
 
 
+async def list_all_users() -> list[dict]:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT id, username, display_name, email, api_token, created_at FROM users ORDER BY created_at"
+        ) as cur:
+            rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def list_all_namespaces() -> list[dict]:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT n.id, n.display_name, n.parent_namespace_id, n.created_at, "
+            "u.username AS owner_username, u.display_name AS owner_display_name "
+            "FROM namespaces n LEFT JOIN users u ON u.id = n.owner_user_id "
+            "ORDER BY n.display_name"
+        ) as cur:
+            rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
 async def get_root_namespace(user_id: str) -> dict | None:
     """Return the root namespace (no parent) owned by user_id, or None."""
     async with aiosqlite.connect(_DB_PATH) as db:

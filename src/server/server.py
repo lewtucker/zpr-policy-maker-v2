@@ -394,6 +394,81 @@ async def set_token(req: SetTokenRequest, session: dict = Depends(get_session)):
     return {"api_token": t}
 
 
+# ── Admin ─────────────────────────────────────────────────────────────────────
+
+async def get_admin_session(session: dict = Depends(get_session)) -> dict:
+    root = await db.get_root_namespace(session["login_user_id"])
+    if not root:
+        raise HTTPException(403, "Admin access requires owning a root namespace")
+    return session
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_page(session: dict = Depends(get_admin_session)):
+    admin_html_path = STATIC_DIR / "admin.html"
+    return HTMLResponse(admin_html_path.read_text())
+
+
+class AdminCreateUserRequest(BaseModel):
+    username: str
+    password: str
+    display_name: str = ""
+    email: str = ""
+
+
+class AdminResetPasswordRequest(BaseModel):
+    new_password: str
+
+
+@app.get("/api/admin/users")
+async def admin_list_users(_: dict = Depends(get_admin_session)):
+    return await db.list_all_users()
+
+
+@app.post("/api/admin/users", status_code=201)
+async def admin_create_user(req: AdminCreateUserRequest,
+                            _: dict = Depends(get_admin_session)):
+    uname = req.username.strip()
+    if not uname:
+        raise HTTPException(400, "username is required")
+    if not req.password:
+        raise HTTPException(400, "password is required")
+    existing = await db.get_user_by_username(uname)
+    if existing:
+        raise HTTPException(409, f"Username '{uname}' already exists")
+    dn = req.display_name.strip() or uname
+    user = await db.create_user(uname, req.password, display_name=dn, email=req.email.strip())
+    ns = await db.get_or_create_root_namespace(user["id"], dn)
+    return {"user": user, "namespace": ns}
+
+
+@app.post("/api/admin/users/{user_id}/reset-password")
+async def admin_reset_password(user_id: str, req: AdminResetPasswordRequest,
+                               session: dict = Depends(get_admin_session)):
+    if not req.new_password:
+        raise HTTPException(400, "new_password is required")
+    user = await db.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+    await db.update_password(user_id, req.new_password)
+    return {"ok": True}
+
+
+@app.delete("/api/admin/users/{user_id}", status_code=200)
+async def admin_delete_user(user_id: str, session: dict = Depends(get_admin_session)):
+    if user_id == session["login_user_id"]:
+        raise HTTPException(400, "Cannot delete your own account")
+    err = await db.delete_user(user_id)
+    if err:
+        raise HTTPException(400, err)
+    return {"ok": True}
+
+
+@app.get("/api/admin/namespaces")
+async def admin_list_namespaces(_: dict = Depends(get_admin_session)):
+    return await db.list_all_namespaces()
+
+
 class MatchRequest(BaseModel):
     subject_class: str = "users"
     subject_name: str | None = None
