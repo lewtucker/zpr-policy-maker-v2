@@ -104,8 +104,14 @@
 <h3>Logging In</h3>
 <p>Use your username and password at the login page. Your session is maintained via a secure cookie.</p>
 
-<h3>Your Root Namespace</h3>
-<p>Every account has a root namespace named after your display name (e.g. <code>Corp</code>). All your ZPL is scoped within this namespace. Sub-namespaces can be created underneath it, each optionally owned by a different user.</p>
+<h3>What You See When You Log In</h3>
+<p>What you see depends on how your account was created. There are two common scenarios:</p>
+
+<p><strong>You own your own root namespace.</strong> If an admin created your account to give you an independent space, you own a root namespace (e.g. <code>Acme</code>) that sits at the top of your own hierarchy. You start with a blank policy and are free to create classes, rules, entities, and sub-namespaces beneath it. Nobody else's changes affect your space.</p>
+
+<p><strong>You were delegated ownership of a sub-namespace.</strong> If another user created a namespace and assigned you as its owner, you will see that namespace — and any sub-namespaces below it — already present in your namespace selector. There may be ZPL, classes, and rules already defined by the user above you in the hierarchy. Your responsibility is to write ZPL within your assigned namespace and to create any additional sub-namespaces below it that your team needs. You cannot modify ZPL in namespaces above yours.</p>
+
+<div class="note">In either case, the active namespace is shown in the editor toolbar. Only ZPL belonging to that namespace is loaded into the editor — classes and rules from parent or sibling namespaces are separate.</div>
 
 <!-- Layout -->
 <h2 id="layout">Layout</h2>
