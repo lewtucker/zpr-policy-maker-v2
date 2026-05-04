@@ -1564,6 +1564,7 @@ class CreateNamespaceRequest(BaseModel):
     owner_username: str | None = None
     owner_password: str | None = None
     owner_email: str = ""
+    description: str = ""
 
 
 @app.post("/api/namespaces", status_code=201)
@@ -1599,10 +1600,12 @@ async def create_namespace_endpoint(req: CreateNamespaceRequest,
     else:
         owner_id = session["login_user_id"]
 
-    ns = await db.create_namespace(display_name, owner_id, parent_id)
+    ns = await db.create_namespace(display_name, owner_id, parent_id,
+                                   description=req.description or "")
     return {"id": ns["id"], "display_name": ns["display_name"],
             "owner_user_id": ns["owner_user_id"],
-            "parent_namespace_id": ns["parent_namespace_id"]}
+            "parent_namespace_id": ns["parent_namespace_id"],
+            "description": ns.get("description", "")}
 
 
 class UpdateNamespaceRequest(BaseModel):
@@ -1611,6 +1614,7 @@ class UpdateNamespaceRequest(BaseModel):
     owner_username: str | None = None   # resolved to owner_user_id server-side
     owner_password: str | None = None   # if owner_username not found, create new user
     owner_email: str = ""
+    description: str | None = None
 
 
 @app.patch("/api/namespaces/{namespace_id}")
@@ -1660,7 +1664,8 @@ async def update_namespace_endpoint(namespace_id: str, req: UpdateNamespaceReque
 
     await db.update_namespace(namespace_id,
                               display_name=new_name,
-                              owner_user_id=owner_id)
+                              owner_user_id=owner_id,
+                              description=req.description)
     root_ns_id = await _get_root_ns_id(session["login_user_id"])
     if root_ns_id:
         _cache_invalidate(root_ns_id)

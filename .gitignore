@@ -11,3 +11,4 @@ snapshots/
 *.pdf
 ZPL_Reference/
 test-cases/
+.claude/

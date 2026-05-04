@@ -163,6 +163,8 @@ async def init_db() -> None:
             )
             await db.execute("DROP TABLE namespace_zpl")
             await db.execute("ALTER TABLE namespace_zpl_new RENAME TO namespace_zpl")
+        if not await _column_exists(db, "namespaces", "description"):
+            await db.execute("ALTER TABLE namespaces ADD COLUMN description TEXT NOT NULL DEFAULT ''")
         await db.commit()
 
 
@@ -363,19 +365,21 @@ async def save_prompt(key: str, content: str) -> None:
 # ── Namespaces ────────────────────────────────────────────────────────────────
 
 async def create_namespace(display_name: str, owner_user_id: str,
-                           parent_namespace_id: str | None = None) -> dict:
+                           parent_namespace_id: str | None = None,
+                           description: str = "") -> dict:
     import uuid as _uuid
     ns_id = _uuid.uuid4().hex
     now = datetime.now(timezone.utc).isoformat()
     async with aiosqlite.connect(_DB_PATH) as db:
         await db.execute(
-            "INSERT INTO namespaces (id, display_name, owner_user_id, parent_namespace_id, created_at) "
-            "VALUES (?,?,?,?,?)",
-            (ns_id, display_name, owner_user_id, parent_namespace_id, now),
+            "INSERT INTO namespaces (id, display_name, owner_user_id, parent_namespace_id, created_at, description) "
+            "VALUES (?,?,?,?,?,?)",
+            (ns_id, display_name, owner_user_id, parent_namespace_id, now, description or ""),
         )
         await db.commit()
     return {"id": ns_id, "display_name": display_name, "owner_user_id": owner_user_id,
-            "parent_namespace_id": parent_namespace_id, "created_at": now}
+            "parent_namespace_id": parent_namespace_id, "created_at": now,
+            "description": description or ""}
 
 
 async def get_namespace(namespace_id: str) -> dict | None:
@@ -389,12 +393,15 @@ async def get_namespace(namespace_id: str) -> dict | None:
 
 
 async def update_namespace(namespace_id: str, *, display_name: str | None = None,
-                           owner_user_id: str | None = None) -> None:
+                           owner_user_id: str | None = None,
+                           description: str | None = None) -> None:
     sets, vals = [], []
     if display_name is not None:
         sets.append("display_name = ?"); vals.append(display_name)
     if owner_user_id is not None:
         sets.append("owner_user_id = ?"); vals.append(owner_user_id)
+    if description is not None:
+        sets.append("description = ?"); vals.append(description)
     if not sets:
         return
     vals.append(namespace_id)
@@ -424,6 +431,7 @@ async def get_namespace_tree(root_id: str) -> dict:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT n.id, n.display_name, n.owner_user_id, n.parent_namespace_id, n.created_at, "
+            "COALESCE(n.description, '') AS description, "
             "u.username AS owner_username "
             "FROM namespaces n LEFT JOIN users u ON u.id = n.owner_user_id"
         ) as cur:

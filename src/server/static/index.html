@@ -25,7 +25,7 @@
     }
 
     html, body { height: 100%; background: var(--bg); color: var(--text);
-                 font-family: system-ui, sans-serif; font-size: 14px; overflow: hidden; }
+                 font-family: system-ui, sans-serif; font-size: 16.8px; overflow: hidden; }
 
     /* ── Header ─────────────────────────────────────────────── */
     header {
@@ -147,6 +147,7 @@
     .tool-btn.primary { border-color: var(--accent); color: var(--accent); }
     .tool-btn.primary:hover { background: var(--accent); color: white; }
     .tool-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .tool-btn.active { background: var(--surface2); border-color: var(--text); color: var(--text); font-weight: 600; }
     #assist-btn { background: #dcfce7; border-color: #86efac; color: #15803d; font-weight: 600; }
     #assist-btn:hover { background: #bbf7d0; border-color: #4ade80; color: #166534; }
     #assist-btn.active { background: #16a34a; border-color: #15803d; color: white; }
@@ -181,7 +182,7 @@
     .zpl-editor {
       flex: 1; width: 100%; min-width: 0; resize: none; outline: none;
       background: var(--bg); color: var(--text);
-      font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
+      font-family: var(--font-mono); font-size: 16px; line-height: 1.6;
       padding: 1rem; border: none;
       tab-size: 2;
     }
@@ -538,148 +539,374 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    /* ── Shell ─────────────────────────────────────────────────── */
+    .shell { display: flex; height: 100vh; overflow: hidden; }
+
+    /* ── Left Nav ──────────────────────────────────────────────── */
+    .left-nav {
+      width: 220px; flex-shrink: 0;
+      background: var(--surface); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .nav-brand {
+      padding: 0.85rem 1.1rem;
+      font-size: 0.92rem; font-weight: 700; color: var(--text);
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .nav-brand span { color: var(--accent); }
+    .nav-scroll { flex: 1; overflow-y: auto; padding: 0.25rem 0; }
+    .nav-item {
+      padding: 0.42rem 1.1rem;
+      font-size: 0.87rem; color: var(--text);
+      cursor: pointer; border-left: 3px solid transparent;
+      transition: background 0.1s; user-select: none;
+    }
+    .nav-item:hover { background: var(--surface2); }
+    .nav-item.active {
+      background: rgba(37,99,235,0.08); color: var(--accent);
+      border-left-color: var(--accent); font-weight: 600;
+    }
+    .nav-footer {
+      border-top: 1px solid var(--border); padding: 0.65rem 1.1rem;
+      font-size: 0.82rem; color: var(--muted); flex-shrink: 0;
+    }
+    .nav-username { font-weight: 600; color: var(--text); display: block; margin-bottom: 0.25rem; font-size: 0.85rem; }
+    .nav-footer-links { display: flex; gap: 0.6rem; }
+    .nav-footer-links button {
+      background: none; border: none; cursor: pointer;
+      color: var(--muted); font-size: 0.8rem; padding: 0;
+    }
+    .nav-footer-links button:hover { color: var(--accent); }
+    .nav-ns-tree .ns-tree-item { padding: 0.3rem 1.1rem; border-left-width: 3px; font-size: 0.84rem; }
+
+    /* ── Main area ──────────────────────────────────────────────── */
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+    /* ── Pages ──────────────────────────────────────────────────── */
+    .page { flex: 1; display: none; flex-direction: column; overflow: hidden; min-width: 0; }
+    .page.active { display: flex; }
+    .page-header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0.5rem 1rem;
+      display: flex; align-items: center; gap: 0.5rem;
+      flex-shrink: 0; min-height: 44px;
+    }
+    .page-header h1 { font-size: 0.95rem; font-weight: 700; white-space: nowrap; }
+    .page-body { flex: 1; overflow-y: auto; padding: 1rem; }
+
+    /* ── Input zone (upper staging) ─────────────────────────────── */
+    .input-zone {
+      background: var(--surface);
+      display: flex; flex-direction: column; overflow: hidden;
+      flex: 0 0 40%;
+    }
+    .input-zone-toolbar {
+      display: flex; align-items: center; gap: 0.4rem;
+      padding: 0.42rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0; flex-wrap: wrap;
+    }
+    .input-zone-scroll {
+      flex: 1; overflow-y: auto;
+      display: flex; flex-direction: column;
+    }
+
+    /* ── Horizontal divider ─────────────────────────────────────── */
+    .h-divider {
+      height: 6px; flex-shrink: 0; cursor: row-resize;
+      background: var(--border); transition: background 0.1s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .h-divider:hover, .h-divider.dragging { background: var(--accent); }
+    .h-divider::after {
+      content: ''; width: 32px; height: 2px;
+      background: rgba(0,0,0,0.12); border-radius: 2px;
+    }
+
+    /* ── Accept bar ─────────────────────────────────────────────── */
+    .accept-bar {
+      display: none; align-items: center; gap: 0.4rem;
+      padding: 0.42rem 0.75rem;
+      border-top: 1px solid var(--border);
+      background: #f0fdf4; flex-shrink: 0;
+    }
+    .accept-bar.visible { display: flex; }
+    .accept-bar.warn { background: #fffbeb; border-top-color: #fcd34d; }
+
+    /* ── Defs zone (lower stored policy) ────────────────────────── */
+    .defs-zone {
+      display: flex; flex-direction: column; overflow: hidden;
+      flex: 1; min-height: 0;
+    }
+    .defs-toolbar {
+      display: flex; align-items: center; gap: 0.4rem;
+      padding: 0.42rem 0.75rem;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      flex-shrink: 0; flex-wrap: wrap;
+    }
+    .defs-label {
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.07em; color: var(--muted);
+    }
+    .defs-body { flex: 1; overflow-y: auto; }
+
+    /* ── ZPL statement rows ─────────────────────────────────────── */
+    .zpl-stmt-row {
+      display: flex; align-items: center;
+      padding: 0.32rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+    .zpl-stmt-row:hover { background: var(--surface2); }
+    .zpl-stmt-text {
+      flex: 1; font-family: var(--font-mono); font-size: 0.8rem;
+      color: var(--text); word-break: break-word;
+    }
+
+    /* ── User guide iframe ──────────────────────────────────────── */
+    .guide-iframe { flex: 1; border: none; }
+
+    /* ── Toast ──────────────────────────────────────────────────── */
+    #_toast {
+      position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
+      background: var(--text); color: white; padding: 0.5rem 1.1rem;
+      border-radius: 20px; font-size: 0.82rem; z-index: 9999;
+      pointer-events: none; opacity: 0; transition: opacity 0.2s;
+      white-space: nowrap;
+    }
+    #_toast.show { opacity: 1; }
   </style>
 </head>
 <body>
 
-<!-- ── Header ──────────────────────────────────────────────────────── -->
-<header>
-  <div class="app-title">ZPR <span>Policy Builder</span></div>
-  <div class="hdr-spacer"></div>
-  <span class="hdr-user" id="hdr-user"></span>
-  <button class="hdr-btn" onclick="window.open('/help','_blank')">User Guide</button>
-  <button class="hdr-btn" onclick="openProfilePanel()">Profile</button>
-  <button class="hdr-btn" onclick="doLogout()">Sign out</button>
-</header>
+<!-- ── App Shell ──────────────────────────────────────────────────────── -->
+<div class="shell" id="shell">
 
-<!-- ── Layout ───────────────────────────────────────────────────────── -->
-<div class="layout" id="layout">
-
-  <!-- Sidebar: namespace tree -->
-  <aside class="sidebar">
-    <div class="sidebar-header">
-      <h2>Namespace Selector</h2>
-      <button class="new-btn" onclick="openNewOwnerModal()">+ New</button>
+  <!-- Left Nav -->
+  <nav class="left-nav" id="left-nav">
+    <div class="nav-brand">ZPR <span>Policy Builder</span></div>
+    <div class="nav-scroll">
+      <div style="display:flex;align-items:center;padding:0.65rem 1.1rem 0.2rem">
+        <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);flex:1">Namespace</span>
+        <button onclick="toggleNavNs(this)"
+          style="font-size:1.3rem;background:none;border:none;cursor:pointer;color:var(--muted);padding:0 0.2rem;border-radius:3px;line-height:1"
+          title="Collapse namespace tree">▾</button>
+        <button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.45rem;margin-left:0.25rem"
+          onclick="openNewOwnerModal()">+</button>
+      </div>
+      <div class="nav-ns-tree" id="ns-tree"></div>
+      <div style="height:1px;background:var(--border);margin:0.35rem 0"></div>
+      <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);padding:0.45rem 1.1rem 0.2rem">Pages</div>
+      <div class="nav-item active" id="nav-editor"   onclick="navigate('editor',this)">Policy Editor</div>
+      <div class="nav-item" id="nav-aiassist"         onclick="navigate('aiassist',this)">AI Assist</div>
+      <div class="nav-item" id="nav-audit"            onclick="navigate('audit',this)">Policy Audit</div>
+      <div class="nav-item" id="nav-testing"          onclick="navigate('testing',this)">Testing</div>
+      <div class="nav-item" id="nav-nsmgr"            onclick="navigate('nsmgr',this)">Namespace Manager</div>
+      <div class="nav-item" id="nav-reports"          onclick="navigate('reports',this)">Reports</div>
+      <div class="nav-item" id="nav-guide"            onclick="navigate('guide',this)">User Guide</div>
     </div>
-    <div class="ns-tree" id="ns-tree"></div>
-
-    <div class="sidebar-owners-sep"></div>
-    <div class="sidebar-owners-header">
-      <span class="sidebar-owners-label">Namespace Management</span>
-      <button class="new-btn" onclick="toggleOwnersPanel()">Edit</button>
+    <div class="nav-footer">
+      <span class="nav-username" id="hdr-user"></span>
+      <div class="nav-footer-links">
+        <button onclick="openProfilePanel()">Profile</button>
+        <button onclick="doLogout()">Sign out</button>
+      </div>
     </div>
-    <div class="sidebar-owners-panel" id="owners-panel" style="display:none"></div>
+  </nav>
 
-    <div class="sidebar-owners-sep"></div>
-    <div class="sidebar-owners-header">
-      <span class="sidebar-owners-label">Reports <span id="reports-count" style="font-weight:400;opacity:0.7"></span></span>
-      <button class="new-btn" onclick="toggleReportsPanel()">▶</button>
-    </div>
-    <div class="reports-panel" id="reports-panel" style="display:none"></div>
-  </aside>
+  <!-- Main content -->
+  <div class="main" id="main">
 
-  <div class="resizer" id="resizer-left"></div>
-
-  <!-- Editor pane -->
-  <main class="editor-pane">
-    <div class="editor-toolbar">
-      <span style="font-size:0.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">ZPL Editor</span>
-      <div class="toolbar-sep"></div>
-      <span class="ns-editor-label" id="ns-editor-label"></span>
-      <div class="toolbar-sep"></div>
-      <button class="tool-btn" onclick="doParse()">Check ZPL</button>
-      <button class="tool-btn primary" id="save-btn" onclick="doSave()">Save</button>
-      <button class="tool-btn" onclick="doReset()">Delete All</button>
-      <button class="tool-btn" id="show-all-btn" onclick="toggleShowAll()" title="Show ZPL for this namespace and all sub-namespaces">Show All</button>
-      <button class="tool-btn" onclick="trRunAnalyst()" title="AI policy analysis">🔍 Rule Analyst</button>
-      <span class="status-pill idle" id="status-pill"></span>
-      <div class="toolbar-right">
-        <button class="tool-btn" id="assist-btn" onclick="toggleAssist()" title="ZPL AI Assistant">⊕ AI Assistant</button>
-        <div class="io-dropdown" id="io-dropdown">
-          <button class="tool-btn" onclick="toggleIoMenu(event)" title="Upload / Download ZPL">↑↓</button>
-          <div class="io-menu" id="io-menu">
-            <div class="io-menu-item" onclick="doUploadZpl()">↑ Upload ZPL file</div>
-            <div class="io-menu-item" onclick="doDownloadZpl()">↓ Download ZPL file</div>
-            <div class="io-menu-item" onclick="doDownloadAllMd()">↓ Export all namespaces (.md)</div>
-            <div class="io-menu-item" onclick="doImportAllMd()">↑ Import all namespaces (.md)</div>
-            <div class="io-menu-item" onclick="doUploadZplc()">↑ Import .zplc definitions</div>
+    <!-- ══ Policy Editor ══ -->
+    <div class="page active" id="page-editor">
+      <div class="page-header">
+        <h1>Policy Editor</h1>
+        <span class="status-pill idle" id="status-pill"></span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:0.4rem;position:relative">
+          <button class="tool-btn" id="show-all-btn" onclick="toggleShowAll()" title="Show ZPL for this namespace and all sub-namespaces">Show All</button>
+          <div class="io-dropdown" id="io-dropdown">
+            <button class="tool-btn" onclick="toggleIoMenu(event)" title="Upload / Download ZPL">↑↓</button>
+            <div class="io-menu" id="io-menu">
+              <div class="io-menu-item" onclick="doUploadZpl()">↑ Upload ZPL file</div>
+              <div class="io-menu-item" onclick="doDownloadZpl()">↓ Download ZPL file</div>
+              <div class="io-menu-item" onclick="doDownloadAllMd()">↓ Export all namespaces (.md)</div>
+              <div class="io-menu-item" onclick="doImportAllMd()">↑ Import all namespaces (.md)</div>
+              <div class="io-menu-item" onclick="doUploadZplc()">↑ Import .zplc definitions</div>
+            </div>
+          </div>
+          <span class="ns-editor-label" id="ns-editor-label"></span>
+        </div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative" id="editor-split">
+        <!-- Upper: staging input -->
+        <div class="input-zone" id="input-zone">
+          <div class="input-zone-toolbar">
+            <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)">New ZPL</span>
+            <div class="toolbar-sep"></div>
+            <button class="tool-btn" onclick="doCheckUpper()">Check ZPL</button>
+            <button class="tool-btn primary" onclick="acceptZpl()">Save</button>
+            <button class="tool-btn" id="assist-btn" onclick="navigate('aiassist',document.getElementById('nav-aiassist'))" title="ZPL AI Assistant" style="background:#dcfce7;border-color:#86efac;color:#15803d;font-weight:600">✨ AI Assist</button>
+            <button class="tool-btn" onclick="discardUpper()" style="color:var(--muted)">Clear</button>
+            <button class="tool-btn" id="mode-entity" disabled title="Entity mode coming soon" style="opacity:0.45;cursor:not-allowed">Entities (soon)</button>
+          </div>
+          <div class="input-zone-scroll">
+            <div class="infer-bar" id="infer-bar">
+              <span id="infer-msg"></span>
+              <div class="infer-actions">
+                <button class="infer-insert" onclick="askAssistantAboutInferred()">Ask Assistant</button>
+                <button class="infer-insert" id="infer-insert-btn" onclick="insertInferredClasses()" style="opacity:0.7">Insert all</button>
+                <button class="infer-dismiss" onclick="dismissInferBar()" title="Dismiss">✕</button>
+              </div>
+            </div>
+            <textarea class="zpl-editor" id="zpl-upper"
+              placeholder="Type ZPL here — Check, then Accept to add to policy"
+              spellcheck="false"
+              oninput="onUpperInput()"
+              onkeydown="handleTabKey(event)"></textarea>
+            <div class="error-bar" id="error-bar"></div>
+            <div class="accept-bar" id="accept-bar">
+              <span id="accept-bar-msg" style="font-size:0.82rem;color:var(--muted)">Valid — add to policy?</span>
+              <button class="tool-btn primary" onclick="acceptZpl()">✓ Accept</button>
+              <button class="tool-btn" onclick="discardUpper()">✕ Discard</button>
+            </div>
           </div>
         </div>
-        <button class="panel-toggle" id="panel-toggle" onclick="togglePanel()" title="Toggle schema panel">⊟</button>
-      </div>
-    </div>
-    <div class="infer-bar" id="infer-bar">
-      <span id="infer-msg"></span>
-      <div class="infer-actions">
-        <button class="infer-insert" onclick="askAssistantAboutInferred()">Ask Assistant</button>
-        <button class="infer-insert" id="infer-insert-btn" onclick="insertInferredClasses()" style="opacity:0.7">Insert all</button>
-        <button class="infer-dismiss" onclick="dismissInferBar()" title="Dismiss">✕</button>
-      </div>
-    </div>
-    <input type="file" id="zpl-file-input" accept=".zpl,.txt" style="display:none" onchange="onZplFileSelected(event)">
-    <input type="file" id="zplc-file-input" accept=".zplc,.toml" style="display:none" onchange="onZplcFileSelected(event)">
-    <textarea class="zpl-editor" id="zpl-editor"
-      placeholder="Add ZPL definitions and rules here"
-      spellcheck="false"
-      oninput="onEditorInput()"
-      onkeydown="handleTabKey(event)"></textarea>
-    <!-- ZPL Assistant split editor (hidden until toggled) -->
-    <div class="assist-split" id="assist-split" style="display:none">
-      <div class="assist-bottom">
-        <div class="assist-bottom-header">
-          <span class="assist-bottom-title">ZPL Assistant</span>
-          <button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="closeAssist()">✓ Done</button>
-        </div>
-        <div class="assist-input-row">
-          <textarea class="assist-input" id="assist-input"
-            placeholder="Type ZPL or describe what you want… (Enter to send, Shift+Enter for newline)"
-            onkeydown="assistKeydown(event)"
-            spellcheck="false" rows="2"></textarea>
-          <button class="tool-btn primary" onclick="assistSend()" id="assist-send-btn">Send</button>
-        </div>
-        <div class="assist-history" id="assist-history"></div>
-      </div>
-      <div class="assist-pane-sep"></div>
-      <div class="assist-stmts-wrap">
-        <div class="assist-stmts-header">
-          <span class="assist-stmts-title">Staged ZPL</span>
-          <div style="display:flex;gap:0.3rem">
-            <button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.45rem" onclick="assistSaveAll()">✓ Save All</button>
-            <button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.45rem" onclick="assistDeleteAll()">✕ Delete All</button>
+        <!-- Horizontal resizer -->
+        <div class="h-divider" id="h-divider"></div>
+        <!-- Lower: stored definitions -->
+        <div class="defs-zone" id="defs-zone">
+          <div class="defs-toolbar">
+            <span class="defs-label">Definitions</span>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">
+              <button class="tool-btn active" id="btn-zpl"   onclick="setDefsView('zpl')">ZPL</button>
+              <button class="tool-btn"        id="btn-table" onclick="setDefsView('table')">Table</button>
+              <div class="toolbar-sep"></div>
+              <button class="tool-btn active" id="btn-fullns" onclick="setNsMode('full')">Full NS</button>
+              <button class="tool-btn"        id="btn-shortns" onclick="setNsMode('short')">Short</button>
+              <div class="toolbar-sep"></div>
+              <button class="tool-btn" onclick="doReset()" style="color:var(--red)">Delete All</button>
+              <button class="tool-btn" onclick="trRunAnalyst()" title="AI policy analysis">🔍 Audit</button>
+            </div>
+          </div>
+          <div class="defs-body">
+            <div id="defs-zpl-rows"></div>
+            <div id="defs-table" style="display:none">
+              <div class="schema-body" id="schema-body">
+                <div class="empty-state">Parse ZPL to see<br>classes and rules here.</div>
+              </div>
+            </div>
           </div>
         </div>
-        <div id="assist-stmts"></div>
       </div>
-      <textarea id="assist-top" style="display:none" spellcheck="false" oninput="scheduleAutoParse()" onkeydown="handleTabKey(event)"></textarea>
+      <!-- Hidden file inputs -->
+      <input type="file" id="zpl-file-input" accept=".zpl,.txt" style="display:none" onchange="onZplFileSelected(event)">
+      <input type="file" id="zplc-file-input" accept=".zplc,.toml" style="display:none" onchange="onZplcFileSelected(event)">
     </div>
-    <div class="error-bar" id="error-bar"></div>
-  </main>
 
-  <div class="resizer" id="resizer-right"></div>
-
-  <!-- Schema pane -->
-  <aside class="schema-pane" id="schema-pane">
-    <div class="schema-pane-header">
-      <div class="schema-tabs">
-        <button class="schema-tab active" onclick="setSchemaTab('tests',this)">Tests</button>
-        <button class="schema-tab" onclick="setSchemaTab('classes',this)">Classes</button>
-        <button class="schema-tab" onclick="setSchemaTab('rules',this)">Rules</button>
-        <button class="schema-tab" onclick="setSchemaTab('entities',this)">Entities</button>
-        <button class="schema-tab" onclick="setSchemaTab('zpl',this)">ZPL (full)</button>
+    <!-- ══ AI Assist ══ -->
+    <div class="page" id="page-aiassist">
+      <div class="page-header">
+        <h1>AI Assist</h1>
+        <span class="ns-editor-label" id="assist-breadcrumb" style="margin-left:0.5rem"></span>
       </div>
-      <button class="panel-toggle" id="schema-expand" onclick="toggleSchemaExpand()" title="Expand schema panel">⊞</button>
+      <div class="assist-split" id="assist-split" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+        <div class="assist-bottom">
+          <div class="assist-bottom-header">
+            <span class="assist-bottom-title">ZPL Assistant</span>
+            <button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="closeAssistPage()">✓ Done — Back to Editor</button>
+          </div>
+          <div class="assist-input-row">
+            <textarea class="assist-input" id="assist-input"
+              placeholder="Type ZPL or describe what you want… (Enter to send, Shift+Enter for newline)"
+              onkeydown="assistKeydown(event)"
+              spellcheck="false" rows="2"></textarea>
+            <button class="tool-btn primary" onclick="assistSend()" id="assist-send-btn">Send</button>
+          </div>
+          <div class="assist-history" id="assist-history"></div>
+        </div>
+        <div class="assist-pane-sep"></div>
+        <div class="assist-stmts-wrap">
+          <div class="assist-stmts-header">
+            <span class="assist-stmts-title">Staged ZPL</span>
+            <div style="display:flex;gap:0.3rem">
+              <button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.45rem" onclick="assistSaveAll()">✓ Save All</button>
+              <button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.45rem" onclick="assistDeleteAll()">✕ Delete All</button>
+            </div>
+          </div>
+          <div id="assist-stmts"></div>
+        </div>
+        <textarea id="assist-top" style="display:none" spellcheck="false" oninput="scheduleAutoParse()" onkeydown="handleTabKey(event)"></textarea>
+      </div>
     </div>
-    <div class="schema-body" id="schema-body">
-      <div class="empty-state">Parse ZPL to see<br>classes and rules here.</div>
-    </div>
-    <div class="tr-busy-overlay" id="tr-busy" style="display:none">
-      <div class="tr-spinner"></div>
-      <div id="tr-busy-msg" class="tr-busy-msg"></div>
-      <button id="tr-stop-btn" class="tool-btn" onclick="trStop()" style="display:none;margin-top:0.5rem;font-size:0.72rem">⏹ Stop</button>
-    </div>
-  </aside>
 
-</div>
+    <!-- ══ Policy Audit ══ -->
+    <div class="page" id="page-audit">
+      <div class="page-header">
+        <h1>Policy Audit</h1>
+        <div id="analyst-ns-label" style="font-size:0.8rem;color:var(--muted);margin-left:0.5rem"></div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:0.4rem">
+          <div class="view-toggle">
+            <button class="active" id="audit-fast-btn"
+              onclick="document.getElementById('audit-fast-btn').classList.add('active');document.getElementById('audit-deep-btn').classList.remove('active');S._auditDeep=false">Fast</button>
+            <button id="audit-deep-btn"
+              onclick="document.getElementById('audit-deep-btn').classList.add('active');document.getElementById('audit-fast-btn').classList.remove('active');S._auditDeep=true">Deep</button>
+          </div>
+          <button class="tool-btn primary" onclick="trRunAnalyst(S._auditDeep||false)">🔍 Run Audit</button>
+          <button id="analyst-save-btn" class="tool-btn" onclick="analystSaveReport()" style="display:none">💾 Save</button>
+          <button id="analyst-deep-btn" class="tool-btn" onclick="trRunAnalyst(true)" style="display:none">Deep ▶</button>
+        </div>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:0.75rem 1rem" id="analyst-body">
+        <div class="empty-state">Run an audit to see results here.</div>
+      </div>
+    </div>
+
+    <!-- ══ Testing ══ -->
+    <div class="page" id="page-testing">
+      <div class="page-header">
+        <h1>Testing</h1>
+        <span class="ns-editor-label" id="testing-breadcrumb" style="margin-left:0.5rem"></span>
+      </div>
+      <div id="testing-body" style="flex:1;overflow-y:auto;position:relative">
+        <div class="empty-state">Loading tests…</div>
+      </div>
+      <div class="tr-busy-overlay" id="tr-busy" style="display:none">
+        <div class="tr-spinner"></div>
+        <div id="tr-busy-msg" class="tr-busy-msg"></div>
+        <button id="tr-stop-btn" class="tool-btn" onclick="trStop()" style="display:none;margin-top:0.5rem;font-size:0.72rem">⏹ Stop</button>
+      </div>
+    </div>
+
+    <!-- ══ Namespace Manager ══ -->
+    <div class="page" id="page-nsmgr">
+      <div class="page-header">
+        <h1>Namespace Manager</h1>
+        <button class="tool-btn primary" style="margin-left:auto" onclick="openNewOwnerModal()">+ New</button>
+      </div>
+      <div class="page-body" id="nsmgr-body">
+        <div class="empty-state">Loading…</div>
+      </div>
+    </div>
+
+    <!-- ══ Reports ══ -->
+    <div class="page" id="page-reports">
+      <div class="page-header">
+        <h1>Audit Reports</h1>
+        <span id="reports-count" style="font-size:0.82rem;color:var(--muted);margin-left:0.25rem"></span>
+      </div>
+      <div class="page-body" id="reports-panel">
+        <div class="empty-state">No saved reports</div>
+      </div>
+    </div>
+
+    <!-- ══ User Guide ══ -->
+    <div class="page" id="page-guide">
+      <iframe class="guide-iframe" src="/help" id="guide-iframe"></iframe>
+    </div>
+
+  </div><!-- /.main -->
+</div><!-- /.shell -->
 
 
 <div class="modal-backdrop" id="unsaved-modal">
@@ -721,25 +948,8 @@
   </div>
 </div>
 
-<!-- ── Rule Analyst modal ──────────────────────────────────────────── -->
-<div class="modal-backdrop" id="analyst-modal" onclick="if(event.target===this)closeAnalystModal()">
-  <div class="modal" style="max-width:680px;width:100%;max-height:88vh;display:flex;flex-direction:column">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:0.9rem 1rem 0.5rem;flex-shrink:0">
-      <div>
-        <h3 style="margin:0;font-size:1rem">🔍 Rule Analyst</h3>
-        <div id="analyst-ns-label" style="font-size:0.72rem;color:var(--muted);margin-top:0.1rem"></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:0.4rem">
-        <button id="analyst-save-btn" class="tool-btn" onclick="analystSaveReport()"
-            title="Save this report" style="font-size:0.75rem;display:none">💾 Save</button>
-        <button id="analyst-deep-btn" class="tool-btn" onclick="trRunAnalyst(true)"
-            title="Re-run with full Sonnet model for deeper analysis" style="font-size:0.75rem">Deep ▶</button>
-        <button class="tool-btn" onclick="closeAnalystModal()" style="font-size:1rem;padding:0.1rem 0.4rem">✕</button>
-      </div>
-    </div>
-    <div id="analyst-body" style="flex:1;overflow-y:auto;padding:0 1rem 1rem"></div>
-  </div>
-</div>
+<!-- analyst-modal content moved to page-audit -->
+<div id="analyst-modal" style="display:none"></div>
 
 <!-- ── New namespace modal ──────────────────────────────────────────── -->
 <div class="modal-backdrop" id="new-owner-modal">
@@ -776,7 +986,7 @@ const S = {
   context: null,
   subOwners: [],
   dirty: false,
-  schemaTab: 'tests',
+  schemaTab: 'classes',
   lastParsed: null,
   inferredZpl: '',
   inferredClasses: [],
@@ -788,12 +998,14 @@ const S = {
   showAll: false,
   classView: 'table',
   ruleView: 'table',
-  panelOpen: true,
-  panelExpanded: false,
-  sidebarWidth: 220,
   analyst: null,
-  panelWidth: Math.floor((window.innerWidth - 220 - 8) / 2),
   parseTimer: null,
+  // new layout state
+  currentPage: 'editor',
+  defsView: 'zpl',
+  nsMode: 'full',
+  _storedZpl: '',
+  _auditDeep: false,
 };
 
 // ── API ────────────────────────────────────────────────────────────────────
@@ -819,10 +1031,237 @@ function esc(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Toast ──────────────────────────────────────────────────────────────────
+
+let _toastTimer;
+function toast(msg) {
+  let el = document.getElementById('_toast');
+  if (!el) {
+    el = document.createElement('div'); el.id = '_toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+
+function navigate(pageId, navEl) {
+  S.currentPage = pageId;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const page = document.getElementById('page-' + pageId);
+  if (page) page.classList.add('active');
+  const nav = navEl || document.getElementById('nav-' + pageId);
+  if (nav) nav.classList.add('active');
+
+  // Page-specific activation
+  if (pageId === 'testing') {
+    const body = document.getElementById('testing-body');
+    if (body) renderTests(body);
+  }
+  if (pageId === 'nsmgr') refreshOwnersPanel();
+  if (pageId === 'reports') loadReports();
+  if (pageId === 'aiassist') _initAssistPage();
+}
+
+function toggleNavNs(btn) {
+  const tree = document.getElementById('ns-tree');
+  if (!tree) return;
+  const collapsed = tree.style.display === 'none';
+  tree.style.display = collapsed ? '' : 'none';
+  btn.textContent = collapsed ? '▾' : '▸';
+  btn.title = collapsed ? 'Collapse namespace tree' : 'Expand namespace tree';
+}
+
+// ── Policy Editor: staging zone ────────────────────────────────────────────
+
+function _defsText() { return S._storedZpl || ''; }
+
+function _splitZplStatements(text) {
+  return (text || '').split('\n').map(l => l.trim()).filter(Boolean);
+}
+
+function renderDefsRows(zplText) {
+  S._storedZpl = zplText || '';
+  const container = document.getElementById('defs-zpl-rows');
+  if (!container) return;
+  if (!zplText || !zplText.trim()) {
+    container.innerHTML = '<div class="empty-state">No definitions saved yet.<br>Type ZPL above and Accept to add.</div>';
+    return;
+  }
+  const stmts = _splitZplStatements(zplText);
+  const nsName = S.context?.active_display_name || '';
+  container.innerHTML = stmts.map(stmt => {
+    const display = (S.nsMode === 'short' && nsName)
+      ? stmt.replace(new RegExp('\\b' + nsName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.', 'g'), '')
+      : stmt;
+    return `<div class="zpl-stmt-row" data-zpl="${esc(stmt)}">
+      <span class="zpl-stmt-text">${esc(display)}</span>
+      <div style="display:flex;gap:0.25rem;flex-shrink:0">
+        <button class="stmt-btn" onclick="openStmtEdit(this.closest('[data-zpl]'))" title="Edit">✏</button>
+        <button class="stmt-btn del" onclick="deleteStmt(this.closest('[data-zpl]'))" title="Delete">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function doCheckUpper() {
+  const text = document.getElementById('zpl-upper')?.value.trim();
+  if (!text) return;
+  setStatus('idle', 'Checking…');
+  try {
+    const stored = _defsText();
+    const combined = stored ? stored.trimEnd() + '\n' + text : text;
+    const res = await api('POST', '/api/parse', { text: combined, language: 'zpl' });
+    const hasErrors   = res.errors && res.errors.length;
+    const hasWarnings = !hasErrors && (
+      (res.undefined_parents && res.undefined_parents.length) ||
+      (res.inferred_classes  && res.inferred_classes.length)  ||
+      (res.inferred_verbs    && res.inferred_verbs.length)
+    );
+    const bar    = document.getElementById('accept-bar');
+    const barMsg = document.getElementById('accept-bar-msg');
+    if (hasErrors) {
+      showErrors(res.errors);
+      setStatus('error', `${res.errors.length} error${res.errors.length > 1 ? 's' : ''}`);
+      bar.classList.remove('visible', 'warn');
+    } else {
+      clearErrors();
+      const nCls   = (res.policy_set?.classes||[]).length;
+      const nRules = (res.policy_set?.rules||[]).length;
+      if (hasWarnings) {
+        bar.classList.add('visible', 'warn');
+        barMsg.style.color = '#92400e';
+        barMsg.textContent = 'Has warnings — add anyway?';
+        setStatus('ok', `Parsed — ${nCls} classes · ${nRules} rules (with warnings)`);
+      } else {
+        bar.classList.add('visible');
+        bar.classList.remove('warn');
+        barMsg.style.color = '';
+        barMsg.textContent = 'Valid — add to policy?';
+        setStatus('ok', `Valid — ${nCls} classes · ${nRules} rules`);
+      }
+    }
+    showInferBar(res.inferred_classes || [], res.inferred_zpl || '', null, res.inferred_verbs || [], res.inferred_verbs_zpl || '', res.undefined_parents || []);
+    S.lastParsed = res.policy_set;
+    S.serializedZpl = res.serialized_zpl || '';
+    renderSchemaBody();
+  } catch(e) { setStatus('error', 'Check failed'); }
+}
+
+async function acceptZpl() {
+  const upper = document.getElementById('zpl-upper');
+  const text = upper?.value.trim();
+  if (!text) return;
+  const saveBtn = document.querySelector('#accept-bar .tool-btn.primary');
+  if (saveBtn) saveBtn.disabled = true;
+  try {
+    const stored = _defsText();
+    const combined = stored ? stored.trimEnd() + '\n' + text : text;
+    const parsed = await api('POST', '/api/parse', { text: combined, language: 'zpl' });
+    if (parsed.errors && parsed.errors.length) { showErrors(parsed.errors); return; }
+    await api('PUT', '/api/namespace/zpl', { text: combined });
+    S.lastParsed = parsed.policy_set;
+    S.serializedZpl = parsed.serialized_zpl || '';
+    clearErrors();
+    clearInferBar();
+    // Reload lower pane from server
+    const res = await api('GET', '/api/namespace/zpl');
+    renderDefsRows(res.text || '');
+    renderSchemaBody();
+    if (upper) upper.value = '';
+    document.getElementById('accept-bar')?.classList.remove('visible');
+    setStatus('ok', 'Saved');
+  } catch(e) {
+    setStatus('error', 'Accept failed: ' + e.message);
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
+  }
+}
+
+function discardUpper() {
+  const upper = document.getElementById('zpl-upper');
+  if (upper) upper.value = '';
+  clearErrors();
+  clearInferBar();
+  document.getElementById('accept-bar')?.classList.remove('visible');
+  setStatus('idle');
+}
+
+function setDefsView(v) {
+  S.defsView = v;
+  const zplRows  = document.getElementById('defs-zpl-rows');
+  const tableWrap = document.getElementById('defs-table');
+  if (zplRows)   zplRows.style.display   = v === 'zpl'   ? '' : 'none';
+  if (tableWrap) tableWrap.style.display = v === 'table' ? '' : 'none';
+  document.getElementById('btn-zpl')?.classList.toggle('active', v === 'zpl');
+  document.getElementById('btn-table')?.classList.toggle('active', v === 'table');
+}
+
+function setNsMode(mode) {
+  S.nsMode = mode;
+  document.getElementById('btn-fullns')?.classList.toggle('active', mode === 'full');
+  document.getElementById('btn-shortns')?.classList.toggle('active', mode === 'short');
+  renderDefsRows(S._storedZpl);
+}
+
+// ── AI Assist page init ────────────────────────────────────────────────────
+
+function _initAssistPage() {
+  if (!S.assist) S.assist = { active: false, history: [], original: '', staged: [], editingId: null };
+  S.assist.active = true;
+  S.assist.original = _defsText();
+  _syncAssistTop();
+  if (!S.assist.history || !S.assist.history.length) {
+    const hist = document.getElementById('assist-history');
+    if (hist) hist.innerHTML = '';
+    _assistAppendMsg('system', 'Type a ZPL statement or describe what you want.');
+  }
+  setTimeout(() => document.getElementById('assist-input')?.focus(), 50);
+}
+
+// ── H-divider drag ─────────────────────────────────────────────────────────
+
+(function initHDivider() {
+  document.addEventListener('DOMContentLoaded', () => {
+    const divider = document.getElementById('h-divider');
+    if (!divider) return;
+    let dragging = false, startY = 0, startTop = 0, startBot = 0;
+    divider.addEventListener('mousedown', e => {
+      dragging = true; startY = e.clientY;
+      const inputZone = document.getElementById('input-zone');
+      const defsZone  = document.getElementById('defs-zone');
+      if (!inputZone || !defsZone) return;
+      startTop = inputZone.getBoundingClientRect().height;
+      startBot = defsZone.getBoundingClientRect().height;
+      divider.classList.add('dragging');
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const dy = e.clientY - startY;
+      const inputZone = document.getElementById('input-zone');
+      const defsZone  = document.getElementById('defs-zone');
+      if (!inputZone || !defsZone) return;
+      const newTop = Math.max(80, startTop + dy);
+      const newBot = Math.max(80, startBot - dy);
+      inputZone.style.flex = 'none';
+      inputZone.style.height = newTop + 'px';
+      defsZone.style.flex = 'none';
+      defsZone.style.height = newBot + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (dragging) { dragging = false; divider.classList.remove('dragging'); }
+    });
+  });
+})();
+
 // ── Boot ───────────────────────────────────────────────────────────────────
 
 async function boot() {
-  initResizers();
   try {
     await loadContext();
     await Promise.all([loadSubOwners(), loadNamespaceZpl(),
@@ -844,7 +1283,10 @@ function renderHeader() {
   if (!ctx) return;
   const nsLabel = ctx.active_display_name || ctx.active_username;
   document.getElementById('hdr-user').textContent = ctx.login_username;
-  document.getElementById('ns-editor-label').textContent = nsLabel;
+  ['ns-editor-label','assist-breadcrumb','testing-breadcrumb'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = nsLabel;
+  });
 }
 
 // ── Sub-owners (namespace tree) ────────────────────────────────────────────
@@ -863,15 +1305,12 @@ async function loadSubOwners() {
 }
 
 function toggleOwnersPanel() {
-  const panel = document.getElementById('owners-panel');
-  const open = panel.style.display === 'none';
-  panel.style.display = open ? '' : 'none';
-  if (open) refreshOwnersPanel();
+  navigate('nsmgr', document.getElementById('nav-nsmgr'));
 }
 
 function refreshOwnersPanel() {
-  const panel = document.getElementById('owners-panel');
-  if (panel.style.display === 'none') return;
+  const panel = document.getElementById('nsmgr-body') || document.getElementById('owners-panel');
+  if (!panel) return;
   if (!S._ownerTree || !S.profile) {
     renderOwnersPanel(null, null);
     return;
@@ -880,8 +1319,8 @@ function refreshOwnersPanel() {
 }
 
 function renderOwnersPanel(profile, tree) {
-  const panel = document.getElementById('owners-panel');
-  if (!profile || !tree) { panel.innerHTML = '<div class="cfg" style="padding:0.5rem">Loading…</div>'; return; }
+  const panel = document.getElementById('nsmgr-body') || document.getElementById('owners-panel');
+  if (!profile || !tree) { if (panel) panel.innerHTML = '<div class="cfg" style="padding:0.5rem">Loading…</div>'; return; }
   const childNodes = (tree.children || []).map(c => renderOwnerTree(c, 1)).join('');
   panel.innerHTML = `<div class="cfg" style="padding:0.5rem">
     <div class="cfg-ns-tree">
@@ -1017,7 +1456,10 @@ function confirmUnsaved() {
 async function switchToNamespace(nsId) {
   const ctx = S.context;
   const activeNsId = ctx.active_namespace_id || ctx.active_user_id;
-  if (nsId === activeNsId) return;
+  if (nsId === activeNsId) {
+    navigate('editor', document.getElementById('nav-editor'));
+    return;
+  }
   if (S.dirty) {
     const choice = await confirmUnsaved();
     if (choice === 'cancel') return;
@@ -1030,12 +1472,12 @@ async function switchToNamespace(nsId) {
     } else {
       await api('POST', '/api/context/switch', { namespace_id: nsId });
     }
-    if (S.panelExpanded) toggleSchemaExpand();
     await loadContext();
     _exitShowAll();
     const switchLoads = [loadSubOwners(), loadNamespaceZpl()];
     if (S.schemaTab === 'entities') switchLoads.push(loadEntities());
     await Promise.all(switchLoads);
+    navigate('editor', document.getElementById('nav-editor'));
   } catch(e) { alert('Could not switch namespace: ' + e.message); }
 }
 
@@ -1077,7 +1519,8 @@ document.getElementById('new-ns-name').addEventListener('keydown', e => {
 async function loadNamespaceZpl() {
   try {
     const res = await api('GET', '/api/namespace/zpl');
-    document.getElementById('zpl-editor').value = res.text || '';
+    S._storedZpl = res.text || '';
+    renderDefsRows(res.text || '');
     S.dirty = false;
     setStatus('idle');
     clearErrors();
@@ -1102,14 +1545,21 @@ function handleTabKey(e) {
 }
 
 function _editorText() {
-  const id = S.assist?.active ? 'assist-top' : 'zpl-editor';
-  return document.getElementById(id)?.value || '';
+  if (S.assist?.active && S.currentPage === 'aiassist') {
+    return document.getElementById('assist-top')?.value || '';
+  }
+  return _defsText();
 }
 
 function onEditorInput() {
   markDirty();
   clearErrors();
   scheduleAutoParse();
+}
+
+function onUpperInput() {
+  document.getElementById('accept-bar')?.classList.remove('visible');
+  clearErrors();
 }
 
 function markDirty() {
@@ -1138,7 +1588,7 @@ async function autoParse() {
 }
 
 async function doParse() {
-  const text = document.getElementById('zpl-editor').value.trim();
+  const text = document.getElementById('zpl-upper')?.value.trim() || _defsText();
   if (!text) return;
   setStatus('idle', 'Parsing…');
   try {
@@ -1158,7 +1608,7 @@ async function doParse() {
 }
 
 async function doValidate() {
-  const text = document.getElementById('zpl-editor').value.trim();
+  const text = document.getElementById('zpl-upper')?.value.trim() || _defsText();
   if (!text) return;
   setStatus('idle', 'Validating…');
   try {
@@ -1168,9 +1618,10 @@ async function doValidate() {
   } catch(e) { setStatus('error', 'Validate failed'); }
 }
 
-async function doSave() {
-  const text = document.getElementById('zpl-editor').value.trim();
-  document.getElementById('save-btn').disabled = true;
+async function doSave(textArg) {
+  const text = textArg !== undefined ? textArg : _defsText().trim();
+  const btn = document.getElementById('save-btn');
+  if (btn) btn.disabled = true;
   try {
     if (text) {
       const parsed = await api('POST', '/api/parse', { text, language: 'zpl' });
@@ -1180,16 +1631,18 @@ async function doSave() {
         return;
       }
       S.lastParsed = parsed.policy_set;
+      S.serializedZpl = parsed.serialized_zpl || '';
       clearErrors();
       renderSchemaBody();
     }
     await api('PUT', '/api/namespace/zpl', { text });
+    S._storedZpl = text;
     S.dirty = false;
     setStatus('ok', 'Saved');
   } catch(e) {
     setStatus('error', 'Save failed: ' + e.message);
   } finally {
-    document.getElementById('save-btn').disabled = false;
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -1214,17 +1667,17 @@ function onZplFileSelected(e) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
-    document.getElementById('zpl-editor').value = ev.target.result;
+    const ta = document.getElementById('zpl-upper');
+    if (ta) ta.value = ev.target.result;
     e.target.value = '';
-    S.dirty = true;
-    onEditorInput();
+    doCheckUpper();
   };
   reader.readAsText(file);
 }
 
 function doDownloadZpl() {
   document.getElementById('io-menu').classList.remove('open');
-  const text = document.getElementById('zpl-editor').value;
+  const text = _defsText();
   const ctx = S.context;
   const ns = ctx ? (ctx.active_display_name || ctx.active_username || 'namespace') : 'namespace';
   const filename = ns.replace(/[^a-z0-9_-]/gi, '_').toLowerCase() + '.zpl';
@@ -1296,15 +1749,18 @@ async function doReset() {
     const choice = await confirmUnsaved();
     if (choice === 'cancel') return;
     if (choice === 'save') { await doSave(); return; }
-  } else if (document.getElementById('zpl-editor').value.trim() &&
-             !confirm('Clear the editor?')) return;
-  document.getElementById('zpl-editor').value = '';
-  S.dirty = false;
-  S.lastParsed = null;
-  clearErrors();
-  clearInferBar();
-  setStatus('idle');
-  renderSchemaBody();
+  } else if (S._storedZpl.trim() && !confirm('Delete all saved definitions?')) return;
+  try {
+    await api('PUT', '/api/namespace/zpl', { text: '' });
+    S._storedZpl = '';
+    S.dirty = false;
+    S.lastParsed = null;
+    clearErrors();
+    clearInferBar();
+    setStatus('idle');
+    renderDefsRows('');
+    renderSchemaBody();
+  } catch(e) { setStatus('error', 'Delete failed: ' + e.message); }
 }
 
 function _exitShowAll() {
@@ -1312,22 +1768,19 @@ function _exitShowAll() {
   S.showAll = false;
   const btn = document.getElementById('show-all-btn');
   if (btn) { btn.textContent = 'Show All'; btn.classList.remove('primary'); }
-  const editor = document.getElementById('zpl-editor');
-  if (editor) { editor.readOnly = false; editor.style.opacity = ''; }
   const saveBtn = document.getElementById('save-btn');
   if (saveBtn) saveBtn.disabled = false;
+  loadNamespaceZpl();
 }
 
 async function toggleShowAll() {
   const btn = document.getElementById('show-all-btn');
-  const editor = document.getElementById('zpl-editor');
   if (S.showAll) {
-    // Return to normal: reload the namespace's own ZPL
     S.showAll = false;
     btn.textContent = 'Show All';
     btn.classList.remove('primary');
-    editor.readOnly = false;
-    editor.style.opacity = '';
+    const saveBtn = document.getElementById('save-btn');
+    if (saveBtn) saveBtn.disabled = false;
     await loadNamespaceZpl();
   } else {
     try {
@@ -1335,17 +1788,17 @@ async function toggleShowAll() {
       S.showAll = true;
       btn.textContent = 'Show Own';
       btn.classList.add('primary');
-      editor.value = res.text || '';
-      editor.readOnly = true;
-      editor.style.opacity = '0.85';
-      document.getElementById('save-btn').disabled = true;
+      const saveBtn = document.getElementById('save-btn');
+      if (saveBtn) saveBtn.disabled = true;
+      renderDefsRows(res.text || '');
+      // Make rows read-only
+      document.querySelectorAll('#defs-zpl-rows .stmt-btn').forEach(b => b.disabled = true);
       setStatus('idle', 'read-only view');
       autoParse();
     } catch(e) {
       setStatus('error', 'Failed to load all ZPL');
     }
   }
-  document.getElementById('save-btn').disabled = !!S.showAll;
 }
 
 // ── Infer bar ──────────────────────────────────────────────────────────────
@@ -1431,18 +1884,18 @@ function askAssistantAboutInferred() {
 
 function insertInferredClasses() {
   if (!S.inferredZpl) return;
-  if (S.assist?.active) {
+  if (S.currentPage === 'aiassist' && S.assist?.active) {
     S.assist.original = (S.inferredZpl.trimEnd() + '\n\n' + (S.assist.original || '')).trim();
     _syncAssistTop();
     const lines = S.inferredZpl.trim().split('\n');
     const codeHtml = lines.map(l => `<code style="display:block;font-size:0.7rem;color:var(--accent);word-break:break-all">${esc(l)}</code>`).join('');
     _assistAppendMsg('system', `Added ${lines.length} definition${lines.length > 1 ? 's' : ''} to your ZPL:<br>` + codeHtml);
   } else {
-    const ta = document.getElementById('zpl-editor');
-    ta.value = S.inferredZpl + '\n\n' + ta.value;
-    ta.scrollTop = 0;
-    markDirty();
-    autoParse();
+    const ta = document.getElementById('zpl-upper');
+    if (ta) {
+      ta.value = S.inferredZpl + '\n\n' + ta.value;
+      ta.scrollTop = 0;
+    }
   }
   clearInferBar();
 }
@@ -1512,50 +1965,34 @@ const _ASSIST_MODS = {};
 let _assistModId = 0;
 
 function toggleAssist() {
-  if (S.assist.active) closeAssist();
-  else openAssist();
+  if (S.currentPage === 'aiassist') navigate('editor', document.getElementById('nav-editor'));
+  else navigate('aiassist', document.getElementById('nav-aiassist'));
 }
 
 function openAssist() {
-  const editorText = document.getElementById('zpl-editor').value;
-  S.assist.original = editorText;
-  S.assist.staged = [];
-  S.assist.editingId = null;
-  _syncAssistTop();
-  S.assist.history = [];
-  document.getElementById('assist-history').innerHTML = '';
-  document.getElementById('zpl-editor').style.display = 'none';
-  document.getElementById('assist-split').style.display = 'flex';
-  S.assist.active = true;
-  const btn = document.getElementById('assist-btn');
-  if (btn) { btn.textContent = '⊠ AI Assistant'; btn.classList.add('active'); }
-  // Switch to Classes tab so live parse updates are visible while typing
-  S.schemaTab = 'classes';
-  document.querySelectorAll('.schema-tab').forEach(b => b.classList.remove('active'));
-  const classTab = document.querySelector('.schema-tab[onclick*="classes"]');
-  if (classTab) classTab.classList.add('active');
-  renderSchemaBody();
-  _assistAppendMsg('system', 'Type a ZPL statement or describe what you want. Say "done" or "stop" when finished.');
-  setTimeout(() => document.getElementById('assist-input')?.focus(), 50);
+  navigate('aiassist', document.getElementById('nav-aiassist'));
 }
 
 function closeAssist() {
-  const topText = document.getElementById('assist-top').value;
-  document.getElementById('zpl-editor').value = topText;
-  document.getElementById('assist-split').style.display = 'none';
-  document.getElementById('zpl-editor').style.display = '';
+  closeAssistPage();
+}
+
+function closeAssistPage() {
+  const topText = document.getElementById('assist-top')?.value || '';
   S.assist.active = false;
-  const btn = document.getElementById('assist-btn');
-  if (btn) { btn.textContent = '⊕ AI Assistant'; btn.classList.remove('active'); }
   if (topText.trim()) {
-    markDirty();
-    // Switch to Classes tab so the user sees parsed results
-    S.schemaTab = 'classes';
-    document.querySelectorAll('.schema-tab').forEach(b => b.classList.remove('active'));
-    const classTab = document.querySelector('.schema-tab[onclick*="classes"]');
-    if (classTab) classTab.classList.add('active');
-    doParse();
+    const combined = S._storedZpl
+      ? S._storedZpl.trimEnd() + '\n' + topText
+      : topText;
+    api('PUT', '/api/namespace/zpl', { text: combined }).then(async () => {
+      S._storedZpl = combined;
+      renderDefsRows(combined);
+      const parsed = await api('POST', '/api/parse', { text: combined, language: 'zpl' }).catch(() => null);
+      if (parsed) { S.lastParsed = parsed.policy_set; S.serializedZpl = parsed.serialized_zpl || ''; }
+      renderSchemaBody();
+    }).catch(e => setStatus('error', 'Save failed: ' + e.message));
   }
+  navigate('editor', document.getElementById('nav-editor'));
 }
 
 function _assistAppendMsg(role, text, extraHtml = '') {
@@ -1784,7 +2221,7 @@ function assistSaveAll() {
   });
   S.assist.staged = [];
   _syncAssistTop();
-  closeAssist();
+  closeAssistPage();
 }
 
 function assistDeleteAll() {
@@ -1796,16 +2233,20 @@ function assistDeleteAll() {
 
 function setSchemaTab(tab, btn) {
   S.schemaTab = tab;
-  document.querySelectorAll('.schema-tab').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
   if (tab === 'entities') { loadEntities(); return; }
   renderSchemaBody();
 }
 
 function renderSchemaBody() {
+  // If on testing page, render tests there
+  if (S.currentPage === 'testing') {
+    const body = document.getElementById('testing-body');
+    if (body) renderTests(body);
+    return;
+  }
   const body = document.getElementById('schema-body');
+  if (!body) return;
   const ps = S.lastParsed;
-  if (S.schemaTab === 'tests') { renderTests(body); return; }
   if (S.schemaTab === 'entities') { renderEntities(body); return; }
   if (!ps) {
     body.innerHTML = '<div class="empty-state">Parse ZPL to see<br>classes and rules here.</div>';
@@ -2134,13 +2575,17 @@ function renderOwnerTree(node, depth) {
   const ownerMeta = node.owner_username
     ? `<div class="cfg-ns-meta">owner: ${esc(node.owner_username)}</div>`
     : `<div class="cfg-ns-unowned">No owner assigned</div>`;
+  const descMeta = node.description
+    ? `<div class="cfg-ns-meta" style="color:var(--muted);font-style:italic">${esc(node.description)}</div>`
+    : '';
   const nodeData = JSON.stringify({ id: node.id, display_name: node.display_name,
-    owner_username: node.owner_username || '' });
+    owner_username: node.owner_username || '', description: node.description || '' });
   return `<div class="cfg-ns-node" id="ns-node-${uid}">
     <div class="cfg-ns-item">
       <div class="cfg-ns-hdr">
         <div class="cfg-ns-hdr-text">
           <div class="cfg-ns-name">${esc(node.display_name)}</div>
+          ${descMeta}
           ${ownerMeta}
         </div>
         <div class="cfg-ns-actions">
@@ -2309,6 +2754,8 @@ function _nsNewFormHtml(uid, title, createCall, cancelCall) {
       <h6>${title}</h6>
       <div class="cfg-row"><label>Namespace name</label>
         <input id="nn-ns-${uid}" placeholder="e.g. Marketing"></div>
+      <div class="cfg-row"><label>Description <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <input id="nn-desc-${uid}" placeholder="e.g. Marketing and Sales"></div>
       <div class="cfg-row"><label>Owner username (optional)</label>
         <input id="nn-user-${uid}" placeholder="leave blank — assign later"
                onblur="checkOwnerExists('${uid}')"></div>
@@ -2365,12 +2812,13 @@ function toggleNsNew(uid) {
 async function doCreateUnder(uid) {
   const key  = uid || '_top';
   const ns   = document.getElementById(`nn-ns-${key}`).value.trim();
+  const desc = document.getElementById(`nn-desc-${key}`)?.value.trim() || '';
   const user = document.getElementById(`nn-user-${key}`).value.trim();
   const pw   = document.getElementById(`nn-pw-${key}`)?.value || '';
   const email= document.getElementById(`nn-email-${key}`).value.trim();
   const msg  = document.getElementById(`nn-msg-${key}`);
   if (!ns) { msg.className='cfg-msg err'; msg.textContent='Namespace name required.'; return; }
-  const body = { display_name: ns, owner_email: email };
+  const body = { display_name: ns, owner_email: email, description: desc };
   if (user) body.owner_username = user;
   if (pw)   body.owner_password = pw;
   body.parent_id = uid || (S._ownerTree && S._ownerTree.id);
@@ -2392,6 +2840,8 @@ function toggleNsEdit(uid, nodeDataJson) {
       <h6>Edit namespace</h6>
       <div class="cfg-row"><label>Namespace name</label>
         <input id="ed-ns-${uid}" value="${esc(node.display_name)}"></div>
+      <div class="cfg-row"><label>Description <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <input id="ed-desc-${uid}" value="${esc(node.description || '')}" placeholder="e.g. Marketing and Sales"></div>
       <div class="cfg-row"><label>Owner username</label>
         <input id="ed-user-${uid}" value="${esc(node.owner_username)}" placeholder="leave blank to keep current owner"></div>
       <div class="cfg-row"><label>Password <span style="font-weight:400;color:var(--muted)">(if creating new owner)</span></label>
@@ -2406,13 +2856,15 @@ function toggleNsEdit(uid, nodeDataJson) {
 
 async function doSaveOwner(uid) {
   const ns   = document.getElementById(`ed-ns-${uid}`).value.trim();
+  const desc = document.getElementById(`ed-desc-${uid}`)?.value.trim() ?? null;
   const user = document.getElementById(`ed-user-${uid}`).value.trim();
   const pw   = document.getElementById(`ed-pw-${uid}`).value;
   const msg  = document.getElementById(`ed-msg-${uid}`);
   const body = {};
-  if (ns)   body.display_name = ns;
-  if (user) body.owner_username = user;
-  if (pw)   body.owner_password = pw;
+  if (ns)           body.display_name = ns;
+  if (desc !== null) body.description = desc;
+  if (user)         body.owner_username = user;
+  if (pw)           body.owner_password = pw;
   try {
     await api('PATCH', `/api/namespaces/${uid}`, body);
     msg.className='cfg-msg ok'; msg.textContent='Saved.';
@@ -2714,61 +3166,48 @@ function toggleYamlDetail(el) {
   el.appendChild(wrap);
 }
 
-function openStmtEdit(el) {
-  // Close any other open edit areas first
-  document.querySelectorAll('.stmt-edit-wrap').forEach(w => w.remove());
-  // Remove JSON detail if open
-  el.querySelector('.json-detail-wrap')?.remove();
-
+async function openStmtEdit(el) {
   const original = _stmtZpl(el);
-  const wrap = document.createElement('div');
-  wrap.className = 'stmt-edit-wrap';
-  wrap.onclick = e => e.stopPropagation();
+  if (!original) return;
 
-  const ta = document.createElement('textarea');
-  ta.value = original;
+  // Remove the statement from stored ZPL and save
+  const current = S._storedZpl || '';
+  const lines = current.split('\n');
+  const idx = lines.findIndex(l => l.trim() === original.trim());
+  if (idx !== -1) lines.splice(idx, 1);
+  const updated = lines.join('\n').trim();
 
-  const acts = document.createElement('div');
-  acts.className = 'stmt-edit-actions';
+  try {
+    await api('PUT', '/api/namespace/zpl', { text: updated });
+    S._storedZpl = updated;
+    renderDefsRows(updated);
+  } catch(e) { setStatus('error', 'Edit failed: ' + e.message); return; }
 
-  const saveBtn = document.createElement('button');
-  saveBtn.className = 'save';
-  saveBtn.textContent = 'Save';
-  saveBtn.onclick = () => {
-    const newZpl = ta.value.trim();
-    if (!newZpl) return;
-    const editor = document.getElementById('zpl-editor');
-    const current = editor.value;
-    // Replace original statement text; fall back to append if not found
-    const updated = original && current.includes(original)
-      ? current.replace(original, newZpl)
-      : current + '\n' + newZpl;
-    editor.value = updated;
-    wrap.remove();
-    markDirty();
-    doParse();
-  };
-
-  const cancelBtn = document.createElement('button');
-  cancelBtn.textContent = 'Cancel';
-  cancelBtn.onclick = () => wrap.remove();
-
-  acts.appendChild(saveBtn);
-  acts.appendChild(cancelBtn);
-  wrap.appendChild(ta);
-  wrap.appendChild(acts);
-  el.appendChild(wrap);
-  setTimeout(() => ta.focus(), 30);
+  // Copy to upper staging textarea
+  const upper = document.getElementById('zpl-upper');
+  if (upper) {
+    upper.value = original;
+    upper.focus();
+    upper.select();
+  }
+  document.getElementById('accept-bar')?.classList.remove('visible');
+  document.getElementById('error-bar')?.classList.remove('visible');
+  // Scroll upper zone into view
+  document.getElementById('input-zone')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  setStatus('idle', 'Editing — modify above and Accept to save');
 }
 
 function deleteStmt(el) {
   const zpl = _stmtZpl(el);
   if (!zpl) return;
-  const editor = document.getElementById('zpl-editor');
-  const updated = editor.value.replace(zpl, '').replace(/\n{3,}/g, '\n\n').trim();
-  editor.value = updated;
-  markDirty();
-  doParse();
+  const updated = (S._storedZpl || '').replace(zpl, '').replace(/\n{3,}/g, '\n\n').trim();
+  api('PUT', '/api/namespace/zpl', { text: updated }).then(async () => {
+    S._storedZpl = updated;
+    renderDefsRows(updated);
+    const parsed = await api('POST', '/api/parse', { text: updated, language: 'zpl' }).catch(() => null);
+    if (parsed) { S.lastParsed = parsed.policy_set; S.serializedZpl = parsed.serialized_zpl || ''; renderSchemaBody(); }
+    setStatus('ok', 'Deleted');
+  }).catch(e => setStatus('error', 'Delete failed: ' + e.message));
 }
 
 // ── JSON detail toggle ─────────────────────────────────────────────────────
@@ -2800,76 +3239,7 @@ function toggleJsonDetail(el) {
   el.appendChild(wrap);
 }
 
-// ── Panel toggle & resize ──────────────────────────────────────────────────
-
-function updateGridColumns() {
-  let cols;
-  if (S.panelExpanded) {
-    cols = `${S.sidebarWidth}px 4px 0px 0px 1fr`;
-  } else {
-    const right = S.panelOpen ? `${S.panelWidth}px` : '0px';
-    cols = `${S.sidebarWidth}px 4px 1fr 4px ${right}`;
-  }
-  document.getElementById('layout').style.gridTemplateColumns = cols;
-}
-
-function togglePanel() {
-  if (S.panelExpanded) toggleSchemaExpand(); // collapse expand first
-  S.panelOpen = !S.panelOpen;
-  document.getElementById('panel-toggle').textContent = S.panelOpen ? '⊟' : '⊞';
-  updateGridColumns();
-}
-
-function toggleSchemaExpand() {
-  S.panelExpanded = !S.panelExpanded;
-  if (S.panelExpanded) {
-    S.panelOpen = true;
-    document.getElementById('schema-expand').textContent = '⊟';
-    document.getElementById('panel-toggle').textContent = '⊞';
-  } else {
-    document.getElementById('schema-expand').textContent = '⊞';
-    document.getElementById('panel-toggle').textContent = S.panelOpen ? '⊟' : '⊞';
-  }
-  updateGridColumns();
-}
-
-function initResizers() {
-  setupResizer('resizer-left', (dx) => {
-    const maxSidebar = window.innerWidth - 8 - 60;
-    S.sidebarWidth = Math.max(60, Math.min(maxSidebar, S.sidebarWidth + dx));
-  });
-  setupResizer('resizer-right', (dx) => {
-    const maxPanel = window.innerWidth - S.sidebarWidth - 8 - 60;
-    S.panelWidth = Math.max(60, Math.min(maxPanel, S.panelWidth - dx));
-  });
-}
-
-function setupResizer(id, onDrag) {
-  const el = document.getElementById(id);
-  el.addEventListener('mousedown', e => {
-    e.preventDefault();
-    let lastX = e.clientX;
-    el.classList.add('dragging');
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-
-    const onMove = e => {
-      const dx = e.clientX - lastX;
-      lastX = e.clientX;
-      onDrag(dx);
-      updateGridColumns();
-    };
-    const onUp = () => {
-      el.classList.remove('dragging');
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  });
-}
+// ── (Panel toggle & col-resize removed — new left-nav SPA layout) ──────────
 
 // ── Logout ─────────────────────────────────────────────────────────────────
 
@@ -3297,23 +3667,21 @@ function _analystRender(ns, data) {
 }
 
 async function trRunAnalyst(deep = false) {
-  const modal    = document.getElementById('analyst-modal');
-  const body     = document.getElementById('analyst-body');
-  const label    = document.getElementById('analyst-ns-label');
-  const deepBtn  = document.getElementById('analyst-deep-btn');
-  if (!modal || !body) return;
+  navigate('audit', document.getElementById('nav-audit'));
+  const body    = document.getElementById('analyst-body');
+  const label   = document.getElementById('analyst-ns-label');
+  const deepBtn = document.getElementById('analyst-deep-btn');
+  if (!body) return;
 
   const msg = deep ? 'Deep analysis (Sonnet)…' : 'Analyzing policy…';
   body.innerHTML = `<div style="padding:1rem;color:var(--muted);font-size:0.83rem">${msg}</div>`;
-  label.textContent = '';
-  modal.classList.add('open');
+  if (label) label.textContent = '';
   if (deepBtn) { deepBtn.disabled = true; deepBtn.textContent = deep ? 'Running…' : 'Deep ▶'; }
-
   const saveBtn = document.getElementById('analyst-save-btn');
   if (saveBtn) saveBtn.style.display = 'none';
   try {
     const resp = await api('POST', '/api/namespace/analyze', { deep });
-    label.textContent = `Namespace: ${resp.namespace}${deep ? ' · deep' : ''}`;
+    if (label) label.textContent = `Namespace: ${resp.namespace}${deep ? ' · deep' : ''}`;
     body.innerHTML = _analystRender(resp.namespace, resp.result || {});
     S.analyst = {
       ns: resp.namespace,
@@ -3330,9 +3698,7 @@ async function trRunAnalyst(deep = false) {
   }
 }
 
-function closeAnalystModal() {
-  document.getElementById('analyst-modal')?.classList.remove('open');
-}
+function closeAnalystModal() { /* no-op: analyst is now a page */ }
 
 async function analystSaveReport() {
   const a = S.analyst;
@@ -3389,18 +3755,17 @@ function renderReportsList() {
 }
 
 async function openReport(reportId) {
-  const modal = document.getElementById('analyst-modal');
-  const body  = document.getElementById('analyst-body');
-  const label = document.getElementById('analyst-ns-label');
+  navigate('audit', document.getElementById('nav-audit'));
+  const body    = document.getElementById('analyst-body');
+  const label   = document.getElementById('analyst-ns-label');
   const saveBtn = document.getElementById('analyst-save-btn');
-  if (!modal || !body) return;
+  if (!body) return;
   body.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.83rem">Loading…</div>';
   if (saveBtn) saveBtn.style.display = 'none';
-  modal.classList.add('open');
   try {
     const r = await api('GET', `/api/reports/${reportId}`);
     const modeLabel = r.mode === 'deep' ? ' · deep' : '';
-    label.textContent = `${r.title}${modeLabel}`;
+    if (label) label.textContent = `${r.title}${modeLabel}`;
     body.innerHTML = _analystRender(r.namespace_name, r.result || {});
     S.analyst = null;
   } catch (e) {
@@ -3418,24 +3783,17 @@ async function deleteReport(reportId) {
   }
 }
 
-function toggleReportsPanel() {
-  const panel = document.getElementById('reports-panel');
-  const btn = event.target;
-  if (!panel) return;
-  const open = panel.style.display !== 'none';
-  panel.style.display = open ? 'none' : '';
-  btn.textContent = open ? '▶' : '▼';
-}
+function toggleReportsPanel() { /* no-op: reports is now a page */ }
 
 function analystApplyFix(zpl, btn) {
-  const ta = document.getElementById('zpl-editor');
-  if (!ta) return;
-  const cur = ta.value.trimEnd();
-  ta.value = cur ? cur + '\n' + zpl : zpl;
-  btn.textContent = '✓ Added';
+  const upper = document.getElementById('zpl-upper');
+  if (!upper) return;
+  const cur = upper.value.trimEnd();
+  upper.value = cur ? cur + '\n' + zpl : zpl;
+  btn.textContent = '✓ Staged';
   btn.style.background = '#16a34a';
   btn.disabled = true;
-  doParse();
+  navigate('editor', document.getElementById('nav-editor'));
 }
 
 // ── Busy overlay ──────────────────────────────────────────────────────────

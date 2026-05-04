@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZPR Policy Builder — Mockup</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --nav-w: 220px;
+    --nav-bg: #ffffff;
+    --nav-border: #e2e8f0;
+    --nav-text: #334155;
+    --nav-muted: #94a3b8;
+    --nav-active-bg: #eff6ff;
+    --nav-active-text: #1d4ed8;
+    --nav-active-border: #2563eb;
+    --nav-hover-bg: #f8fafc;
+
+    --bg: #f1f5f9;
+    --surface: #ffffff;
+    --surface2: #f8fafc;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --muted: #64748b;
+    --accent: #2563eb;
+    --accent-bg: #eff6ff;
+    --green: #15803d;
+    --green-bg: #f0fdf4;
+    --green-border: #86efac;
+    --red: #dc2626;
+    --red-bg: #fef2f2;
+    --red-border: #fca5a5;
+    --amber: #b45309;
+    --amber-bg: #fffbeb;
+    --amber-border: #fcd34d;
+
+    --font: system-ui, -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --radius: 6px;
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 16px; line-height: 1.5; overflow: hidden; }
+
+  /* ── Shell ───────────────────────────────────────── */
+  .shell { display: flex; height: 100vh; }
+
+  /* ── Left Nav ────────────────────────────────────── */
+  .left-nav {
+    width: var(--nav-w); flex-shrink: 0;
+    background: var(--nav-bg);
+    border-right: 1px solid var(--nav-border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  .nav-brand {
+    padding: 1.1rem 1.1rem 0.9rem;
+    font-size: 1rem; font-weight: 700; color: var(--accent);
+    border-bottom: 1px solid var(--nav-border);
+    flex-shrink: 0; letter-spacing: -0.01em;
+  }
+
+  .nav-scroll { flex: 1; overflow-y: auto; padding: 0.5rem 0; }
+
+  .nav-section-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--nav-muted);
+    padding: 0.8rem 1.1rem 0.3rem;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 0.55rem;
+    padding: 0.55rem 1.1rem;
+    font-size: 0.92rem; color: var(--nav-text);
+    cursor: pointer; border-left: 3px solid transparent;
+    transition: background 0.1s;
+    user-select: none;
+  }
+  .nav-item:hover { background: var(--nav-hover-bg); }
+  .nav-item.active {
+    background: var(--nav-active-bg); color: var(--nav-active-text);
+    border-left-color: var(--nav-active-border); font-weight: 600;
+  }
+
+  /* Namespace tree in nav */
+  .ns-tree-section { padding: 0.3rem 0 0.5rem; }
+  .ns-tree-item {
+    display: flex; align-items: center; gap: 0.4rem;
+    padding: 0.35rem 1.1rem 0.35rem;
+    font-size: 0.88rem; color: var(--nav-text);
+    cursor: pointer; border-left: 3px solid transparent;
+    transition: background 0.1s;
+  }
+  .ns-tree-item:hover { background: var(--nav-hover-bg); }
+  .ns-tree-item.ns-active {
+    background: var(--nav-active-bg); color: var(--nav-active-text);
+    border-left-color: var(--nav-active-border); font-weight: 600;
+  }
+  .ns-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--nav-muted); flex-shrink: 0; }
+  .ns-dot.active { background: var(--accent); }
+  .ns-indent { color: #cbd5e1; font-family: var(--mono); font-size: 0.8rem; flex-shrink: 0; }
+
+  .nav-footer {
+    border-top: 1px solid var(--nav-border);
+    padding: 0.75rem 1.1rem;
+    font-size: 0.85rem; color: var(--muted);
+    flex-shrink: 0;
+  }
+  .nav-footer .username { font-weight: 600; color: var(--text); display: block; margin-bottom: 0.3rem; }
+  .nav-footer-links { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+  .nav-footer-links a { color: var(--muted); text-decoration: none; font-size: 0.8rem; }
+  .nav-footer-links a:hover { color: var(--accent); }
+
+  /* ── Main Content ────────────────────────────────── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .page-header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 0.75rem 1.5rem;
+    display: flex; align-items: center; gap: 0.75rem;
+    flex-shrink: 0;
+  }
+  .page-header h1 { font-size: 1.2rem; font-weight: 700; }
+  .page-header .breadcrumb { font-size: 0.9rem; color: var(--muted); margin-left: auto; }
+  .page-header .breadcrumb span { color: var(--accent); font-weight: 600; }
+
+  .page { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+  .page.active { display: flex; }
+
+  /* ── Buttons ─────────────────────────────────────── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    padding: 0.45rem 1rem; border-radius: var(--radius);
+    font-size: 0.9rem; font-weight: 500; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); transition: all 0.1s; white-space: nowrap;
+  }
+  .btn:hover { background: var(--surface2); }
+  .btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+  .btn.primary:hover { background: #1d4ed8; }
+  .btn.success { background: var(--green); color: white; border-color: var(--green); }
+  .btn.danger { background: var(--red); color: white; border-color: var(--red); }
+  .btn.sm { padding: 0.3rem 0.7rem; font-size: 0.82rem; }
+  .btn.ghost { background: none; border-color: transparent; color: var(--muted); }
+  .btn.ghost:hover { background: var(--surface2); color: var(--text); }
+
+  /* ── Policy Editor Page ──────────────────────────── */
+  .editor-page { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Upper input zone */
+  .input-zone {
+    background: var(--surface);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .input-zone-toolbar {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.65rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .input-zone-label {
+    font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--muted); margin-right: 0.25rem;
+  }
+  .input-zone-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+  .input-zone textarea {
+    width: 100%; flex: 1; min-height: 80px; resize: none;
+    border: none; outline: none;
+    font-family: var(--mono); font-size: 0.95rem; line-height: 1.7;
+    padding: 1rem 1.25rem;
+    background: var(--surface); color: var(--text);
+  }
+  .input-zone textarea::placeholder { color: #94a3b8; }
+
+  /* Inline error/success zone */
+  .inline-feedback {
+    padding: 0 1.25rem 0.75rem; display: none;
+  }
+  .feedback-line {
+    display: flex; align-items: flex-start; gap: 0.5rem;
+    font-size: 0.88rem; padding: 0.5rem 0.75rem;
+    border-radius: var(--radius); margin-bottom: 0.3rem;
+  }
+  .feedback-line.error { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
+  .feedback-line.success { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+  .feedback-line.info { background: var(--accent-bg); color: var(--accent); border: 1px solid #bfdbfe; }
+
+  /* Accept / Discard action bar */
+  .accept-bar {
+    display: none; align-items: center; gap: 0.6rem;
+    padding: 0.6rem 1.25rem 0.75rem;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .accept-bar.visible { display: flex; }
+  .accept-bar-label { font-size: 0.88rem; color: var(--muted); margin-right: 0.25rem; }
+
+  /* Horizontal resizer */
+  .h-divider {
+    height: 6px; flex-shrink: 0; cursor: row-resize;
+    background: var(--border); transition: background 0.1s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .h-divider:hover, .h-divider.dragging { background: var(--accent); }
+  .h-divider::after { content: ''; width: 32px; height: 2px; background: rgba(255,255,255,0.7); border-radius: 2px; }
+
+  /* Lower definitions zone */
+  .defs-zone { display: flex; flex-direction: column; overflow: hidden; }
+  .defs-toolbar {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.6rem 1.25rem;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .defs-label {
+    font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--muted);
+  }
+  .view-toggle { display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .view-toggle button {
+    padding: 0.3rem 0.75rem; font-size: 0.82rem; border: none;
+    background: var(--surface); color: var(--muted); cursor: pointer;
+  }
+  .view-toggle button.active { background: var(--accent); color: white; }
+
+  .defs-body { flex: 1; overflow-y: auto; padding: 0.75rem 1.25rem; }
+
+  /* Policy table */
+  .policy-section { margin-bottom: 1.25rem; }
+  .policy-section-header {
+    font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--muted);
+    padding: 0.4rem 0; margin-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .policy-row {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.55rem 0.75rem; border-radius: var(--radius);
+    font-size: 0.92rem; transition: background 0.1s;
+    border-bottom: 1px solid var(--border);
+  }
+  .policy-row:hover { background: var(--surface2); }
+  .policy-row.new-row { background: var(--green-bg); animation: fadeIn 0.4s; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; } }
+  .policy-row-text { flex: 1; font-family: var(--mono); font-size: 0.88rem; color: var(--text); }
+  .policy-row-badge {
+    font-size: 0.72rem; padding: 0.1rem 0.45rem; border-radius: 999px;
+    font-weight: 600; flex-shrink: 0;
+  }
+  .badge-class { background: #dbeafe; color: #1e40af; }
+  .badge-allow { background: #dcfce7; color: #15803d; }
+  .badge-never { background: #fee2e2; color: #b91c1c; }
+  .badge-new { background: #fef9c3; color: #854d0e; }
+  .row-actions { display: flex; gap: 0.3rem; flex-shrink: 0; }
+
+  /* ZPL view */
+  .zpl-view {
+    display: none; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    font-family: var(--mono); font-size: 0.88rem; line-height: 1.8;
+    white-space: pre; overflow-x: auto;
+  }
+
+  /* ── Shared page styles ──────────────────────────── */
+  .page-body { flex: 1; overflow-y: auto; padding: 1.5rem; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.75rem; }
+  .form-row { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 0.75rem; }
+  .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
+  .form-group label { font-size: 0.82rem; font-weight: 600; color: var(--muted); }
+  .form-group input, .form-group select {
+    padding: 0.5rem 0.75rem; border-radius: var(--radius);
+    border: 1px solid var(--border); font-size: 0.92rem;
+    background: var(--surface); color: var(--text); min-width: 140px;
+  }
+  .result-badge {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.35rem 0.9rem; border-radius: 999px;
+    font-size: 0.88rem; font-weight: 700;
+  }
+  .result-allow { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+  .result-deny  { background: var(--red-bg);   color: var(--red);   border: 1px solid var(--red-border); }
+
+  /* AI Assist */
+  .chat-area { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; }
+  .chat-bubble {
+    padding: 0.75rem 1rem; border-radius: var(--radius);
+    font-size: 0.92rem; line-height: 1.6; max-width: 85%;
+  }
+  .chat-user { background: var(--accent-bg); border: 1px solid #bfdbfe; color: var(--text); align-self: flex-end; }
+  .chat-ai { background: var(--surface2); border: 1px solid var(--border); color: var(--text); align-self: flex-start; }
+  .chat-code { font-family: var(--mono); font-size: 0.85rem; background: var(--surface); border: 1px solid var(--border); padding: 0.75rem 1rem; border-radius: var(--radius); margin-top: 0.4rem; }
+
+  /* Namespace manager */
+  .ns-mgmt-item {
+    display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.6rem 0.75rem; border-radius: var(--radius);
+    font-size: 0.92rem; border: 1px solid var(--border);
+    background: var(--surface); margin-bottom: 0.5rem;
+  }
+  .ns-mgmt-indent { color: #cbd5e1; font-family: var(--mono); font-size: 0.88rem; }
+
+  /* Reports */
+  .report-row {
+    display: flex; align-items: flex-start; gap: 0.75rem;
+    padding: 0.75rem 1rem; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    margin-bottom: 0.6rem; cursor: pointer; transition: background 0.1s;
+  }
+  .report-row:hover { background: var(--surface2); }
+  .report-title { font-size: 0.95rem; font-weight: 600; }
+  .report-meta { font-size: 0.82rem; color: var(--muted); margin-top: 0.15rem; }
+
+  /* Policy Audit */
+  .issue-card {
+    border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; margin-bottom: 0.75rem;
+  }
+  .issue-header {
+    display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.7rem 1rem; cursor: pointer; background: var(--surface);
+  }
+  .issue-header:hover { background: var(--surface2); }
+  .sev-chip { font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 999px; flex-shrink: 0; }
+  .sev-high { background: #fee2e2; color: #b91c1c; }
+  .sev-med  { background: #fef3c7; color: #92400e; }
+  .sev-low  { background: #f1f5f9; color: var(--muted); }
+  .issue-body { display: none; padding: 0.75rem 1rem; border-top: 1px solid var(--border); background: var(--surface2); font-size: 0.88rem; line-height: 1.6; }
+  .issue-body.open { display: block; }
+  .issue-rule { font-family: var(--mono); font-size: 0.85rem; background: var(--surface); border: 1px solid var(--border); padding: 0.4rem 0.6rem; border-radius: 4px; margin-bottom: 0.5rem; }
+
+  /* User Guide */
+  .guide-body { max-width: 720px; }
+  .guide-body h2 { font-size: 1.1rem; font-weight: 700; margin: 1.5rem 0 0.5rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+  .guide-body h2:first-child { border-top: none; margin-top: 0; }
+  .guide-body p { font-size: 0.92rem; margin-bottom: 0.75rem; color: var(--text); }
+  .guide-body ul { margin: 0 0 0.75rem 1.5rem; }
+  .guide-body li { font-size: 0.92rem; margin-bottom: 0.3rem; }
+  .guide-body code { font-family: var(--mono); font-size: 0.82rem; background: var(--surface2); padding: 0.1em 0.35em; border-radius: 3px; border: 1px solid var(--border); }
+
+  /* Placeholder */
+  .placeholder { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); gap: 0.5rem; }
+  .placeholder-icon { font-size: 2.5rem; }
+  .placeholder-title { font-size: 1.1rem; font-weight: 600; color: var(--text); }
+  .placeholder-sub { font-size: 0.9rem; }
+
+  /* yaml detail */
+  .yaml-detail { display:none; padding: 0.6rem 0.75rem; background: var(--surface2); border-top: 1px solid var(--border); font-family: var(--mono); font-size: 0.82rem; }
+  .yaml-detail.open { display: block; }
+
+  /* io dropdown */
+  .io-item { padding: 0.5rem 0.75rem; font-size: 0.9rem; cursor: pointer; color: var(--text); }
+  .io-item:hover { background: var(--surface2); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- ── Left Nav ── -->
+<nav class="left-nav">
+  <div class="nav-brand">ZPR Policy Builder</div>
+
+  <div class="nav-scroll">
+    <div style="display:flex;align-items:center;padding:0.8rem 1.1rem 0.3rem">
+      <span class="nav-section-label" style="padding:0;flex:1">Namespace</span>
+      <button onclick="toggleNsTree(this)"
+          style="font-size:1.5rem;background:none;border:none;cursor:pointer;color:var(--nav-muted);padding:0 0.2rem;border-radius:3px;line-height:1"
+          title="Collapse namespace tree">▾</button>
+    </div>
+    <div class="ns-tree-section" id="ns-tree-section">
+      <div class="ns-tree-item" onclick="switchNs('corp', this)">
+        <span class="ns-dot"></span>
+        <span>Corp</span>
+      </div>
+      <div class="ns-tree-item ns-active" onclick="switchNs('ws', this)">
+        <span class="ns-indent">└ </span>
+        <span class="ns-dot active"></span>
+        <span>Ws</span>
+      </div>
+      <div class="ns-tree-item" onclick="switchNs('ec', this)">
+        <span class="ns-indent">&nbsp;&nbsp;└ </span>
+        <span class="ns-dot"></span>
+        <span>EC</span>
+      </div>
+    </div>
+
+    <div style="height:1px;background:var(--nav-border);margin:0.4rem 0"></div>
+
+    <div class="nav-section-label">Pages</div>
+    <div class="nav-item active" onclick="navigate('editor', this)">Policy Editor</div>
+    <div class="nav-item" onclick="navigate('aiassist', this)">AI Assist</div>
+    <div class="nav-item" onclick="navigate('audit', this)">Policy Audit</div>
+    <div class="nav-item" onclick="navigate('testing', this)">Testing</div>
+    <div class="nav-item" onclick="navigate('nsmgr', this)">Namespace Manager</div>
+    <div class="nav-item" onclick="navigate('reports', this)">Reports</div>
+    <div class="nav-item" onclick="navigate('guide', this)">User Guide</div>
+  </div>
+
+  <div class="nav-footer">
+    <span class="username">LT</span>
+    <div class="nav-footer-links">
+      <a href="#">Profile</a>
+      <a href="#">Sign out</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Main ── -->
+<div class="main">
+
+  <!-- ══ Policy Editor ══ -->
+  <div class="page active" id="page-editor">
+    <div class="page-header">
+      <h1>Policy Editor</h1>
+      <div class="breadcrumb">Corp › <span>Ws</span></div>
+    </div>
+    <div class="editor-page">
+
+      <!-- Upper: input zone -->
+      <div class="input-zone" style="height:40%">
+        <div class="input-zone-toolbar">
+          <span class="input-zone-label" id="editor-mode-label">ZPL Mode</span>
+          <div class="view-toggle">
+            <button class="active" id="mode-zpl" onclick="setEditorMode('zpl')">ZPL</button>
+            <button id="mode-entity" onclick="setEditorMode('entity')">Entities</button>
+          </div>
+          <button class="btn sm primary" onclick="checkZpl()">Check ZPL</button>
+          <button class="btn sm ghost" onclick="clearInput()">Clear</button>
+          <div style="position:relative">
+            <button class="btn sm ghost" onclick="toggleIoMenu(event)">↑↓ Import/Export</button>
+            <div id="io-menu" style="display:none;position:absolute;top:100%;left:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,0.12);min-width:200px;z-index:100;margin-top:2px">
+              <div style="padding:0.3rem 0.75rem;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);border-bottom:1px solid var(--border)">ZPL Policies</div>
+              <div class="io-item" onclick="closeIoMenu()">↑ Import ZPL</div>
+              <div class="io-item" onclick="closeIoMenu()">↑ Import YAML</div>
+              <div class="io-item" onclick="closeIoMenu()">↓ Export ZPL</div>
+              <div class="io-item" onclick="closeIoMenu()">↓ Export YAML</div>
+              <div style="padding:0.3rem 0.75rem;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">Entities</div>
+              <div class="io-item" onclick="closeIoMenu()">↑ Import YAML</div>
+              <div class="io-item" onclick="closeIoMenu()">↑ Import LDAP</div>
+              <div class="io-item" onclick="closeIoMenu()">↓ Export YAML</div>
+              <div class="io-item" onclick="closeIoMenu()">↓ Export LDAP</div>
+            </div>
+          </div>
+        </div>
+        <div class="input-zone-scroll">
+          <textarea id="zpl-input" placeholder="Type ZPL here, e.g.:&#10;Allow shift-supervisor to read fulfillment-system.&#10;Never allow floor-worker to access payroll-system.">Allow shift-supervisor to read fulfillment-system.</textarea>
+
+          <!-- Inline feedback (errors / success shown here) -->
+          <div class="inline-feedback" id="inline-feedback"></div>
+
+          <!-- Accept/Discard bar -->
+          <div class="accept-bar" id="accept-bar">
+            <span class="accept-bar-label">Add to policy?</span>
+            <button class="btn sm success" onclick="acceptZpl()">✓ Accept</button>
+            <button class="btn sm ghost" onclick="discardZpl()">✕ Discard</button>
+            <button class="btn sm" onclick="navigate('aiassist', document.querySelector('.nav-item:nth-child(2)'))">✨ Send to AI Assist</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Horizontal resizer -->
+      <div class="h-divider" id="h-divider"></div>
+
+      <!-- Lower: definitions panel -->
+      <div class="defs-zone" id="defs-zone" style="height:55%">
+        <div class="defs-toolbar">
+          <span class="defs-label">Definitions (Classes &amp; Rules)</span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:0.4rem">
+            <div class="view-toggle">
+              <button class="active" id="btn-zpl" onclick="setView('zpl')">ZPL</button>
+              <button id="btn-table" onclick="setView('table')">Table</button>
+            </div>
+            <button class="btn sm ghost" onclick="showAll()">Show All</button>
+            <button class="btn sm ghost" style="color:var(--red)" onclick="if(confirm('Delete all stored policies?'))clearAll()">Delete All</button>
+            <div class="view-toggle">
+              <button class="active" id="btn-fullns" onclick="toggleNsMode('full',this)">Full NS</button>
+              <button id="btn-shortns" onclick="toggleNsMode('short',this)">Short</button>
+            </div>
+          </div>
+        </div>
+        <div class="defs-body" id="defs-body">
+
+          <!-- TABLE VIEW -->
+          <div id="view-table" style="display:none">
+            <div class="policy-section">
+              <div class="policy-section-header">
+                <span>Classes</span>
+                <span style="font-weight:400;color:var(--muted);font-size:0.75rem">(7)</span>
+              </div>
+              <div id="classes-list">
+                <div class="policy-row">
+                  <span class="policy-row-badge badge-class">class</span>
+                  <span class="policy-row-text">warehouse-worker</span>
+                  <div class="row-actions">
+                    <button class="btn sm ghost">Edit</button>
+                    <button class="btn sm ghost">✕</button>
+                    <button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button>
+                  </div>
+                </div>
+                <div class="yaml-detail"><pre>class_name: warehouse-worker
+extends: user
+attributes:
+  - zone
+  - shift
+  - employment-type</pre></div>
+                <div class="policy-row">
+                  <span class="policy-row-badge badge-class">class</span>
+                  <span class="policy-row-text">floor-worker <span style="color:var(--muted);font-size:0.82rem">extends warehouse-worker</span></span>
+                  <div class="row-actions">
+                    <button class="btn sm ghost">Edit</button>
+                    <button class="btn sm ghost">✕</button>
+                    <button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button>
+                  </div>
+                </div>
+                <div class="yaml-detail"></div>
+                <div class="policy-row">
+                  <span class="policy-row-badge badge-class">class</span>
+                  <span class="policy-row-text">shift-supervisor <span style="color:var(--muted);font-size:0.82rem">extends warehouse-worker</span></span>
+                  <div class="row-actions">
+                    <button class="btn sm ghost">Edit</button>
+                    <button class="btn sm ghost">✕</button>
+                    <button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button>
+                  </div>
+                </div>
+                <div class="yaml-detail"></div>
+                <div class="policy-row">
+                  <span class="policy-row-badge badge-class">class</span>
+                  <span class="policy-row-text">warehouse-machine <span style="color:var(--muted);font-size:0.82rem">endpoint</span></span>
+                  <div class="row-actions">
+                    <button class="btn sm ghost">Edit</button>
+                    <button class="btn sm ghost">✕</button>
+                    <button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button>
+                  </div>
+                </div>
+                <div class="yaml-detail"></div>
+                <div class="policy-row">
+                  <span class="policy-row-badge badge-class">class</span>
+                  <span class="policy-row-text">system-controller <span style="color:var(--muted);font-size:0.82rem">extends warehouse-machine</span></span>
+                  <div class="row-actions">
+                    <button class="btn sm ghost">Edit</button>
+                    <button class="btn sm ghost">✕</button>
+                    <button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button>
+                  </div>
+                </div>
+                <div class="yaml-detail"></div>
+                <div class="policy-row">
+                  <span class="policy-row-badge badge-class">class</span>
+                  <span class="policy-row-text">warehouse-service</span>
+                  <div class="row-actions">
+                    <button class="btn sm ghost">Edit</button>
+                    <button class="btn sm ghost">✕</button>
+                    <button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button>
+                  </div>
+                </div>
+                <div class="yaml-detail"></div>
+                <div class="policy-row">
+                  <span class="policy-row-badge badge-class">class</span>
+                  <span class="policy-row-text">payroll-system <span style="color:var(--muted);font-size:0.82rem">extends warehouse-service · classification:confidential</span></span>
+                  <div class="row-actions">
+                    <button class="btn sm ghost">Edit</button>
+                    <button class="btn sm ghost">✕</button>
+                    <button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button>
+                  </div>
+                </div>
+                <div class="yaml-detail"></div>
+              </div>
+            </div>
+
+            <div class="policy-section">
+              <div class="policy-section-header">
+                <span>Rules</span>
+                <span style="font-weight:400;color:var(--muted);font-size:0.75rem" id="rule-count">(4)</span>
+              </div>
+              <div id="rules-list">
+                <div class="policy-row">
+                  <span class="policy-row-badge badge-allow">allow</span>
+                  <span class="policy-row-text">floor-worker → use → packing-machine</span>
+                  <div class="row-actions">
+                    <button class="btn sm ghost">Edit</button>
+                    <button class="btn sm ghost">✕</button>
+                    <button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button>
+                  </div>
+                </div>
+                <div class="yaml-detail"></div>
+                <div class="policy-row">
+                  <span class="policy-row-badge badge-allow">allow</span>
+                  <span class="policy-row-text">shift-supervisor → use → warehouse-machine</span>
+                  <div class="row-actions">
+                    <button class="btn sm ghost">Edit</button>
+                    <button class="btn sm ghost">✕</button>
+                    <button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button>
+                  </div>
+                </div>
+                <div class="yaml-detail"></div>
+                <div class="policy-row">
+                  <span class="policy-row-badge badge-never">never</span>
+                  <span class="policy-row-text">floor-worker → use → system-controller</span>
+                  <div class="row-actions">
+                    <button class="btn sm ghost">Edit</button>
+                    <button class="btn sm ghost">✕</button>
+                    <button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button>
+                  </div>
+                </div>
+                <div class="yaml-detail"></div>
+                <div class="policy-row">
+                  <span class="policy-row-badge badge-allow">allow</span>
+                  <span class="policy-row-text">warehouse-manager → access → warehouse-service</span>
+                  <div class="row-actions">
+                    <button class="btn sm ghost">Edit</button>
+                    <button class="btn sm ghost">✕</button>
+                    <button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button>
+                  </div>
+                </div>
+                <div class="yaml-detail"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ZPL VIEW -->
+          <div id="view-zpl" style="display:block">
+            <div id="view-zpl-rows">
+              <div class="policy-row zpl-stmt-row" data-full="Define Ws.warehouse-worker as a user with zone and shift.">
+                <span class="policy-row-text" style="font-family:var(--mono);font-size:0.88rem">Define Ws.warehouse-worker as a user with zone and shift.</span>
+                <div class="row-actions"><button class="btn sm ghost">Edit</button><button class="btn sm ghost">✕</button><button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button></div>
+              </div><div class="yaml-detail"></div>
+              <div class="policy-row zpl-stmt-row" data-full="Define Ws.floor-worker as a Ws.warehouse-worker.">
+                <span class="policy-row-text" style="font-family:var(--mono);font-size:0.88rem">Define Ws.floor-worker as a Ws.warehouse-worker.</span>
+                <div class="row-actions"><button class="btn sm ghost">Edit</button><button class="btn sm ghost">✕</button><button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button></div>
+              </div><div class="yaml-detail"></div>
+              <div class="policy-row zpl-stmt-row" data-full="Define Ws.shift-supervisor as a Ws.warehouse-worker.">
+                <span class="policy-row-text" style="font-family:var(--mono);font-size:0.88rem">Define Ws.shift-supervisor as a Ws.warehouse-worker.</span>
+                <div class="row-actions"><button class="btn sm ghost">Edit</button><button class="btn sm ghost">✕</button><button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button></div>
+              </div><div class="yaml-detail"></div>
+              <div class="policy-row zpl-stmt-row" data-full="Define Ws.warehouse-machine as an endpoint with zone and status.">
+                <span class="policy-row-text" style="font-family:var(--mono);font-size:0.88rem">Define Ws.warehouse-machine as an endpoint with zone and status.</span>
+                <div class="row-actions"><button class="btn sm ghost">Edit</button><button class="btn sm ghost">✕</button><button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button></div>
+              </div><div class="yaml-detail"></div>
+              <div class="policy-row zpl-stmt-row" data-full="Define Ws.system-controller as a Ws.warehouse-machine with status:active.">
+                <span class="policy-row-text" style="font-family:var(--mono);font-size:0.88rem">Define Ws.system-controller as a Ws.warehouse-machine with status:active.</span>
+                <div class="row-actions"><button class="btn sm ghost">Edit</button><button class="btn sm ghost">✕</button><button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button></div>
+              </div><div class="yaml-detail"></div>
+              <div class="policy-row zpl-stmt-row" data-full="Define Ws.warehouse-service as a service with classification.">
+                <span class="policy-row-text" style="font-family:var(--mono);font-size:0.88rem">Define Ws.warehouse-service as a service with classification.</span>
+                <div class="row-actions"><button class="btn sm ghost">Edit</button><button class="btn sm ghost">✕</button><button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button></div>
+              </div><div class="yaml-detail"></div>
+              <div class="policy-row zpl-stmt-row" data-full="Define Ws.payroll-system as a Ws.warehouse-service with classification:confidential.">
+                <span class="policy-row-text" style="font-family:var(--mono);font-size:0.88rem">Define Ws.payroll-system as a Ws.warehouse-service with classification:confidential.</span>
+                <div class="row-actions"><button class="btn sm ghost">Edit</button><button class="btn sm ghost">✕</button><button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button></div>
+              </div><div class="yaml-detail"></div>
+              <div class="policy-row zpl-stmt-row" data-full="Allow Ws.floor-worker to use Ws.packing-machine.">
+                <span class="policy-row-text" style="font-family:var(--mono);font-size:0.88rem">Allow Ws.floor-worker to use Ws.packing-machine.</span>
+                <div class="row-actions"><button class="btn sm ghost">Edit</button><button class="btn sm ghost">✕</button><button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button></div>
+              </div><div class="yaml-detail"></div>
+              <div class="policy-row zpl-stmt-row" data-full="Allow Ws.shift-supervisor to use Ws.warehouse-machine.">
+                <span class="policy-row-text" style="font-family:var(--mono);font-size:0.88rem">Allow Ws.shift-supervisor to use Ws.warehouse-machine.</span>
+                <div class="row-actions"><button class="btn sm ghost">Edit</button><button class="btn sm ghost">✕</button><button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button></div>
+              </div><div class="yaml-detail"></div>
+              <div class="policy-row zpl-stmt-row" data-full="Never allow Ws.floor-worker to use Ws.system-controller.">
+                <span class="policy-row-text" style="font-family:var(--mono);font-size:0.88rem">Never allow Ws.floor-worker to use Ws.system-controller.</span>
+                <div class="row-actions"><button class="btn sm ghost">Edit</button><button class="btn sm ghost">✕</button><button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button></div>
+              </div><div class="yaml-detail"></div>
+              <div class="policy-row zpl-stmt-row" data-full="Allow Ws.warehouse-manager to access Ws.warehouse-service.">
+                <span class="policy-row-text" style="font-family:var(--mono);font-size:0.88rem">Allow Ws.warehouse-manager to access Ws.warehouse-service.</span>
+                <div class="row-actions"><button class="btn sm ghost">Edit</button><button class="btn sm ghost">✕</button><button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button></div>
+              </div><div class="yaml-detail"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ AI Assist ══ -->
+  <div class="page" id="page-aiassist">
+    <div class="page-header">
+      <h1>AI Assist</h1>
+      <div class="breadcrumb">Corp › <span>Ws</span></div>
+    </div>
+    <div class="page-body">
+      <div class="card">
+        <h3>Type ZPL to check</h3>
+        <textarea style="width:100%;height:100px;resize:none;font-family:var(--mono);font-size:0.95rem;padding:0.75rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2)" placeholder="Type ZPL here…">Define cat as an animal with name.</textarea>
+        <div style="margin-top:0.6rem;display:flex;gap:0.5rem">
+          <button class="btn primary" onclick="aiCheck()">Check</button>
+          <button class="btn ghost">Clear</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Conversation</h3>
+        <div class="chat-area" id="ai-chat">
+          <div class="chat-bubble chat-user">Define cat as an animal with name.</div>
+          <div class="chat-bubble chat-ai">
+            <strong>Error:</strong> <code>animal</code> is not a valid base class. Valid base classes are <code>user</code>, <code>service</code>, and <code>endpoint</code>.<br><br>
+            Did you mean to create a new class that extends <code>user</code>? Try:
+            <div class="chat-code">Define cat as a user with name.</div>
+          </div>
+          <div style="display:flex;gap:0.5rem;align-self:flex-start">
+            <button class="btn sm success">✓ Accept fix</button>
+            <button class="btn sm ghost">Edit</button>
+            <button class="btn sm ghost">Discard</button>
+          </div>
+          <div class="chat-bubble chat-user">Define worker as a corp.employee with department.</div>
+          <div class="chat-bubble chat-ai">
+            ✓ Valid. <code>corp.employee</code> is defined in the parent namespace.<br>
+            <div class="chat-code">Define Ws.worker as a Corp.employee with department.</div>
+          </div>
+          <div style="display:flex;gap:0.5rem;align-self:flex-start">
+            <button class="btn sm success">✓ Accept</button>
+            <button class="btn sm ghost">Edit</button>
+            <button class="btn sm ghost">Discard</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Policy Audit ══ -->
+  <div class="page" id="page-audit">
+    <div class="page-header">
+      <h1>Policy Audit</h1>
+      <div class="breadcrumb">Corp › <span>Ws</span></div>
+    </div>
+    <div class="page-body">
+      <div class="card" style="display:flex;align-items:center;gap:0.75rem">
+        <button class="btn primary" onclick="runAudit()">🔍 Run Audit</button>
+        <div class="view-toggle">
+          <button class="active">Fast</button>
+          <button>Deep</button>
+        </div>
+        <span style="font-size:0.88rem;color:var(--muted)">Analyzes Ws and all sub-namespaces</span>
+        <div style="margin-left:auto;display:flex;gap:0.5rem">
+          <button class="btn sm success" onclick="this.textContent='✓ Saved';this.disabled=true">💾 Save Report</button>
+          <button class="btn sm ghost" style="color:var(--red)" onclick="document.getElementById('audit-results').innerHTML=''">✕ Clear</button>
+        </div>
+      </div>
+      <div id="audit-results">
+        <div style="display:flex;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap">
+          <span style="background:#fee2e2;color:#b91c1c;padding:0.2rem 0.75rem;border-radius:999px;font-size:0.88rem;font-weight:700">HIGH: 1</span>
+          <span style="background:#fef3c7;color:#92400e;padding:0.2rem 0.75rem;border-radius:999px;font-size:0.88rem;font-weight:700">MEDIUM: 2</span>
+          <span style="background:#f1f5f9;color:var(--muted);padding:0.2rem 0.75rem;border-radius:999px;font-size:0.88rem;font-weight:700">LOW: 1</span>
+        </div>
+        <p style="font-size:0.92rem;margin-bottom:1rem">Policy has a reasonable hierarchy but <strong>warehouse-manager</strong> gains unintended access to confidential systems via parent-class inheritance. Three medium issues involve inconsistent never-allow coverage.</p>
+
+        <div class="issue-card">
+          <div class="issue-header" onclick="toggleIssue(this)">
+            <span class="sev-chip sev-high">HIGH</span>
+            <span style="font-size:0.78rem;color:var(--muted)">Overly Broad</span>
+            <span style="flex:1;font-size:0.92rem;font-weight:500">warehouse-manager gains access to confidential systems</span>
+            <span style="color:var(--muted);font-size:0.8rem">▾</span>
+          </div>
+          <div class="issue-body">
+            <div class="issue-rule">Allow Ws.warehouse-manager to access Ws.warehouse-service.</div>
+            <p><strong>Finding:</strong> warehouse-service is the parent class of payroll-system (classification:confidential). This rule grants managers access to payroll via inheritance.</p>
+            <p><strong>Fix:</strong> Add explicit never-allow guards or narrow the allow rule to specific subclasses.</p>
+            <div style="margin-top:0.6rem;display:flex;align-items:center;gap:0.5rem">
+              <code style="flex:1;background:var(--green-bg);border:1px solid var(--green-border);padding:0.35rem 0.6rem;border-radius:4px;font-size:0.85rem">Never allow Ws.warehouse-manager to access Ws.payroll-system.</code>
+              <button class="btn sm success" onclick="this.textContent='✓ Added';this.disabled=true">+ Add</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="issue-card">
+          <div class="issue-header" onclick="toggleIssue(this)">
+            <span class="sev-chip sev-med">MEDIUM</span>
+            <span style="font-size:0.78rem;color:var(--muted)">Coverage Gap</span>
+            <span style="flex:1;font-size:0.92rem;font-weight:500">fulfillment-system has no allow rules</span>
+            <span style="color:var(--muted);font-size:0.8rem">▾</span>
+          </div>
+          <div class="issue-body">
+            <p><strong>Finding:</strong> fulfillment-system (classification:internal) has no direct allow rules. floor-worker and shift-supervisor likely need access but are denied by default.</p>
+            <p><strong>Fix:</strong> Add explicit allow rules for roles that need fulfillment access.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Testing ══ -->
+  <div class="page" id="page-testing">
+    <div class="page-header">
+      <h1>Testing</h1>
+      <div class="breadcrumb">Corp › <span>Ws</span></div>
+    </div>
+    <div class="page-body">
+      <div class="card">
+        <h3>Manual Test</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Subject Class</label>
+            <input type="text" value="floor-worker">
+          </div>
+          <div class="form-group">
+            <label>Action</label>
+            <select><option>use</option><option>access</option><option>read</option></select>
+          </div>
+          <div class="form-group">
+            <label>Object Class</label>
+            <input type="text" value="system-controller">
+          </div>
+          <button class="btn primary" style="align-self:flex-end" onclick="runTest()">Run</button>
+        </div>
+        <div id="test-result" style="margin-top:0.5rem">
+          <span class="result-badge result-deny">✕ DENY — never allow Ws.floor-worker to use Ws.system-controller</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Generate Test Suite</h3>
+        <div class="form-row">
+          <div class="form-group"><label>Positive tests</label><input type="number" value="3" style="width:80px"></div>
+          <div class="form-group"><label>Adversarial tests</label><input type="number" value="3" style="width:80px"></div>
+          <button class="btn primary" style="align-self:flex-end">⚡ Generate</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Test Suite <span style="font-weight:400;color:var(--muted);font-size:0.88rem">(4 tests)</span></h3>
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">
+          <button class="btn sm primary">▶ Run All</button>
+          <button class="btn sm ghost">↓ Export</button>
+          <button class="btn sm ghost">✕ Reset</button>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:0.9rem">
+          <tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:0.4rem 0.5rem;font-size:0.78rem;color:var(--muted);font-weight:600">Test</th>
+            <th style="text-align:left;padding:0.4rem 0.5rem;font-size:0.78rem;color:var(--muted);font-weight:600">Expected</th>
+            <th style="text-align:left;padding:0.4rem 0.5rem;font-size:0.78rem;color:var(--muted);font-weight:600">Result</th>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:0.5rem">floor-worker uses packing-machine</td>
+            <td><span class="result-badge result-allow" style="font-size:0.78rem;padding:0.1rem 0.5rem">ALLOW</span></td>
+            <td><span style="color:var(--green);font-weight:700;font-size:0.88rem">PASS</span></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:0.5rem">floor-worker uses system-controller</td>
+            <td><span class="result-badge result-deny" style="font-size:0.78rem;padding:0.1rem 0.5rem">DENY</span></td>
+            <td><span style="color:var(--green);font-weight:700;font-size:0.88rem">PASS</span></td>
+          </tr>
+          <tr>
+            <td style="padding:0.5rem">shift-supervisor accesses payroll-system</td>
+            <td><span class="result-badge result-deny" style="font-size:0.78rem;padding:0.1rem 0.5rem">DENY</span></td>
+            <td><span style="color:var(--green);font-weight:700;font-size:0.88rem">PASS</span></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Namespace Manager ══ -->
+  <div class="page" id="page-nsmgr">
+    <div class="page-header">
+      <h1>Namespace Manager</h1>
+    </div>
+    <div class="page-body">
+      <div style="display:flex;gap:0.75rem;margin-bottom:1rem">
+        <button class="btn primary">+ New Namespace</button>
+      </div>
+      <div class="ns-mgmt-item">
+        <span style="font-weight:600;min-width:6rem">Corp</span>
+        <span style="font-size:0.84rem;color:var(--muted);flex:1;padding-left:0.5rem">Corporate Policy Root</span>
+        <span style="font-size:0.82rem;color:var(--muted);margin-right:0.75rem">owner: LT</span>
+        <button class="btn sm ghost">Edit</button>
+        <button class="btn sm ghost">+ Sub</button>
+        <button class="btn sm ghost" style="color:var(--red);border:1px solid var(--red-border);font-weight:700;padding:0.3rem 0.55rem">⊠</button>
+      </div>
+      <div class="ns-mgmt-item" style="margin-left:1.5rem">
+        <span class="ns-mgmt-indent">└ </span>
+        <span style="font-weight:600;min-width:5rem;color:var(--accent)">Ws</span>
+        <span style="font-size:0.84rem;color:var(--muted);flex:1;padding-left:0.5rem">Warehouse Operations</span>
+        <span style="font-size:0.82rem;color:var(--muted);margin-right:0.75rem">owner: LT · active</span>
+        <button class="btn sm ghost">Edit</button>
+        <button class="btn sm ghost">+ Sub</button>
+        <button class="btn sm ghost" style="color:var(--red);border:1px solid var(--red-border);font-weight:700;padding:0.3rem 0.55rem">⊠</button>
+      </div>
+      <div class="ns-mgmt-item" style="margin-left:3rem">
+        <span class="ns-mgmt-indent">└ </span>
+        <span style="font-weight:600;min-width:3.5rem">EC</span>
+        <span style="font-size:0.84rem;color:var(--muted);flex:1;padding-left:0.5rem">East Coast Distribution</span>
+        <span style="font-size:0.82rem;color:var(--muted);margin-right:0.75rem">owner: LT</span>
+        <button class="btn sm ghost">Edit</button>
+        <button class="btn sm ghost">+ Sub</button>
+        <button class="btn sm ghost" style="color:var(--red);border:1px solid var(--red-border);font-weight:700;padding:0.3rem 0.55rem">⊠</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Reports ══ -->
+  <div class="page" id="page-reports">
+    <div class="page-header">
+      <h1>Audit Reports</h1>
+    </div>
+    <div class="page-body">
+      <div class="report-row">
+        <div style="flex:1">
+          <div class="report-title">Policy Audit — Ws — 2026-05-04 v2</div>
+          <div class="report-meta">Namespace: Ws · deep · 12 issues (3 HIGH, 5 MEDIUM, 4 LOW)</div>
+        </div>
+        <button class="btn sm ghost" style="color:var(--red)">✕</button>
+      </div>
+      <div class="report-row">
+        <div style="flex:1">
+          <div class="report-title">Policy Audit — Ws — 2026-05-03 v1</div>
+          <div class="report-meta">Namespace: Ws · fast · 1 issue (1 MEDIUM)</div>
+        </div>
+        <button class="btn sm ghost" style="color:var(--red)">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ User Guide ══ -->
+  <div class="page" id="page-guide">
+    <div class="page-header">
+      <h1>User Guide</h1>
+    </div>
+    <div class="page-body">
+      <div class="guide-body">
+        <h2>Overview</h2>
+        <p>ZPR Policy Builder is a browser-based editor for writing and testing <strong>ZPL (Zero-trust Policy Language)</strong> policies. ZPL provides a structured, human-readable way to express access control rules.</p>
+        <ul>
+          <li>Write ZPL incrementally — enter new statements, check them, accept or discard</li>
+          <li>Organize policies into a namespace tree with delegated ownership</li>
+          <li>Generate and run test suites including AI-generated adversarial tests</li>
+          <li>Run the AI-powered <strong>Policy Audit</strong> to detect shadowing, gaps, and overly broad rules</li>
+          <li>Save audit results as versioned <strong>Reports</strong></li>
+        </ul>
+        <h2>Policy Editor</h2>
+        <p>The Policy Editor has two zones. The <strong>upper zone</strong> is where you enter new ZPL. Type one or more statements, click <strong>Check ZPL</strong>, and any errors appear directly below your text. If valid, an Accept / Discard / Send to AI bar appears. Clicking <strong>Accept</strong> adds the new statements to the full policy shown in the lower panel.</p>
+        <p>The <strong>lower zone</strong> shows all accepted policies for the active namespace. Switch between <strong>Table</strong> view (with Edit / Delete / yaml per row) and <strong>ZPL</strong> view (the full canonical text).</p>
+        <h2>Namespace Selector</h2>
+        <p>The namespace tree in the left nav shows your full hierarchy. Click any namespace to make it active — all pages operate on the active namespace.</p>
+        <h2>Policy Audit</h2>
+        <p>Run a <strong>Fast</strong> audit (a few seconds, Haiku model) or a <strong>Deep</strong> audit (~2 minutes, Sonnet model) on the active namespace and all sub-namespaces. Results show color-coded issues (HIGH / MEDIUM / LOW) with findings, recommended fixes, and one-click <strong>+ Add</strong> buttons for fixes expressible as new ZPL rules.</p>
+        <h2>Reports</h2>
+        <p>After an audit completes, click <strong>Save</strong> to store the result as a versioned report. Reports are listed in the <strong>Reports</strong> page, newest first.</p>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.main -->
+</div><!-- /.shell -->
+
+<script>
+  // ── Navigation ────────────────────────────────────
+  function navigate(pageId, el) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-' + pageId).classList.add('active');
+    if (el) el.classList.add('active');
+  }
+
+  // ── Editor mode toggle ────────────────────────────
+  function setEditorMode(mode) {
+    document.getElementById('mode-zpl').classList.toggle('active', mode === 'zpl');
+    document.getElementById('mode-entity').classList.toggle('active', mode === 'entity');
+    const label = document.getElementById('editor-mode-label');
+    const ta = document.getElementById('zpl-input');
+    if (mode === 'zpl') {
+      label.textContent = 'ZPL Mode';
+      ta.placeholder = 'Type ZPL here, e.g.:\nAllow shift-supervisor to read fulfillment-system.\nNever allow floor-worker to access payroll-system.';
+    } else {
+      label.textContent = 'Entity Mode';
+      ta.placeholder = 'Define entities, e.g.:\nAlice is a floor-worker with zone:A, shift:day.\nPayroll-DB is a payroll-system with classification:confidential.';
+      ta.value = '';
+    }
+    clearInput();
+  }
+
+  // ── Import/Export menu ────────────────────────────
+  function toggleIoMenu(e) {
+    e.stopPropagation();
+    const menu = document.getElementById('io-menu');
+    menu.style.display = menu.style.display === 'none' ? '' : 'none';
+  }
+  function closeIoMenu() {
+    document.getElementById('io-menu').style.display = 'none';
+  }
+  document.addEventListener('click', () => closeIoMenu());
+
+  // ── Namespace tree toggle ─────────────────────────
+  function toggleNsTree(btn) {
+    const tree = document.getElementById('ns-tree-section');
+    const collapsed = tree.style.display === 'none';
+    tree.style.display = collapsed ? '' : 'none';
+    btn.textContent = collapsed ? '▾' : '▸';
+    btn.title = collapsed ? 'Collapse namespace tree' : 'Expand namespace tree';
+  }
+
+  // ── Namespace switching ───────────────────────────
+  function switchNs(ns, el) {
+    document.querySelectorAll('.ns-tree-item').forEach(i => i.classList.remove('ns-active'));
+    document.querySelectorAll('.ns-dot').forEach(d => d.classList.remove('active'));
+    el.classList.add('ns-active');
+    el.querySelector('.ns-dot').classList.add('active');
+    const names = { corp: 'Corp', ws: 'Ws', ec: 'EC' };
+    document.querySelectorAll('.breadcrumb span').forEach(b => b.textContent = names[ns] || ns);
+  }
+
+  // ── Policy Editor ─────────────────────────────────
+  function checkZpl() {
+    const text = document.getElementById('zpl-input').value.trim();
+    const fb = document.getElementById('inline-feedback');
+    const bar = document.getElementById('accept-bar');
+    if (!text) {
+      fb.style.display = 'block';
+      fb.innerHTML = '<div class="feedback-line error">⚠ No ZPL entered.</div>';
+      bar.classList.remove('visible');
+      return;
+    }
+    // Simulate: error if contains 'animal', success otherwise
+    if (text.toLowerCase().includes('animal')) {
+      fb.style.display = 'block';
+      fb.innerHTML = '<div class="feedback-line error">✗ Line 1: <code>animal</code> is not a valid base class. Use <code>user</code>, <code>service</code>, or <code>endpoint</code>.</div>';
+      bar.classList.remove('visible');
+    } else {
+      const count = text.split('\n').filter(l => l.trim()).length;
+      fb.style.display = 'block';
+      fb.innerHTML = `<div class="feedback-line success">✓ Valid — ${count} statement${count > 1 ? 's' : ''} parsed.</div>`;
+      bar.classList.add('visible');
+    }
+  }
+
+  function clearInput() {
+    document.getElementById('zpl-input').value = '';
+    document.getElementById('inline-feedback').style.display = 'none';
+    document.getElementById('accept-bar').classList.remove('visible');
+  }
+
+  function discardZpl() {
+    clearInput();
+  }
+
+  let ruleCount = 4;
+  let currentNsMode = 'full';
+
+  function _makeZplRow(text) {
+    const currentNs = document.querySelector('.breadcrumb span').textContent;
+    const displayed = currentNsMode === 'short'
+      ? text.replace(new RegExp('\\b' + currentNs + '\\.', 'g'), '')
+      : text;
+    const frag = document.createDocumentFragment();
+    const row = document.createElement('div');
+    row.className = 'policy-row zpl-stmt-row';
+    row.dataset.full = text;
+    row.innerHTML = `<span class="policy-row-text" style="font-family:var(--mono);font-size:0.88rem">${displayed}</span>
+      <div class="row-actions">
+        <button class="btn sm ghost">Edit</button>
+        <button class="btn sm ghost">✕</button>
+        <button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button>
+      </div>`;
+    const detail = document.createElement('div');
+    detail.className = 'yaml-detail';
+    frag.appendChild(row);
+    frag.appendChild(detail);
+    return frag;
+  }
+
+  function acceptZpl() {
+    const text = document.getElementById('zpl-input').value.trim();
+    if (!text) return;
+    // Add to table rules list
+    ruleCount++;
+    document.getElementById('rule-count').textContent = `(${ruleCount})`;
+    const rulesList = document.getElementById('rules-list');
+    const isNever = text.toLowerCase().startsWith('never');
+    const badge = isNever ? 'badge-never' : 'badge-allow';
+    const btext = isNever ? 'never' : 'allow';
+    const display = text.replace(/^(allow|never allow)\s+/i, '').replace(/\s+to\s+/i, ' → ').replace(/\s*\.$/, '');
+    const div = document.createElement('div');
+    div.innerHTML = `<div class="policy-row new-row">
+      <span class="policy-row-badge ${badge}">${btext}</span>
+      <span class="policy-row-text">${display}</span>
+      <span class="policy-row-badge badge-new" style="margin-left:auto">new</span>
+      <div class="row-actions">
+        <button class="btn sm ghost">Edit</button>
+        <button class="btn sm ghost">✕</button>
+        <button class="btn sm ghost" onclick="toggleYaml(this)">yaml</button>
+      </div>
+    </div><div class="yaml-detail"></div>`;
+    rulesList.appendChild(div);
+    // Add to ZPL view rows
+    document.getElementById('view-zpl-rows').appendChild(_makeZplRow(text));
+    clearInput();
+  }
+
+  function clearAll() {
+    document.getElementById('rules-list').innerHTML = '';
+    document.getElementById('classes-list').innerHTML = '';
+    document.getElementById('view-zpl-rows').innerHTML = '';
+    ruleCount = 0;
+    document.getElementById('rule-count').textContent = '(0)';
+  }
+
+  function showAll() {
+    const rows = document.getElementById('view-zpl-rows');
+    const extras = [
+      '# Corp namespace',
+      'Define Corp.employee as a user with department.',
+    ];
+    extras.reverse().forEach(text => {
+      rows.insertBefore(_makeZplRow(text), rows.firstChild);
+    });
+    setView('zpl');
+  }
+
+  // ── NS mode toggle ─────────────────────────────────
+  function toggleNsMode(mode, btn) {
+    currentNsMode = mode;
+    document.getElementById('btn-fullns').classList.toggle('active', mode === 'full');
+    document.getElementById('btn-shortns').classList.toggle('active', mode === 'short');
+    const currentNs = document.querySelector('.breadcrumb span').textContent;
+    document.querySelectorAll('.zpl-stmt-row').forEach(row => {
+      const full = row.dataset.full;
+      const span = row.querySelector('.policy-row-text');
+      if (!span) return;
+      span.textContent = mode === 'short'
+        ? full.replace(new RegExp('\\b' + currentNs + '\\.', 'g'), '')
+        : full;
+    });
+  }
+
+  // ── View toggle ────────────────────────────────────
+  function setView(v) {
+    document.getElementById('view-table').style.display = v === 'table' ? '' : 'none';
+    document.getElementById('view-zpl').style.display   = v === 'zpl'   ? 'block' : 'none';
+    document.getElementById('btn-table').classList.toggle('active', v === 'table');
+    document.getElementById('btn-zpl').classList.toggle('active', v === 'zpl');
+  }
+
+  // ── Horizontal divider drag ────────────────────────
+  (function() {
+    const divider = document.getElementById('h-divider');
+    if (!divider) return;
+    let dragging = false, startY = 0, startTop = 0, startBot = 0;
+
+    divider.addEventListener('mousedown', e => {
+      dragging = true;
+      startY = e.clientY;
+      const inputZone = divider.previousElementSibling;
+      const defsZone  = divider.nextElementSibling;
+      startTop = inputZone.getBoundingClientRect().height;
+      startBot = defsZone.getBoundingClientRect().height;
+      divider.classList.add('dragging');
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const dy = e.clientY - startY;
+      const inputZone = divider.previousElementSibling;
+      const defsZone  = divider.nextElementSibling;
+      const newTop = Math.max(80, startTop + dy);
+      const newBot = Math.max(80, startBot - dy);
+      inputZone.style.flex = 'none';
+      inputZone.style.height = newTop + 'px';
+      defsZone.style.flex = 'none';
+      defsZone.style.height = newBot + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (dragging) { dragging = false; divider.classList.remove('dragging'); }
+    });
+  })();
+
+  // ── YAML toggle ────────────────────────────────────
+  function toggleYaml(btn) {
+    const row = btn.closest('.policy-row');
+    const yaml = row.nextElementSibling;
+    if (!yaml || !yaml.classList.contains('yaml-detail')) return;
+    const open = yaml.classList.toggle('open');
+    if (open && !yaml.textContent.trim()) {
+      const name = row.querySelector('.policy-row-text').textContent.split(' ')[0];
+      yaml.innerHTML = `<pre>name: ${name}\ntype: ${row.querySelector('.policy-row-badge').textContent}\nnamespace: Ws</pre>`;
+    }
+    btn.textContent = open ? 'yaml ▴' : 'yaml';
+  }
+
+  // ── AI Assist ──────────────────────────────────────
+  function aiCheck() {
+    const chat = document.getElementById('ai-chat');
+    chat.innerHTML += `<div class="chat-bubble chat-user">Checking…</div>`;
+  }
+
+  // ── Policy Audit ───────────────────────────────────
+  function toggleIssue(header) {
+    const body = header.nextElementSibling;
+    body.classList.toggle('open');
+    const arrow = header.querySelector('span:last-child');
+    arrow.textContent = body.classList.contains('open') ? '▴' : '▾';
+  }
+
+  function runAudit() {
+    document.getElementById('audit-results').style.opacity = '0.5';
+    setTimeout(() => { document.getElementById('audit-results').style.opacity = '1'; }, 1200);
+  }
+
+  // ── Testing ────────────────────────────────────────
+  function runTest() {
+    const subj = document.querySelector('#page-testing input[type=text]').value;
+    const res = document.getElementById('test-result');
+    const deny = subj.includes('floor') || subj.includes('intern');
+    res.innerHTML = deny
+      ? `<span class="result-badge result-deny">✕ DENY — never allow rule matched</span>`
+      : `<span class="result-badge result-allow">✓ ALLOW — rule matched</span>`;
+  }
+</script>
+</body>
+</html>
