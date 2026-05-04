@@ -70,6 +70,8 @@
     <a href="#entities">Entities</a>
     <a href="#tests">Tests</a>
     <a href="#ai-assist">AI Assist</a>
+    <a href="#rule-analyst">Rule Analyst</a>
+    <a href="#audit-reports">Audit Reports</a>
   </div>
   <div class="nav-section">
     <div class="nav-title">Reference</div>
@@ -96,6 +98,8 @@
   <li>Define named entity instances (e.g. specific users, databases) for realistic testing</li>
   <li>Generate and run policy test suites — including AI-generated adversarial tests</li>
   <li>Use AI assistance to help author or explain ZPL</li>
+  <li>Run an AI-powered <strong>Rule Analyst</strong> to detect shadowing, gaps, and overly broad rules</li>
+  <li>Save analysis results as versioned <strong>Audit Reports</strong> accessible from the sidebar</li>
 </ul>
 
 <!-- Getting Started -->
@@ -141,6 +145,7 @@
   <tr><td><strong>Save</strong></td><td>Parse and save ZPL to the active namespace. The namespace prefix is injected automatically on save.</td></tr>
   <tr><td><strong>Reset</strong></td><td>Discard unsaved changes and reload the saved ZPL from the server.</td></tr>
   <tr><td><strong>Show All</strong></td><td>Load a read-only combined view of ZPL for the active namespace and all sub-namespaces.</td></tr>
+  <tr><td><strong>🔍 Rule Analyst</strong></td><td>Run an AI analysis of the active namespace policy (see <a href="#rule-analyst">Rule Analyst</a>).</td></tr>
   <tr><td><strong>⊕ Assist</strong></td><td>Open the AI assistant panel (see <a href="#ai-assist">AI Assist</a>).</td></tr>
   <tr><td><strong>↑↓</strong></td><td>Upload a ZPL file from disk, or download the current editor content.</td></tr>
   <tr><td><strong>⊟</strong></td><td>Collapse the right panel to give the editor more room.</td></tr>
@@ -243,6 +248,60 @@ Define internet-gateway as a gateway with external-network-connection:public-int
 <h2 id="ai-assist">AI Assist</h2>
 <p>Click <strong>⊕ Assist</strong> in the editor toolbar to open the AI assistant panel. You can ask questions about ZPL, request help authoring rules, or ask the assistant to explain what existing rules do.</p>
 <p>The assistant has access to the current ZPL editor content as context. Suggested edits can be applied directly to the editor.</p>
+
+<!-- Rule Analyst -->
+<h2 id="rule-analyst">Rule Analyst</h2>
+<p>The <strong>Rule Analyst</strong> uses AI to review your policy and identify issues that are difficult to spot by reading ZPL directly — things like rules that cancel each other out, access grants that are broader than intended due to class inheritance, or protective <code>never-allow</code> rules that should exist but don't.</p>
+<p>Click <strong>🔍 Rule Analyst</strong> in the ZPL editor toolbar to run an analysis of the active namespace and all its sub-namespaces. The analysis typically completes in a few seconds.</p>
+
+<h3>Reading the Report</h3>
+<p>Results appear in a modal with a summary at the top and a list of issues below. Each issue is color-coded by severity:</p>
+<table>
+  <tr><th>Severity</th><th>Meaning</th></tr>
+  <tr><td><span style="color:#ef4444;font-weight:600">HIGH</span></td><td>Security risk or unintended access bypass — review immediately</td></tr>
+  <tr><td><span style="color:#f59e0b;font-weight:600">MEDIUM</span></td><td>Likely unintended behavior or unclear policy intent</td></tr>
+  <tr><td><span style="color:#6b7280;font-weight:600">LOW</span></td><td>Redundant rule, cosmetic issue, or minor inconsistency</td></tr>
+</table>
+<p>Each issue card shows the relevant rule text, a one-sentence <strong>Finding</strong> explaining the problem, and a one-sentence <strong>Fix</strong> recommendation. Issue cards are collapsed by default — click a card to expand it.</p>
+<p>Categories with no issues found are listed at the bottom under <em>No issues in:</em>.</p>
+
+<h3>Applying a Suggested Fix</h3>
+<p>When the analyst can express the fix as a concrete ZPL statement (typically a new <code>never-allow</code> or <code>allow</code> rule), a green code block with a <strong>+ Add</strong> button appears inside the issue card. Clicking <strong>+ Add</strong> appends the suggested statement to the ZPL editor and immediately re-parses the policy. You can then review the change and click <strong>Save</strong> to persist it.</p>
+<p>Not all issues have a <strong>+ Add</strong> button — fixes that require rewriting or deleting an existing rule must be made manually.</p>
+
+<h3>Fast vs. Deep Mode</h3>
+<p>By default the analyst uses a fast AI model and returns results in a few seconds. For a more thorough analysis — covering subtler issues and more edge cases — click the <strong>Deep ▶</strong> button in the modal header. Deep mode uses a more capable model and may take up to two minutes.</p>
+<div class="note">The analyst examines the combined ZPL across the active namespace and all its sub-namespaces. Switch to the namespace you want to analyze before opening the analyst.</div>
+
+<h3>What the Analyst Checks</h3>
+<ul>
+  <li><strong>Shadowing</strong> — <code>never-allow</code> rules that block <code>allow</code> rules that look intentional; unreachable rules</li>
+  <li><strong>Overly broad rules</strong> — parent-class grants that unintentionally cover confidential or privileged subclasses</li>
+  <li><strong>Class inconsistencies</strong> — references to undefined classes, unknown attribute names, or mismatched values</li>
+  <li><strong>Coverage gaps</strong> — classes with no rules (accidental default-deny); missing <code>never-allow</code> for sensitive verbs</li>
+  <li><strong>Priority conflicts</strong> — rules at the same priority with overlapping subjects and objects, giving non-deterministic results</li>
+  <li><strong>Redundant rules</strong> — rules fully subsumed by another rule; exact duplicates</li>
+  <li><strong>Never-allow risks</strong> — guards that are too broad; missing hard blocks on destructive verbs for sensitive classes</li>
+  <li><strong>Structural issues</strong> — per-subclass blocking patterns that break when new subclasses are added; namespace scatter</li>
+</ul>
+
+<!-- Audit Reports -->
+<h2 id="audit-reports">Audit Reports</h2>
+<p>After a Rule Analyst run completes, you can save the result as a versioned <strong>Audit Report</strong>. Reports are stored in the database and persist across sessions.</p>
+
+<h3>Saving a Report</h3>
+<p>After the analyst returns results, a <strong>💾 Save</strong> button appears in the modal header. Click it to save. The report is titled automatically:</p>
+<pre><code>Policy Audit — &lt;namespace&gt; — &lt;date&gt; v&lt;n&gt;</code></pre>
+<p>The version number increments for each report saved for the same namespace — so running the analyst weekly on <code>Corp.WS</code> produces <em>Policy Audit — WS — 2026-05-03 v1</em>, <em>v2</em>, and so on.</p>
+
+<h3>Viewing Saved Reports</h3>
+<p>Saved reports appear in the <strong>Reports</strong> section at the bottom of the left sidebar. Click the <strong>▶</strong> toggle to expand it. Reports are listed newest-first with the namespace name, date, and a <em>deep</em> badge if the report came from a deep-mode analysis.</p>
+<p>Click any report in the list to open it in the analyst modal for review.</p>
+
+<h3>Deleting a Report</h3>
+<p>Each report row has an <strong>✕</strong> button on the right. Click it to permanently delete that report. You will be asked to confirm.</p>
+
+<div class="note">Reports are per-user — you only see reports you saved. The report stores the structured analysis result as JSON; the visual formatting is applied each time you open it, so it always renders in the current style.</div>
 
 <!-- Profile -->
 <h2 id="profile">Profile &amp; API Token</h2>
