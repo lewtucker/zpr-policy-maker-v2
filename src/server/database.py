@@ -127,6 +127,12 @@ async def init_db() -> None:
             await db.execute("ALTER TABLE users ADD COLUMN api_token TEXT")
         if not await _column_exists(db, "users", "email"):
             await db.execute("ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT ''")
+        if not await _column_exists(db, "users", "is_admin"):
+            await db.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
+            # First user ever created becomes admin
+            await db.execute(
+                "UPDATE users SET is_admin = 1 WHERE id = (SELECT id FROM users ORDER BY created_at LIMIT 1)"
+            )
         # Drop legacy columns (SQLite 3.35+)
         for _col in ("delegated", "delegated_to_user_id", "created_by_id"):
             if await _column_exists(db, "users", _col):
@@ -158,20 +164,20 @@ async def user_count() -> int:
 
 
 async def create_user(username: str, password: str, display_name: str | None = None,
-                      email: str = "") -> dict:
+                      email: str = "", is_admin: bool = False) -> dict:
     import uuid
     uid = uuid.uuid4().hex
     now = datetime.now(timezone.utc).isoformat()
     dn = display_name or username
     async with aiosqlite.connect(_DB_PATH) as db:
         await db.execute(
-            "INSERT INTO users (id, username, password_hash, display_name, email, created_at) "
-            "VALUES (?,?,?,?,?,?)",
-            (uid, username, hash_password(password), dn, email or "", now),
+            "INSERT INTO users (id, username, password_hash, display_name, email, is_admin, created_at) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (uid, username, hash_password(password), dn, email or "", int(is_admin), now),
         )
         await db.commit()
     return {"id": uid, "username": username, "display_name": dn, "email": email or "",
-            "created_at": now}
+            "is_admin": is_admin, "created_at": now}
 
 
 async def update_profile(user_id: str, email: str, display_name: str | None = None) -> None:
@@ -422,10 +428,16 @@ async def list_all_users() -> list[dict]:
     async with aiosqlite.connect(_DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT id, username, display_name, email, api_token, created_at FROM users ORDER BY created_at"
+            "SELECT id, username, display_name, email, api_token, is_admin, created_at FROM users ORDER BY created_at"
         ) as cur:
             rows = await cur.fetchall()
     return [dict(r) for r in rows]
+
+
+async def set_user_admin(user_id: str, is_admin: bool) -> None:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        await db.execute("UPDATE users SET is_admin = ? WHERE id = ?", (int(is_admin), user_id))
+        await db.commit()
 
 
 async def list_all_namespaces() -> list[dict]:

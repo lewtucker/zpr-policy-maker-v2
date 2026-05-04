@@ -288,7 +288,7 @@ async def setup_submit(request: Request):
     password = form.get("password") or ""
     if not username or not password:
         return HTMLResponse(_setup_html(error="Username and password required."), status_code=400)
-    user = await db.create_user(username, password)
+    user = await db.create_user(username, password, is_admin=True)
     dn = user.get("display_name") or user["username"]
     root_ns = await db.get_or_create_root_namespace(user["id"], dn)
     token = _make_session(user["id"], user["username"], dn, root_ns["id"], root_ns["display_name"])
@@ -397,9 +397,9 @@ async def set_token(req: SetTokenRequest, session: dict = Depends(get_session)):
 # ── Admin ─────────────────────────────────────────────────────────────────────
 
 async def get_admin_session(session: dict = Depends(get_session)) -> dict:
-    root = await db.get_root_namespace(session["login_user_id"])
-    if not root:
-        raise HTTPException(403, "Admin access requires owning a root namespace")
+    user = await db.get_user_by_id(session["login_user_id"])
+    if not user or not user.get("is_admin"):
+        raise HTTPException(403, "Admin access denied")
     return session
 
 
@@ -414,6 +414,7 @@ class AdminCreateUserRequest(BaseModel):
     password: str
     display_name: str = ""
     email: str = ""
+    is_admin: bool = False
 
 
 class AdminResetPasswordRequest(BaseModel):
@@ -437,7 +438,8 @@ async def admin_create_user(req: AdminCreateUserRequest,
     if existing:
         raise HTTPException(409, f"Username '{uname}' already exists")
     dn = req.display_name.strip() or uname
-    user = await db.create_user(uname, req.password, display_name=dn, email=req.email.strip())
+    user = await db.create_user(uname, req.password, display_name=dn, email=req.email.strip(),
+                                is_admin=req.is_admin)
     ns = await db.get_or_create_root_namespace(user["id"], dn)
     return {"user": user, "namespace": ns}
 
@@ -461,6 +463,22 @@ async def admin_delete_user(user_id: str, session: dict = Depends(get_admin_sess
     err = await db.delete_user(user_id)
     if err:
         raise HTTPException(400, err)
+    return {"ok": True}
+
+
+class AdminSetAdminRequest(BaseModel):
+    is_admin: bool
+
+
+@app.patch("/api/admin/users/{user_id}/admin")
+async def admin_set_admin(user_id: str, req: AdminSetAdminRequest,
+                          session: dict = Depends(get_admin_session)):
+    if user_id == session["login_user_id"] and not req.is_admin:
+        raise HTTPException(400, "Cannot remove your own admin privileges")
+    user = await db.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+    await db.set_user_admin(user_id, req.is_admin)
     return {"ok": True}
 
 

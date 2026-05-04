@@ -93,12 +93,13 @@
             <th>Display name</th>
             <th>Email</th>
             <th>Root namespace</th>
+            <th>Admin</th>
             <th>Created</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="users-body">
-          <tr><td colspan="6" class="empty">Loading…</td></tr>
+          <tr><td colspan="7" class="empty">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -121,6 +122,10 @@
         <div class="field">
           <label>Email</label>
           <input type="text" id="new-email" placeholder="optional">
+        </div>
+        <div class="field full" style="display:flex;align-items:center;gap:0.5rem;padding-top:0.25rem">
+          <input type="checkbox" id="new-is-admin" style="width:auto;margin:0">
+          <label for="new-is-admin" style="font-size:0.8rem;font-weight:500;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer">Admin privileges</label>
         </div>
       </div>
       <div class="form-actions">
@@ -197,46 +202,64 @@ async function loadUsers() {
     _users = await api('GET', '/api/admin/users');
     renderUsers();
   } catch(e) {
-    document.getElementById('users-body').innerHTML = `<tr><td colspan="6" class="empty" style="color:#ef4444">Error: ${esc(e.message)}</td></tr>`;
+    document.getElementById('users-body').innerHTML = `<tr><td colspan="7" class="empty" style="color:#ef4444">Error: ${esc(e.message)}</td></tr>`;
   }
 }
 
 function renderUsers() {
   document.getElementById('user-count').textContent = `${_users.length} user${_users.length !== 1 ? 's' : ''}`;
   if (!_users.length) {
-    document.getElementById('users-body').innerHTML = '<tr><td colspan="6" class="empty">No users found.</td></tr>';
+    document.getElementById('users-body').innerHTML = '<tr><td colspan="7" class="empty">No users found.</td></tr>';
     return;
   }
-  document.getElementById('users-body').innerHTML = _users.map(u => `
-    <tr>
+  document.getElementById('users-body').innerHTML = _users.map(u => {
+    const adminChecked = u.is_admin ? 'checked' : '';
+    return `<tr>
       <td class="mono">${esc(u.username)}</td>
       <td>${esc(u.display_name)}</td>
       <td style="color:var(--text-dim)">${esc(u.email) || '<span style="opacity:0.4">—</span>'}</td>
       <td><span class="badge badge-root">${esc(u.display_name || u.username)}</span></td>
+      <td style="text-align:center">
+        <input type="checkbox" ${adminChecked} onchange="toggleAdmin('${u.id}','${esc(u.username)}',this)" style="cursor:pointer">
+      </td>
       <td style="color:var(--text-dim);font-size:0.72rem">${u.created_at ? u.created_at.slice(0,10) : '—'}</td>
       <td style="text-align:right;white-space:nowrap">
         <button class="btn" onclick="openReset('${u.id}','${esc(u.username)}')">Reset pw</button>
         <button class="btn btn-danger" onclick="deleteUser('${u.id}','${esc(u.username)}')">Delete</button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
+}
+
+async function toggleAdmin(userId, username, checkbox) {
+  const isAdmin = checkbox.checked;
+  try {
+    await api('PATCH', `/api/admin/users/${userId}/admin`, { is_admin: isAdmin });
+  } catch(e) {
+    checkbox.checked = !isAdmin; // revert
+    try { alert(JSON.parse(e.message)?.detail || e.message); }
+    catch { alert(e.message); }
+  }
 }
 
 async function addUser() {
-  const uname = document.getElementById('new-username').value.trim();
-  const pw    = document.getElementById('new-password').value;
-  const dn    = document.getElementById('new-displayname').value.trim();
-  const email = document.getElementById('new-email').value.trim();
-  const msg   = document.getElementById('add-user-msg');
+  const uname   = document.getElementById('new-username').value.trim();
+  const pw      = document.getElementById('new-password').value;
+  const dn      = document.getElementById('new-displayname').value.trim();
+  const email   = document.getElementById('new-email').value.trim();
+  const isAdmin = document.getElementById('new-is-admin').checked;
+  const msg     = document.getElementById('add-user-msg');
   msg.textContent = '';
   if (!uname) { msg.className = 'msg err'; msg.textContent = 'Username is required'; return; }
   if (!pw)    { msg.className = 'msg err'; msg.textContent = 'Password is required'; return; }
   try {
-    await api('POST', '/api/admin/users', { username: uname, password: pw, display_name: dn, email });
+    await api('POST', '/api/admin/users', { username: uname, password: pw, display_name: dn, email, is_admin: isAdmin });
     msg.className = 'msg ok'; msg.textContent = `User "${uname}" created.`;
     document.getElementById('new-username').value = '';
     document.getElementById('new-password').value = '';
     document.getElementById('new-displayname').value = '';
     document.getElementById('new-email').value = '';
+    document.getElementById('new-is-admin').checked = false;
     await loadUsers();
     await loadNamespaces();
   } catch(e) {
