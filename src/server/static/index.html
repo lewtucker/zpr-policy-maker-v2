@@ -2428,15 +2428,17 @@ function renderClassesTable(body, classes) {
       const indent = depth ? `<span style="color:#cbd5e1;font-family:var(--font-mono)">${'  '.repeat(depth)}└ </span>` : '';
       const zpl = esc(c.zpl || '');
       const json = esc(JSON.stringify(c, null, 2));
-      html += `<div data-json="${json}" data-zpl="${zpl}" style="display:flex;align-items:flex-start;padding:0.35rem 0.75rem;border-bottom:1px solid var(--border);gap:0.5rem">
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:500;font-family:var(--font-mono);font-size:0.88rem">${indent}${esc(c.name)}<span style="color:var(--muted);font-size:0.8rem;font-family:sans-serif;margin-left:0.5rem">← ${esc(c.parent||'')}</span></div>
-          ${attrStr ? `<div style="color:var(--muted);font-size:0.78rem;margin-top:0.1rem">${esc(attrStr)}</div>` : ''}
-        </div>
-        <div style="display:flex;gap:0.25rem;flex-shrink:0;padding-top:0.1rem">
-          <button class="tool-btn" onclick="openStmtEdit(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">Edit</button>
-          <button class="tool-btn" onclick="event.stopPropagation();deleteStmt(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem;color:#ef4444">[x]</button>
-          <button class="tool-btn" onclick="event.stopPropagation();toggleYamlDetail(this.closest('[data-json]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">yaml</button>
+      html += `<div data-json="${json}" data-zpl="${zpl}" style="border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:flex-start;padding:0.35rem 0.75rem;gap:0.5rem">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:500;font-family:var(--font-mono);font-size:0.88rem">${indent}${esc(c.name)}<span style="color:var(--muted);font-size:0.8rem;font-family:sans-serif;margin-left:0.5rem">← ${esc(c.parent||'')}</span></div>
+            ${attrStr ? `<div style="color:var(--muted);font-size:0.78rem;margin-top:0.1rem">${esc(attrStr)}</div>` : ''}
+          </div>
+          <div style="display:flex;gap:0.25rem;flex-shrink:0;padding-top:0.1rem">
+            <button class="tool-btn" onclick="openStmtEdit(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">Edit</button>
+            <button class="tool-btn" onclick="event.stopPropagation();deleteStmt(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem;color:#ef4444">[x]</button>
+            <button class="tool-btn" onclick="event.stopPropagation();toggleYamlDetail(this.closest('[data-json]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">yaml</button>
+          </div>
         </div>
       </div>`;
     }
@@ -2468,13 +2470,15 @@ function renderRulesTable(body, rules) {
       const badgeText = effect === 'deny' ? 'NEVER' : 'ALLOW';
       const zpl = esc(r.zpl || '');
       const json = esc(JSON.stringify(r, null, 2));
-      html += `<div data-json="${json}" data-zpl="${zpl}" style="display:flex;align-items:center;padding:0.4rem 0.75rem;border-bottom:1px solid var(--border);gap:0.5rem">
-        <span class="rule-effect ${effect}" style="flex-shrink:0">${badgeText}</span>
-        <span style="flex:1;min-width:0;font-size:0.88rem">${esc(subj)}${onPart} <span style="color:var(--muted)">${esc(action)}</span> ${esc(obj)}</span>
-        <div style="display:flex;gap:0.25rem;flex-shrink:0">
-          <button class="tool-btn" onclick="openStmtEdit(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">Edit</button>
-          <button class="tool-btn" onclick="event.stopPropagation();deleteStmt(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem;color:#ef4444">[x]</button>
-          <button class="tool-btn" onclick="event.stopPropagation();toggleYamlDetail(this.closest('[data-json]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">yaml</button>
+      html += `<div data-json="${json}" data-zpl="${zpl}" style="border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;padding:0.4rem 0.75rem;gap:0.5rem">
+          <span class="rule-effect ${effect}" style="flex-shrink:0">${badgeText}</span>
+          <span style="flex:1;min-width:0;font-size:0.88rem">${esc(subj)}${onPart} <span style="color:var(--muted)">${esc(action)}</span> ${esc(obj)}</span>
+          <div style="display:flex;gap:0.25rem;flex-shrink:0">
+            <button class="tool-btn" onclick="openStmtEdit(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">Edit</button>
+            <button class="tool-btn" onclick="event.stopPropagation();deleteStmt(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem;color:#ef4444">[x]</button>
+            <button class="tool-btn" onclick="event.stopPropagation();toggleYamlDetail(this.closest('[data-json]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">yaml</button>
+          </div>
         </div>
       </div>`;
     }
