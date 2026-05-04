@@ -12,9 +12,15 @@ Covered (docs/zpl_rfc15_5.bnf):
   <subject-clause> ::= <user-spec> ("on" <endpoint-spec>)?
   <object-clause>  ::= <service-spec> ("on" <endpoint-spec>)?
 
+Extensions beyond RFC-15.5 (implemented here, not in the BNF):
+  - attr:value filters in Allow/Never subject/object specs:
+      Never allow backup:nightly servers to access backup-services.
+    The <word>:<word> token in a spec is treated as an attribute filter on the class.
+  - Dotted cross-namespace class references: corp.employee, corp.hr.employee
+  - AKA aliases: define employee AKA employees as a user with ...
+
 Out of scope (deferred):
   - Quoted strings with escapes (namespace names with dots are now supported)
-  - Quoted strings with escapes
   - Signal clauses (tolerated but ignored)
 
 The parser produces::
@@ -289,7 +295,7 @@ def _parse_define_attrs(p: _P) -> dict[str, dict]:
                 tag_values.append(_consume_name(p))
                 if not _eat_separator(p):
                     break
-                if _next_is_attr_prefix(p):
+                if _next_is_attr_prefix(p) or _next_looks_like_attr(p):
                     consumed_separator_for_outer = True
                     break
             existing_tags = attrs.get("tags", {}).get("values", [])
@@ -542,9 +548,11 @@ def build_alias_map(parsed: dict) -> dict[str, str]:
     return alias_map
 
 
-def infer_missing_classes(parsed: dict) -> list[dict]:
+def infer_missing_classes(parsed: dict, known_classes: set[str] | None = None) -> list[dict]:
     """Return define-dicts for classes used in rules but not defined in the document."""
     defined = {c["class"] for c in parsed.get("classes", [])} | _BUILTIN_CLASSES
+    if known_classes:
+        defined |= known_classes
     resolvable = defined | set(build_alias_map(parsed).keys())
     inferred: dict[str, dict] = {}
 
@@ -555,6 +563,34 @@ def infer_missing_classes(parsed: dict) -> list[dict]:
         _collect_spec(rule.get("server_endpoint"),   "endpoints", inferred, resolvable)
 
     return [_build_inferred(name, info) for name, info in inferred.items()]
+
+
+def infer_undefined_parents(parsed: dict, known_classes: set[str] | None = None) -> list[dict]:
+    """Return entries for Define parents that are not built-in, not locally defined,
+    and not in known_classes. Each entry: {parent, suggestion} where suggestion is
+    a fully-qualified name from known_classes if one matches the bare name."""
+    defined = {c["class"] for c in parsed.get("classes", [])} | _BUILTIN_CLASSES
+    known = known_classes or set()
+    resolvable = defined | known | set(build_alias_map(parsed).keys())
+
+    # Build a lookup: bare leaf name → fully-qualified name(s) from known_classes.
+    leaf_to_fq: dict[str, list[str]] = {}
+    for fq in known:
+        leaf = fq.rsplit(".", 1)[-1]
+        leaf_to_fq.setdefault(leaf, []).append(fq)
+
+    issues = []
+    for cls in parsed.get("classes", []):
+        parent = cls.get("parent")
+        if not parent or parent in resolvable:
+            continue
+        suggestions = leaf_to_fq.get(parent, [])
+        issues.append({
+            "parent": parent,
+            "used_in": cls.get("class", "?"),
+            "suggestion": suggestions[0] if len(suggestions) == 1 else None,
+        })
+    return issues
 
 
 def _collect_spec(spec: dict | None, parent: str, inferred: dict, defined: set) -> None:

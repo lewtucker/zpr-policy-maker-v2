@@ -1,0 +1,138 @@
+# Acme Corp — LDAP LDIF format
+#
+# LDAP is a Trusted Source for user and endpoint attributes (RFC-15.5 section 2.7).
+# Attribute name mappings at read time:
+#   LDAP employeeType  → ZPL employment-type
+#   LDAP title         → ZPL roles (multi-value: one title: line per role)
+#   LDAP businessCategory → ZPL clearance
+#   LDAP description   → ZPL os (on device entries)
+#   LDAP l             → ZPL managed tag (on device entries)
+#
+# Infrastructure entries (databases, services, APIs, servers) are not typical
+# LDAP content — they are included here for completeness using the generic
+# device objectClass. In practice they would come from a service registry.
+
+# ── Organisational structure ─────────────────────────────────────────────────
+
+dn: dc=acme-corp,dc=com
+objectClass: dcObject
+objectClass: organization
+dc: acme-corp
+o: Acme Corporation
+
+dn: ou=Employees,dc=acme-corp,dc=com
+objectClass: organizationalUnit
+ou: Employees
+
+dn: ou=Devices,dc=acme-corp,dc=com
+objectClass: organizationalUnit
+ou: Devices
+
+dn: ou=Infrastructure,dc=acme-corp,dc=com
+objectClass: organizationalUnit
+ou: Infrastructure
+
+dn: ou=Servers,ou=Infrastructure,dc=acme-corp,dc=com
+objectClass: organizationalUnit
+ou: Servers
+
+# ── Employees ────────────────────────────────────────────────────────────────
+
+dn: cn=Bob,ou=Employees,dc=acme-corp,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+cn: Bob
+sn: Baker
+givenName: Bob
+mail: bob@acme-corp.com
+department: sales
+employeeType: full-time        # maps to ZPL employment-type
+title: manager                 # maps to ZPL roles
+businessCategory: confidential # maps to ZPL clearance
+
+dn: cn=Ted,ou=Employees,dc=acme-corp,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+cn: Ted
+sn: Torres
+givenName: Ted
+mail: ted@acme-corp.com
+department: engineering
+employeeType: full-time
+title: engineer
+businessCategory: secret
+
+dn: cn=Carol,ou=Employees,dc=acme-corp,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+cn: Carol
+sn: Chen
+givenName: Carol
+mail: carol@acme-corp.com
+department: engineering
+employeeType: intern
+title: developer
+businessCategory: none
+
+# ── Devices ──────────────────────────────────────────────────────────────────
+
+dn: cn=Bob-laptop,ou=Devices,dc=acme-corp,dc=com
+objectClass: device
+cn: Bob-laptop
+serialNumber: ACM-LAP-001
+owner: cn=Bob,ou=Employees,dc=acme-corp,dc=com
+description: windows           # maps to ZPL os
+l: managed                     # maps to ZPL managed tag
+
+dn: cn=Ted-laptop,ou=Devices,dc=acme-corp,dc=com
+objectClass: device
+cn: Ted-laptop
+serialNumber: ACM-LAP-002
+owner: cn=Ted,ou=Employees,dc=acme-corp,dc=com
+description: macos             # maps to ZPL os
+l: managed                     # maps to ZPL managed tag
+
+dn: cn=Carol-laptop,ou=Devices,dc=acme-corp,dc=com
+objectClass: device
+cn: Carol-laptop
+serialNumber: ACM-LAP-003
+owner: cn=Carol,ou=Employees,dc=acme-corp,dc=com
+description: linux             # maps to ZPL os
+
+# ── Infrastructure ────────────────────────────────────────────────────────────
+# Services and databases are not typical LDAP entries. Shown here for reference;
+# in practice they come from a service registry (e.g. Consul) or config store.
+
+dn: cn=Acme-HR-database,ou=Infrastructure,dc=acme-corp,dc=com
+objectClass: device
+cn: Acme-HR-database
+description: hr                # maps to ZPL data
+businessCategory: confidential # maps to ZPL classification
+l: production                  # maps to ZPL env
+
+dn: cn=Acme-Sales-database,ou=Infrastructure,dc=acme-corp,dc=com
+objectClass: device
+cn: Acme-Sales-database
+description: customer
+businessCategory: confidential
+l: production
+
+dn: cn=Acme-intranet,ou=Infrastructure,dc=acme-corp,dc=com
+objectClass: device
+cn: Acme-intranet
+businessCategory: internal
+l: production
+
+dn: cn=Acme-partner-api,ou=Infrastructure,dc=acme-corp,dc=com
+objectClass: device
+cn: Acme-partner-api
+businessCategory: public
+l: production
+
+dn: cn=Acme-app-server,ou=Servers,ou=Infrastructure,dc=acme-corp,dc=com
+objectClass: device
+objectClass: groupOfNames
+cn: Acme-app-server
+member: cn=Acme-HR-database,ou=Infrastructure,dc=acme-corp,dc=com
+member: cn=Acme-intranet,ou=Infrastructure,dc=acme-corp,dc=com
+l: managed                     # maps to ZPL managed tag

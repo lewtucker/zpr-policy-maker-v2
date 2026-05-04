@@ -52,12 +52,13 @@ async def init_db() -> None:
     async with aiosqlite.connect(_DB_PATH) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                id               TEXT PRIMARY KEY,
-                username         TEXT NOT NULL UNIQUE,
-                password_hash    TEXT NOT NULL,
-                display_name     TEXT NOT NULL DEFAULT '',
-                created_by_id    TEXT,
-                created_at       TEXT NOT NULL
+                id            TEXT PRIMARY KEY,
+                username      TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                display_name  TEXT NOT NULL DEFAULT '',
+                email         TEXT NOT NULL DEFAULT '',
+                api_token     TEXT,
+                created_at    TEXT NOT NULL
             )
         """)
         await db.execute("""
@@ -83,9 +84,18 @@ async def init_db() -> None:
         """)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS namespace_zpl (
-                user_id    TEXT PRIMARY KEY,
-                zpl_text   TEXT NOT NULL DEFAULT '',
-                updated_at TEXT NOT NULL
+                namespace_id TEXT PRIMARY KEY,
+                zpl_text     TEXT NOT NULL DEFAULT '',
+                updated_at   TEXT NOT NULL
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS namespaces (
+                id                  TEXT PRIMARY KEY,
+                display_name        TEXT NOT NULL,
+                owner_user_id       TEXT NOT NULL,
+                parent_namespace_id TEXT,
+                created_at          TEXT NOT NULL
             )
         """)
         await db.execute("""
@@ -93,6 +103,16 @@ async def init_db() -> None:
                 key        TEXT PRIMARY KEY,
                 content    TEXT NOT NULL,
                 updated_at TEXT NOT NULL
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS namespace_entities (
+                id           TEXT PRIMARY KEY,
+                namespace_id TEXT NOT NULL,
+                class_name   TEXT NOT NULL,
+                name         TEXT NOT NULL,
+                attributes   TEXT NOT NULL DEFAULT '{}',
+                created_at   TEXT NOT NULL
             )
         """)
         # Migrations for older schemas
@@ -107,10 +127,24 @@ async def init_db() -> None:
             await db.execute("ALTER TABLE users ADD COLUMN api_token TEXT")
         if not await _column_exists(db, "users", "email"):
             await db.execute("ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT ''")
-        if not await _column_exists(db, "users", "delegated"):
-            await db.execute("ALTER TABLE users ADD COLUMN delegated INTEGER NOT NULL DEFAULT 0")
-        if not await _column_exists(db, "users", "delegated_to_user_id"):
-            await db.execute("ALTER TABLE users ADD COLUMN delegated_to_user_id TEXT")
+        # Drop legacy columns (SQLite 3.35+)
+        for _col in ("delegated", "delegated_to_user_id", "created_by_id"):
+            if await _column_exists(db, "users", _col):
+                await db.execute(f"ALTER TABLE users DROP COLUMN {_col}")
+        # Migrate namespace_zpl: user_id → namespace_id
+        if await _column_exists(db, "namespace_zpl", "user_id"):
+            await db.execute("""
+                CREATE TABLE namespace_zpl_new (
+                    namespace_id TEXT PRIMARY KEY,
+                    zpl_text     TEXT NOT NULL DEFAULT '',
+                    updated_at   TEXT NOT NULL
+                )
+            """)
+            await db.execute(
+                "INSERT INTO namespace_zpl_new SELECT user_id, zpl_text, updated_at FROM namespace_zpl"
+            )
+            await db.execute("DROP TABLE namespace_zpl")
+            await db.execute("ALTER TABLE namespace_zpl_new RENAME TO namespace_zpl")
         await db.commit()
 
 
@@ -124,21 +158,20 @@ async def user_count() -> int:
 
 
 async def create_user(username: str, password: str, display_name: str | None = None,
-                      created_by_id: str | None = None, email: str = "",
-                      delegated: bool = False) -> dict:
+                      email: str = "") -> dict:
     import uuid
     uid = uuid.uuid4().hex
     now = datetime.now(timezone.utc).isoformat()
     dn = display_name or username
     async with aiosqlite.connect(_DB_PATH) as db:
         await db.execute(
-            "INSERT INTO users (id, username, password_hash, display_name, email, delegated, created_by_id, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?)",
-            (uid, username, hash_password(password), dn, email or "", int(delegated), created_by_id, now),
+            "INSERT INTO users (id, username, password_hash, display_name, email, created_at) "
+            "VALUES (?,?,?,?,?,?)",
+            (uid, username, hash_password(password), dn, email or "", now),
         )
         await db.commit()
     return {"id": uid, "username": username, "display_name": dn, "email": email or "",
-            "delegated": delegated, "created_by_id": created_by_id, "created_at": now}
+            "created_at": now}
 
 
 async def update_profile(user_id: str, email: str, display_name: str | None = None) -> None:
@@ -209,8 +242,7 @@ async def set_token(user_id: str, token: str) -> None:
 
 async def update_user(user_id: str, *, display_name: str | None = None,
                       username: str | None = None, password: str | None = None,
-                      email: str | None = None, delegated: bool | None = None,
-                      delegated_to_user_id: str | None = None) -> None:
+                      email: str | None = None) -> None:
     sets, vals = [], []
     if display_name is not None:
         sets.append("display_name = ?"); vals.append(display_name)
@@ -220,10 +252,6 @@ async def update_user(user_id: str, *, display_name: str | None = None,
         sets.append("password_hash = ?"); vals.append(hash_password(password))
     if email is not None:
         sets.append("email = ?"); vals.append(email)
-    if delegated is not None:
-        sets.append("delegated = ?"); vals.append(int(delegated))
-    if delegated_to_user_id is not None:
-        sets.append("delegated_to_user_id = ?"); vals.append(delegated_to_user_id)
     if not sets:
         return
     vals.append(user_id)
@@ -233,139 +261,60 @@ async def update_user(user_id: str, *, display_name: str | None = None,
 
 
 async def delete_user(user_id: str) -> str | None:
-    """Delete user. Returns error string if the user has children, else None."""
+    """Delete user. Blocks if user owns a root namespace (no ancestor to reassign to)."""
+    root_ns = await get_root_namespace(user_id)
+    if root_ns:
+        return "Cannot delete: user owns a root namespace. Delete that namespace first."
+    await reassign_orphaned_namespaces(user_id)
     async with aiosqlite.connect(_DB_PATH) as db:
-        async with db.execute(
-            "SELECT COUNT(*) FROM users WHERE created_by_id = ?", (user_id,)
-        ) as cur:
-            row = await cur.fetchone()
-        if row and row[0] > 0:
-            return "Cannot delete: this owner has sub-namespaces. Delete those first."
         await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
-        await db.execute("DELETE FROM namespace_zpl WHERE user_id = ?", (user_id,))
         await db.commit()
     return None
 
 
-async def list_users_created_by(creator_id: str) -> list[dict]:
-    """Return all users directly created by creator_id."""
-    async with aiosqlite.connect(_DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT id, username, display_name, email, delegated, created_by_id, created_at FROM users "
-            "WHERE created_by_id = ? ORDER BY display_name",
-            (creator_id,),
-        ) as cur:
-            rows = await cur.fetchall()
-    return [dict(r) for r in rows]
-
-
-async def get_owner_tree(root_id: str) -> dict:
-    """Return the full ownership tree rooted at root_id as nested dicts."""
-    async with aiosqlite.connect(_DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT id, username, display_name, email, delegated, delegated_to_user_id, "
-            "created_by_id, created_at FROM users"
-        ) as cur:
-            all_rows = [dict(r) for r in await cur.fetchall()]
-
-    by_id = {r["id"]: {**r, "children": []} for r in all_rows}
-
-    # Resolve delegated_to_user info into each row
-    for r in by_id.values():
-        dtuid = r.get("delegated_to_user_id")
-        if dtuid and dtuid in by_id:
-            du = by_id[dtuid]
-            r["owner_username"] = du["username"]
-            r["owner_email"] = du["email"]
-        elif r.get("delegated"):
-            r["owner_username"] = r["username"]
-            r["owner_email"] = r["email"]
-        else:
-            r["owner_username"] = None
-            r["owner_email"] = None
-
-    for r in all_rows:
-        parent_id = r["created_by_id"]
-        if parent_id and parent_id in by_id:
-            by_id[parent_id]["children"].append(by_id[r["id"]])
-
-    return by_id.get(root_id, {})
-
-
-async def can_switch_to(login_user_id: str, target_user_id: str) -> bool:
-    """Return True if login_user_id is an ancestor (direct or indirect) of target_user_id."""
-    if login_user_id == target_user_id:
-        return True
-    async with aiosqlite.connect(_DB_PATH) as db:
-        # Allow if login_user is the delegated owner of the target namespace
-        async with db.execute(
-            "SELECT delegated_to_user_id FROM users WHERE id = ?", (target_user_id,)
-        ) as cur:
-            row = await cur.fetchone()
-        if row and row[0] == login_user_id:
-            return True
-        # Walk up the created_by chain from target
-        current_id = target_user_id
-        seen = set()
-        while current_id and current_id not in seen:
-            seen.add(current_id)
-            async with db.execute(
-                "SELECT created_by_id FROM users WHERE id = ?", (current_id,)
-            ) as cur:
-                row = await cur.fetchone()
-            if row is None:
-                break
-            current_id = row[0]
-            if current_id == login_user_id:
-                return True
-    return False
-
-
 # ── Namespace ZPL ────────────────────────────────────────────────────────────
 
-async def get_namespace_zpl(user_id: str) -> str:
+async def get_namespace_zpl(namespace_id: str) -> str:
     async with aiosqlite.connect(_DB_PATH) as db:
         async with db.execute(
-            "SELECT zpl_text FROM namespace_zpl WHERE user_id = ?", (user_id,)
+            "SELECT zpl_text FROM namespace_zpl WHERE namespace_id = ?", (namespace_id,)
         ) as cur:
             row = await cur.fetchone()
     return row[0] if row else ""
 
 
-async def get_namespace_zpl_batch(user_ids: list[str]) -> dict[str, str]:
-    """Return {user_id: zpl_text} for all given IDs that have ZPL stored."""
-    if not user_ids:
+async def get_namespace_zpl_batch(namespace_ids: list[str]) -> dict[str, str]:
+    """Return {namespace_id: zpl_text} for all given IDs that have ZPL stored."""
+    if not namespace_ids:
         return {}
-    placeholders = ",".join("?" * len(user_ids))
+    placeholders = ",".join("?" * len(namespace_ids))
     async with aiosqlite.connect(_DB_PATH) as db:
         async with db.execute(
-            f"SELECT user_id, zpl_text FROM namespace_zpl WHERE user_id IN ({placeholders})",
-            user_ids,
+            f"SELECT namespace_id, zpl_text FROM namespace_zpl WHERE namespace_id IN ({placeholders})",
+            namespace_ids,
         ) as cur:
             rows = await cur.fetchall()
     return {row[0]: row[1] for row in rows}
 
 
-async def save_namespace_zpl(user_id: str, text: str) -> None:
+async def save_namespace_zpl(namespace_id: str, text: str) -> None:
     now = datetime.now(timezone.utc).isoformat()
     async with aiosqlite.connect(_DB_PATH) as db:
         await db.execute(
-            """INSERT INTO namespace_zpl (user_id, zpl_text, updated_at)
+            """INSERT INTO namespace_zpl (namespace_id, zpl_text, updated_at)
                VALUES (?, ?, ?)
-               ON CONFLICT(user_id) DO UPDATE SET
+               ON CONFLICT(namespace_id) DO UPDATE SET
                    zpl_text = excluded.zpl_text,
                    updated_at = excluded.updated_at""",
-            (user_id, text, now),
+            (namespace_id, text, now),
         )
         await db.commit()
 
 
 async def list_all_namespace_zpl() -> list[tuple[str, str]]:
-    """Return (user_id, zpl_text) for all namespaces — for simulation."""
+    """Return (namespace_id, zpl_text) for all namespaces — for simulation."""
     async with aiosqlite.connect(_DB_PATH) as db:
-        async with db.execute("SELECT user_id, zpl_text FROM namespace_zpl") as cur:
+        async with db.execute("SELECT namespace_id, zpl_text FROM namespace_zpl") as cur:
             rows = await cur.fetchall()
     return [(r[0], r[1]) for r in rows]
 
@@ -390,6 +339,168 @@ async def save_prompt(key: str, content: str) -> None:
                    updated_at = excluded.updated_at""",
             (key, content, now),
         )
+        await db.commit()
+
+
+# ── Namespaces ────────────────────────────────────────────────────────────────
+
+async def create_namespace(display_name: str, owner_user_id: str,
+                           parent_namespace_id: str | None = None) -> dict:
+    import uuid as _uuid
+    ns_id = _uuid.uuid4().hex
+    now = datetime.now(timezone.utc).isoformat()
+    async with aiosqlite.connect(_DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO namespaces (id, display_name, owner_user_id, parent_namespace_id, created_at) "
+            "VALUES (?,?,?,?,?)",
+            (ns_id, display_name, owner_user_id, parent_namespace_id, now),
+        )
+        await db.commit()
+    return {"id": ns_id, "display_name": display_name, "owner_user_id": owner_user_id,
+            "parent_namespace_id": parent_namespace_id, "created_at": now}
+
+
+async def get_namespace(namespace_id: str) -> dict | None:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM namespaces WHERE id = ?", (namespace_id,)
+        ) as cur:
+            row = await cur.fetchone()
+    return dict(row) if row else None
+
+
+async def update_namespace(namespace_id: str, *, display_name: str | None = None,
+                           owner_user_id: str | None = None) -> None:
+    sets, vals = [], []
+    if display_name is not None:
+        sets.append("display_name = ?"); vals.append(display_name)
+    if owner_user_id is not None:
+        sets.append("owner_user_id = ?"); vals.append(owner_user_id)
+    if not sets:
+        return
+    vals.append(namespace_id)
+    async with aiosqlite.connect(_DB_PATH) as db:
+        await db.execute(f"UPDATE namespaces SET {', '.join(sets)} WHERE id = ?", vals)
+        await db.commit()
+
+
+async def delete_namespace(namespace_id: str) -> str | None:
+    """Delete namespace. Returns error string if it has children."""
+    async with aiosqlite.connect(_DB_PATH) as db:
+        async with db.execute(
+            "SELECT COUNT(*) FROM namespaces WHERE parent_namespace_id = ?", (namespace_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        if row and row[0] > 0:
+            return "Cannot delete: namespace has children. Delete those first."
+        await db.execute("DELETE FROM namespaces WHERE id = ?", (namespace_id,))
+        await db.execute("DELETE FROM namespace_zpl WHERE namespace_id = ?", (namespace_id,))
+        await db.commit()
+    return None
+
+
+async def get_namespace_tree(root_id: str) -> dict:
+    """Return full namespace tree rooted at root_id as nested dicts."""
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT n.id, n.display_name, n.owner_user_id, n.parent_namespace_id, n.created_at, "
+            "u.username AS owner_username "
+            "FROM namespaces n LEFT JOIN users u ON u.id = n.owner_user_id"
+        ) as cur:
+            all_rows = [dict(r) for r in await cur.fetchall()]
+    by_id = {r["id"]: {**r, "children": []} for r in all_rows}
+    for r in all_rows:
+        pid = r["parent_namespace_id"]
+        if pid and pid in by_id:
+            by_id[pid]["children"].append(by_id[r["id"]])
+    return by_id.get(root_id, {})
+
+
+async def get_root_namespace(user_id: str) -> dict | None:
+    """Return the root namespace (no parent) owned by user_id, or None."""
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM namespaces WHERE owner_user_id = ? AND parent_namespace_id IS NULL LIMIT 1",
+            (user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+    return dict(row) if row else None
+
+
+async def get_or_create_root_namespace(user_id: str, display_name: str) -> dict:
+    """Return the root namespace for user_id, creating it if necessary."""
+    existing = await get_root_namespace(user_id)
+    if existing:
+        return existing
+    return await create_namespace(display_name, user_id, parent_namespace_id=None)
+
+
+async def get_namespaces_owned_by(user_id: str) -> list[dict]:
+    """All namespaces where owner_user_id = user_id, ordered by display_name."""
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM namespaces WHERE owner_user_id = ? ORDER BY display_name",
+            (user_id,)
+        ) as cur:
+            rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def can_access_namespace(user_id: str, namespace_id: str) -> bool:
+    """True if user owns this namespace or any ancestor namespace."""
+    async with aiosqlite.connect(_DB_PATH) as db:
+        current_id: str | None = namespace_id
+        seen: set[str] = set()
+        while current_id and current_id not in seen:
+            seen.add(current_id)
+            async with db.execute(
+                "SELECT owner_user_id, parent_namespace_id FROM namespaces WHERE id = ?",
+                (current_id,)
+            ) as cur:
+                row = await cur.fetchone()
+            if row is None:
+                break
+            if row[0] == user_id:
+                return True
+            current_id = row[1]
+    return False
+
+
+async def reassign_orphaned_namespaces(deleted_user_id: str) -> None:
+    """Reassign namespaces owned by deleted_user_id to nearest active ancestor owner."""
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT id, parent_namespace_id FROM namespaces WHERE owner_user_id = ?",
+            (deleted_user_id,)
+        ) as cur:
+            owned = [dict(r) for r in await cur.fetchall()]
+        for ns in owned:
+            current_id: str | None = ns["parent_namespace_id"]
+            seen: set[str] = set()
+            new_owner: str | None = None
+            while current_id and current_id not in seen:
+                seen.add(current_id)
+                async with db.execute(
+                    "SELECT owner_user_id, parent_namespace_id FROM namespaces WHERE id = ?",
+                    (current_id,)
+                ) as cur2:
+                    row = await cur2.fetchone()
+                if row is None:
+                    break
+                if row[0] != deleted_user_id:
+                    new_owner = row[0]
+                    break
+                current_id = row[1]
+            if new_owner:
+                await db.execute(
+                    "UPDATE namespaces SET owner_user_id = ? WHERE id = ?",
+                    (new_owner, ns["id"]),
+                )
         await db.commit()
 
 
@@ -501,3 +612,77 @@ async def get_conversation(conv_id: str, user_id: str) -> Conversation | None:
         created_at=datetime.fromisoformat(row["created_at"]),
         updated_at=datetime.fromisoformat(row["updated_at"]),
     )
+
+
+# ── Entities ──────────────────────────────────────────────────────────────────
+
+async def get_entities(namespace_id: str) -> list[dict]:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM namespace_entities WHERE namespace_id = ? ORDER BY class_name, name",
+            (namespace_id,)
+        ) as cur:
+            rows = await cur.fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["attributes"] = json.loads(d["attributes"])
+        result.append(d)
+    return result
+
+
+async def create_entity(namespace_id: str, class_name: str, name: str,
+                        attributes: dict) -> dict:
+    import uuid as _uuid
+    eid = _uuid.uuid4().hex
+    now = datetime.now(timezone.utc).isoformat()
+    async with aiosqlite.connect(_DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO namespace_entities (id, namespace_id, class_name, name, attributes, created_at) "
+            "VALUES (?,?,?,?,?,?)",
+            (eid, namespace_id, class_name, name, json.dumps(attributes), now),
+        )
+        await db.commit()
+    return {"id": eid, "namespace_id": namespace_id, "class_name": class_name,
+            "name": name, "attributes": attributes, "created_at": now}
+
+
+async def update_entity(entity_id: str, namespace_id: str, *, class_name: str | None = None,
+                        name: str | None = None, attributes: dict | None = None) -> bool:
+    sets, vals = [], []
+    if class_name is not None:
+        sets.append("class_name = ?"); vals.append(class_name)
+    if name is not None:
+        sets.append("name = ?"); vals.append(name)
+    if attributes is not None:
+        sets.append("attributes = ?"); vals.append(json.dumps(attributes))
+    if not sets:
+        return True
+    vals.extend([entity_id, namespace_id])
+    async with aiosqlite.connect(_DB_PATH) as db:
+        cur = await db.execute(
+            f"UPDATE namespace_entities SET {', '.join(sets)} WHERE id = ? AND namespace_id = ?",
+            vals
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def delete_entity(entity_id: str, namespace_id: str) -> bool:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        cur = await db.execute(
+            "DELETE FROM namespace_entities WHERE id = ? AND namespace_id = ?",
+            (entity_id, namespace_id)
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def delete_all_entities(namespace_id: str) -> int:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        cur = await db.execute(
+            "DELETE FROM namespace_entities WHERE namespace_id = ?", (namespace_id,)
+        )
+        await db.commit()
+        return cur.rowcount

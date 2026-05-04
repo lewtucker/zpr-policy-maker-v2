@@ -1,0 +1,34 @@
+Define warehouse-worker AKA warehouse-workers as a users with department, shift, employment-type and optional tags managed, compliant.
+Define floor-worker AKA floor-workers as a warehouse-worker with zone.
+Define shift-supervisor AKA shift-supervisors as a warehouse-worker.
+Define warehouse-manager AKA warehouse-managers as a warehouse-worker.
+Define maintenance-tech AKA maintenance-techs as a warehouse-worker with zone.
+Define warehouse-service AKA warehouse-services as a services with classification and env.
+Define inventory-system AKA inventory-systems as a warehouse-service with classification:internal.
+Define payroll-system AKA payroll-systems as a warehouse-service with classification:confidential.
+Define scheduling-system AKA scheduling-systems as a warehouse-service with classification:internal.
+Define hr-system AKA hr-systems as a warehouse-service with classification:confidential.
+Define safety-monitor AKA safety-monitors as a warehouse-service with classification:internal.
+Define fulfillment-system AKA fulfillment-systems as a warehouse-service with classification:internal.
+Define warehouse-machine AKA warehouse-machines as a endpoints with zone and status.
+Define packing-machine AKA packing-machines as a warehouse-machine with zone and status.
+Define conveyor-system AKA conveyor-systems as a warehouse-machine with zone and status.
+Define system-controller AKA system-controllers as a warehouse-machine with zone and status:active.
+Allow warehouse-worker to read scheduling-system.
+Allow warehouse-worker to read safety-monitor.
+Allow floor-worker to use packing-machine.
+Allow floor-worker to use conveyor-system.
+Allow shift-supervisor to access inventory-system.
+Allow shift-supervisor to use warehouse-machine.
+Allow warehouse-manager to access warehouse-service.
+Allow warehouse-manager to use warehouse-machine.
+Allow warehouse-manager to use system-controller.
+Allow maintenance-tech to use warehouse-machine.
+Allow maintenance-tech to use system-controller.
+Never allow floor-worker to access payroll-system.
+Never allow floor-worker to access hr-system.
+Never allow floor-worker to use system-controller.
+Never allow shift-supervisor to access payroll-system.
+Never allow shift-supervisor to access hr-system.
+Never allow maintenance-tech to access payroll-system.
+Never allow maintenance-tech to access hr-system.

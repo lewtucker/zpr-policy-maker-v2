@@ -1,0 +1,101 @@
+# ZPR rules export
+
+rules:
+  -     id: never-intern-classified
+    name: "Interns cannot access classified services"
+    description: "Interns cannot access any service with classification:secret or higher.\n"
+    result: never
+    priority: 1000
+    subject:
+      class: employee
+      attrs:
+        employment-type: intern
+    object:
+      class: services
+      attrs:
+        classification: [secret, top-secret]
+  -     id: sales-customer-dbs
+    name: "Sales can access customer databases on managed laptops"
+    description: "Department:sales employees may access data:customer databases, but only when connecting from a managed laptop (tags:managed).\n"
+    result: allow
+    priority: 100
+    verb: access
+    subject:
+      class: employee
+      attrs:
+        department: sales
+    accessor_endpoint:
+      class: laptop
+      attrs:
+        tags: managed
+    object:
+      class: database
+      attrs:
+        data: customer
+  -     id: engineers-build-services
+    name: "Engineers can use services from managed endpoints"
+    description: "Employees with role:engineer or role:admin can access any service, but only from a managed endpoint (tags:managed).\n"
+    result: allow
+    priority: 100
+    verb: access
+    subject:
+      class: employee
+      attrs:
+        roles: [engineer, admin]
+    accessor_endpoint:
+      class: endpoints
+      attrs:
+        tags: managed
+    object:
+      class: services
+  -     id: hr-timesheet
+    name: "HR employees can access the Timesheet database"
+    description: "Any employee in department:hr can access the named Timesheet-database.\n"
+    result: allow
+    priority: 100
+    verb: access
+    subject:
+      class: employee
+      attrs:
+        department: hr
+    object:
+      name: Timesheet-database
+  -     id: lb-to-timesheet
+    name: "Load balancer can reach Timesheet-database"
+    description: "The named Timesheet-load-balancer can call the Timesheet-database.\n"
+    result: allow
+    priority: 100
+    verb: access
+    subject:
+      name: Timesheet-load-balancer
+    object:
+      name: Timesheet-database
+  -     id: cleared-access-load-balancer
+    name: "Cleared employees access the Timesheet load balancer"
+    description: "Employees with clearance:secret or top-secret may access Timesheet-load-balancer.\n"
+    result: allow
+    priority: 100
+    verb: access
+    subject:
+      class: employee
+      attrs:
+        clearance: [secret, top-secret]
+    object:
+      name: Timesheet-load-balancer
+  -     id: top-secret-signal
+    name: "Top-secret access is logged"
+    description: "Employees with clearance:top-secret may access classified services, but every such access emits a signal to Access-logger.\n"
+    result: allow
+    priority: 50
+    verb: access
+    subject:
+      class: employee
+      attrs:
+        clearance: top-secret
+    object:
+      class: services
+      attrs:
+        classification: top-secret
+    signal:
+      message: accessing
+      to: Access-logger

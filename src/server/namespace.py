@@ -12,9 +12,6 @@ _BUILTIN_CLASSES = frozenset({
     "endpoint", "endpoints", "server", "servers",
 })
 
-# Internal meta-keys used by the serializer — never namespace these.
-_SYSTEM_KEYS = frozenset({"tags"})
-
 
 def active_ns(session: dict) -> str:
     """Return the active namespace string, or '' if none applies."""
@@ -34,10 +31,9 @@ def _qualify(name: str, ns: str) -> str:
     return f"{ns}.{name}"
 
 
-def _qualify_key(key: str, ns: str) -> str:
-    if not key or not ns or "." in key or key in _SYSTEM_KEYS:
-        return key
-    return f"{ns}.{key}"
+def _qualify_key(key: str, _ns: str) -> str:
+    # Attribute names are never namespace-prefixed — return as-is.
+    return key
 
 
 def _inject_spec(spec: dict | None, ns: str) -> dict | None:
@@ -58,10 +54,9 @@ def _strip(name: str, prefix: str) -> str:
     return name[len(prefix):] if name and name.startswith(prefix) else name
 
 
-def _strip_key(key: str, prefix: str) -> str:
-    if key in _SYSTEM_KEYS:
-        return key
-    return _strip(key, prefix)
+def _strip_key(key: str, _prefix: str) -> str:
+    # Attribute names are never namespace-prefixed — return as-is.
+    return key
 
 
 def _strip_spec(spec: dict | None, prefix: str) -> dict | None:

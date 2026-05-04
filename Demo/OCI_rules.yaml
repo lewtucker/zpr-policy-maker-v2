@@ -1,0 +1,56 @@
+# ZPR rules export
+
+rules:
+  - id: 5fadb5d5f1a04db2954e7fcd1abdd483
+    name: "Allow web tier access to app tier on ZPR-Test network"
+    result: allow
+    priority: 100
+    subject:
+      class: OCI-workload
+      attrs:
+        tier: web
+    accessor_endpoint:
+      class: network
+      attrs:
+        name: ZPR-Test
+    object:
+      class: OCI-workload
+      attrs:
+        tier: db
+    server_endpoint:
+      class: network
+      attrs:
+        name: ZPR-Test
+  - id: a4842da1c829464a9d644706743c88fd
+    name: "Customer app access to customer database"
+    result: allow
+    priority: 100
+    subject:
+      class: OCI-workload
+      attrs:
+        name: customer-app
+    accessor_endpoint:
+      class: network
+      attrs:
+        tier: app
+    object:
+      class: servers
+      attrs:
+        name: customer-db
+    server_endpoint:
+      class: network
+      attrs:
+        tier: db
+  - id: ba071740f2424f86ba45e7d20be5b215
+    name: "Apps on app tier have internet access"
+    result: allow
+    priority: 100
+    subject:
+      class: network
+      attrs:
+        tier: app
+        name: ZPR-Test
+    object:
+      class: Internet
+      attrs:
+        name: ZPR-Test

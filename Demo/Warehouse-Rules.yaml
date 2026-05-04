@@ -1,0 +1,165 @@
+# ZPR rules export
+
+rules:
+  - id: f31cf7c0097f421c8c45f64c41e83aff
+    name: "Allow warehouse-worker read scheduling-system"
+    result: allow
+    priority: 100
+    verb: read
+    subject:
+      class: warehouse-worker
+    object:
+      class: scheduling-system
+  - id: b1518cd184904b4d837cab51d1ef9ccf
+    name: "Allow warehouse-worker read safety-monitor"
+    result: allow
+    priority: 100
+    verb: read
+    subject:
+      class: warehouse-worker
+    object:
+      class: safety-monitor
+  - id: c7653fad93334783b69b6a9e9064d5dc
+    name: "Allow floor-worker use packing-machine"
+    result: allow
+    priority: 100
+    verb: use
+    subject:
+      class: floor-worker
+    object:
+      class: packing-machine
+  - id: 100f1297fc1542ac81804b2794663477
+    name: "Allow floor-worker use conveyor-system"
+    result: allow
+    priority: 100
+    verb: use
+    subject:
+      class: floor-worker
+    object:
+      class: conveyor-system
+  - id: ebc9e08d534646f6895d3c5c91169d10
+    name: "Allow shift-supervisor access inventory-system"
+    result: allow
+    priority: 100
+    verb: access
+    subject:
+      class: shift-supervisor
+    object:
+      class: inventory-system
+  - id: 5c7c2212159f4503bf1f72cf4dd25ed0
+    name: "Allow shift-supervisor use warehouse-machine"
+    result: allow
+    priority: 100
+    verb: use
+    subject:
+      class: shift-supervisor
+    object:
+      class: warehouse-machine
+  - id: 775f49163e86466e8955b0a7067399b8
+    name: "Allow warehouse-manager access warehouse-service"
+    result: allow
+    priority: 100
+    verb: access
+    subject:
+      class: warehouse-manager
+    object:
+      class: warehouse-service
+  - id: cae8731e83cf4f4dbc11a1f04f73332e
+    name: "Allow warehouse-manager use warehouse-machine"
+    result: allow
+    priority: 100
+    verb: use
+    subject:
+      class: warehouse-manager
+    object:
+      class: warehouse-machine
+  - id: a50fe4739beb417b8efd6bf4b35d6706
+    name: "Allow warehouse-manager use system-controller"
+    result: allow
+    priority: 100
+    verb: use
+    subject:
+      class: warehouse-manager
+    object:
+      class: system-controller
+  - id: e65264ae28ac45d581f3ea5cacbd9b06
+    name: "Allow maintenance-tech use warehouse-machine"
+    result: allow
+    priority: 100
+    verb: use
+    subject:
+      class: maintenance-tech
+    object:
+      class: warehouse-machine
+  - id: 57a00ab48e1f4eb0a92bf1fe9843cd8b
+    name: "Allow maintenance-tech use system-controller"
+    result: allow
+    priority: 100
+    verb: use
+    subject:
+      class: maintenance-tech
+    object:
+      class: system-controller
+  - id: 882c489757b84dcab224c3fc9249b785
+    name: "Never floor-worker access payroll-system"
+    result: never
+    priority: 100
+    verb: access
+    subject:
+      class: floor-worker
+    object:
+      class: payroll-system
+  - id: 187c943c0b73426095949089798ce9a1
+    name: "Never floor-worker access hr-system"
+    result: never
+    priority: 100
+    verb: access
+    subject:
+      class: floor-worker
+    object:
+      class: hr-system
+  - id: 511bd451203541c2a8c7273c0827aff2
+    name: "Never floor-worker use system-controller"
+    result: never
+    priority: 100
+    verb: use
+    subject:
+      class: floor-worker
+    object:
+      class: system-controller
+  - id: 6653716cdf4649c68424cdc85d683a60
+    name: "Never shift-supervisor access payroll-system"
+    result: never
+    priority: 100
+    verb: access
+    subject:
+      class: shift-supervisor
+    object:
+      class: payroll-system
+  - id: b33d2883ab8f4cd999974601d4bdd93e
+    name: "Never shift-supervisor access hr-system"
+    result: never
+    priority: 100
+    verb: access
+    subject:
+      class: shift-supervisor
+    object:
+      class: hr-system
+  - id: a9ff6e9afc3d43f1b56fea06e0c3c51c
+    name: "Never maintenance-tech access payroll-system"
+    result: never
+    priority: 100
+    verb: access
+    subject:
+      class: maintenance-tech
+    object:
+      class: payroll-system
+  - id: 7ab82c668dcc410ead8443e900f7f992
+    name: "Never maintenance-tech access hr-system"
+    result: never
+    priority: 100
+    verb: access
+    subject:
+      class: maintenance-tech
+    object:
+      class: hr-system

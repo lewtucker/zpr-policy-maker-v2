@@ -1,0 +1,157 @@
+# ZPR entities — Warehouse scenario
+
+entities:
+
+  # ── Warehouse workers ───────────────────────────────────────────────────────
+
+  - id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+    class: warehouse-manager
+    name: Alice
+    attributes:
+      department: operations
+      shift: day
+      employment-type: full-time
+
+  - id: b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5
+    class: warehouse-manager
+    name: Bob
+    attributes:
+      department: operations
+      shift: night
+      employment-type: full-time
+
+  - id: c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6
+    class: shift-supervisor
+    name: Carol
+    attributes:
+      department: operations
+      shift: day
+      employment-type: full-time
+
+  - id: d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1
+    class: shift-supervisor
+    name: Dave
+    attributes:
+      department: operations
+      shift: night
+      employment-type: full-time
+
+  - id: e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
+    class: floor-worker
+    name: Eve
+    attributes:
+      department: operations
+      shift: day
+      employment-type: full-time
+      zone: receiving
+
+  - id: f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3
+    class: floor-worker
+    name: Frank
+    attributes:
+      department: operations
+      shift: day
+      employment-type: full-time
+      zone: packing
+
+  - id: 1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d
+    class: floor-worker
+    name: Grace
+    attributes:
+      department: operations
+      shift: night
+      employment-type: part-time
+      zone: shipping
+
+  - id: 2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e
+    class: maintenance-tech
+    name: Henry
+    attributes:
+      department: maintenance
+      shift: day
+      employment-type: full-time
+      zone: packing
+
+  - id: 3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f
+    class: maintenance-tech
+    name: Iris
+    attributes:
+      department: maintenance
+      shift: night
+      employment-type: full-time
+      zone: receiving
+
+  # ── Warehouse services ──────────────────────────────────────────────────────
+
+  - id: 4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a
+    class: inventory-system
+    name: Inventory-DB
+    attributes:
+      env: production
+
+  - id: 5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b
+    class: payroll-system
+    name: Payroll-DB
+    attributes:
+      env: production
+
+  - id: 6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c
+    class: scheduling-system
+    name: Shift-Scheduler
+    attributes:
+      env: production
+
+  - id: 7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d
+    class: hr-system
+    name: HR-Portal
+    attributes:
+      env: production
+
+  - id: 8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e
+    class: safety-monitor
+    name: Safety-Dashboard
+    attributes:
+      env: production
+
+  - id: 9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f
+    class: fulfillment-system
+    name: Fulfillment-API
+    attributes:
+      env: production
+
+  # ── Warehouse machines ──────────────────────────────────────────────────────
+
+  - id: 0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a
+    class: packing-machine
+    name: Packer-1
+    attributes:
+      zone: packing
+      status: active
+
+  - id: 1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b
+    class: packing-machine
+    name: Packer-2
+    attributes:
+      zone: packing
+      status: active
+
+  - id: 2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c
+    class: conveyor-system
+    name: Conveyor-Receiving
+    attributes:
+      zone: receiving
+      status: active
+
+  - id: 3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d
+    class: conveyor-system
+    name: Conveyor-Shipping
+    attributes:
+      zone: shipping
+      status: active
+
+  - id: 4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e
+    class: system-controller
+    name: Warehouse-Controller
+    attributes:
+      zone: operations
+      status: active

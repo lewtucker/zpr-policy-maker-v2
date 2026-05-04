@@ -1,0 +1,131 @@
+# ZPR rules export
+
+rules:
+  - id: 97d1921424574d868cbce0b50284b03b
+    name: "Block visitor laptops from any services"
+    description: "Prevent visitor laptops from accessing any services."
+    result: never
+    priority: 500
+    accessor_endpoint:
+      name: Visitor-laptop
+    object:
+      class: services
+  - id: 36a9a4df83cc4600800775f605c2530a
+    name: "Block interns from development resources"
+    description: "Prevents interns from accessing any resource tagged as development."
+    result: never
+    priority: 500
+    subject:
+      class: employee
+      attrs:
+        employment-type: intern
+    object:
+      attrs:
+        tags: development
+  - id: 53d080a05ba849f5b587451bf981557c
+    name: "Secret clearance employees access confidential services"
+    description: "Employees with secret clearance can access services classified as confidential or lower."
+    result: allow
+    priority: 100
+    verb: access
+    subject:
+      class: employee
+      attrs:
+        clearance: secret
+    object:
+      class: services
+      attrs:
+        classification: confidential
+  - id: 123520f96e1f46b586b4009ce3d6a00a
+    name: "Secret-cleared employees access confidential databases"
+    description: "Employees with secret clearance can access databases classified as confidential or lower."
+    result: allow
+    priority: 100
+    verb: access
+    subject:
+      class: employee
+      attrs:
+        clearance: secret
+    object:
+      class: database
+      attrs:
+        classification: confidential
+  - id: 5f779193d8a842f889ab29a008c1a24c
+    name: "Finance accesses HR databases"
+    description: "Allow finance department employees to access databases containing HR and employee data."
+    result: allow
+    priority: 100
+    verb: access
+    subject:
+      class: employee
+      attrs:
+        department: finance
+    object:
+      class: database
+      attrs:
+        data: hr
+  - id: 101da533e7d246908c65c73d69dfb6f4
+    name: "Block sales from customer data"
+    description: "Prevent sales department employees from accessing customer databases to maintain data separation."
+    result: never
+    priority: 500
+    verb: access
+    subject:
+      class: employee
+      attrs:
+        department: sales
+    object:
+      class: database
+      attrs:
+        data: customer
+  - id: c083b0ae8f8b49fe956dee719bbd69c9
+    name: "Block uncleared employees from confidential data"
+    description: "Prevents employees without clearance from accessing any confidential or secret classified resources."
+    result: never
+    priority: 500
+    subject:
+      class: employee
+      attrs:
+        clearance: none
+    object:
+      class: services
+      attrs:
+        classification: [confidential, secret]
+  - id: 615446278f584012ac58609cd2d68910
+    name: "Block partners from internal services"
+    description: "Partners should only access public or partner-designated services, not internal systems."
+    result: never
+    priority: 500
+    verb: access
+    subject:
+      class: partner
+    object:
+      class: services
+      attrs:
+        classification: internal
+  - id: 8af394ad477a4e8b96e5b8ce4de10246
+    name: "Engineering accesses production internal services"
+    description: "Allow engineering department employees to access internal services in production environment."
+    result: allow
+    priority: 100
+    verb: access
+    subject:
+      class: employee
+      attrs:
+        department: engineering
+    object:
+      class: internal-service
+      attrs:
+        env: production
+  - id: c244a6bd34c24bb69a9c61ba75611629
+    name: "Confidential-cleared employees access customer database"
+    description: "Allow employees with confidential or higher clearance to access the customer database."
+    result: allow
+    priority: 100
+    verb: access
+    subject:
+      class: employee
+      attrs:
+        clearance: [confidential, secret]
+    object:
+      name: Customer-database

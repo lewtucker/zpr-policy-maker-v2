@@ -1,0 +1,146 @@
+# ZPL Demo Entities — LDAP LDIF format
+#
+# LDAP is a Trusted Source for user and endpoint attributes (RFC-15.5 section 2.7).
+# The ZPL attribute service maps LDAP attribute names to ZPL attribute names at
+# read time. For example, LDAP 'department' maps directly; 'employeeType' maps
+# to ZPL 'employment-type'; 'l' (locality) maps to ZPL managed tag if configured.
+#
+# User and device entities (employees, partners, laptops) are typical LDAP content.
+# Infrastructure entities (databases, services, APIs, servers) are usually sourced
+# from a service registry or configuration description — they are included here
+# in a separate ou=Infrastructure tree for completeness, using the generic
+# 'device' objectClass with extended attributes.
+
+# ── Organisational structure ─────────────────────────────────────────────────
+
+dn: dc=example,dc=com
+objectClass: dcObject
+objectClass: organization
+dc: example
+o: Example Organisation
+
+dn: ou=Employees,dc=example,dc=com
+objectClass: organizationalUnit
+ou: Employees
+
+dn: ou=Partners,dc=example,dc=com
+objectClass: organizationalUnit
+ou: Partners
+
+dn: ou=Devices,dc=example,dc=com
+objectClass: organizationalUnit
+ou: Devices
+
+dn: ou=Infrastructure,dc=example,dc=com
+objectClass: organizationalUnit
+ou: Infrastructure
+
+dn: ou=Servers,ou=Infrastructure,dc=example,dc=com
+objectClass: organizationalUnit
+ou: Servers
+
+# ── Users ────────────────────────────────────────────────────────────────────
+
+dn: cn=Ted,ou=Employees,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+cn: Ted
+sn: Smith
+givenName: Ted
+mail: ted@example.com
+department: sales
+employeeType: full-time        # maps to ZPL employment-type
+title: manager                 # maps to ZPL roles
+businessCategory: confidential # maps to ZPL clearance
+
+dn: cn=Alice,ou=Employees,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+cn: Alice
+sn: Jones
+givenName: Alice
+mail: alice@example.com
+department: engineering
+employeeType: full-time
+title: engineer                # multi-value: repeated attribute for each role
+title: admin
+businessCategory: secret
+
+dn: cn=Sam,ou=Employees,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+cn: Sam
+sn: Lee
+givenName: Sam
+mail: sam@example.com
+department: engineering
+employeeType: intern
+title: developer
+businessCategory: none
+
+dn: cn=Bob,ou=Partners,dc=example,dc=com
+objectClass: inetOrgPerson
+cn: Bob
+sn: Brown
+givenName: Bob
+mail: bob@acme-corp.com
+o: Acme-Corp                   # maps to ZPL organisation
+businessCategory: none
+
+# ── Endpoints (devices) ──────────────────────────────────────────────────────
+# Devices can be stored in LDAP using the device objectClass.
+# Management status and OS are stored as custom or extended attributes.
+
+dn: cn=Ted-laptop,ou=Devices,dc=example,dc=com
+objectClass: device
+cn: Ted-laptop
+serialNumber: TLAP-001
+owner: cn=Ted,ou=Employees,dc=example,dc=com
+description: macos             # maps to ZPL os
+l: managed                     # maps to ZPL managed tag
+
+dn: cn=Sam-laptop,ou=Devices,dc=example,dc=com
+objectClass: device
+cn: Sam-laptop
+serialNumber: SLAP-001
+owner: cn=Sam,ou=Employees,dc=example,dc=com
+description: linux             # maps to ZPL os
+
+# ── Infrastructure ────────────────────────────────────────────────────────────
+# Services, databases, APIs, and servers are not typical LDAP entries.
+# They are shown here as device entries for reference; in practice they would
+# come from a service registry (e.g. Consul) or configuration description.
+
+dn: cn=Timesheet-database,ou=Infrastructure,dc=example,dc=com
+objectClass: device
+cn: Timesheet-database
+description: hr                # maps to ZPL data
+businessCategory: internal     # maps to ZPL classification
+l: production                  # maps to ZPL env
+
+dn: cn=Customer-database,ou=Infrastructure,dc=example,dc=com
+objectClass: device
+cn: Customer-database
+description: customer
+businessCategory: confidential
+l: production
+
+dn: cn=Timesheet-load-balancer,ou=Infrastructure,dc=example,dc=com
+objectClass: device
+cn: Timesheet-load-balancer
+businessCategory: internal
+l: production
+
+dn: cn=Partner-API,ou=Infrastructure,dc=example,dc=com
+objectClass: device
+cn: Partner-API
+businessCategory: public
+l: production
+
+dn: cn=App-server-1,ou=Servers,ou=Infrastructure,dc=example,dc=com
+objectClass: device
+objectClass: groupOfNames
+cn: App-server-1
+member: cn=Timesheet-database,ou=Infrastructure,dc=example,dc=com
+member: cn=Timesheet-load-balancer,ou=Infrastructure,dc=example,dc=com
+l: managed                     # maps to ZPL managed tag

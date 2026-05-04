@@ -98,6 +98,95 @@ _signer = URLSafeSerializer(SECRET_KEY, salt="session")
 
 STATIC_DIR = Path(__file__).parent / "static"
 
+# ── Class name cache ─────────────────────────────────────────────────────────
+# Keyed by root_ns_id → set of fully-qualified class names from all stored ZPL
+# in that namespace tree. Invalidated on every ZPL save or namespace structural
+# change, rebuilt lazily on next parse.
+
+_class_cache: dict[str, set[str]] = {}
+
+
+def _cache_invalidate(root_ns_id: str) -> None:
+    _class_cache.pop(root_ns_id, None)
+
+
+def _cache_remove(root_ns_id: str, fq_class_name: str) -> None:
+    """Remove a single fully-qualified class name from the cache."""
+    if root_ns_id in _class_cache:
+        _class_cache[root_ns_id].discard(fq_class_name)
+
+
+async def _tree_root_ns_id(login_user_id: str) -> str | None:
+    """Return the root namespace ID for the tree containing this user's namespaces.
+    For users with their own root, that's it. For sub-namespace owners, walk up
+    from their first owned namespace to find the tree root."""
+    root_ns = await db.get_root_namespace(login_user_id)
+    if root_ns:
+        return root_ns["id"]
+    owned = await db.get_namespaces_owned_by(login_user_id)
+    if not owned:
+        return None
+    # Walk up from first owned namespace to find tree root.
+    current = owned[0]
+    seen: set[str] = set()
+    while current.get("parent_namespace_id") and current["id"] not in seen:
+        seen.add(current["id"])
+        parent = await db.get_namespace(current["parent_namespace_id"])
+        if not parent:
+            break
+        current = parent
+    return current["id"]
+
+
+async def _known_classes(login_user_id: str) -> set[str]:
+    """Return the cached set of fully-qualified class names for the user's tree,
+    building it from stored ZPL if not already cached."""
+    root_ns_id = await _tree_root_ns_id(login_user_id)
+    if not root_ns_id:
+        return set()
+    root_ns_id = root_ns_id
+    if root_ns_id in _class_cache:
+        return _class_cache[root_ns_id]
+
+    tree = await db.get_namespace_tree(root_ns_id)
+
+    def _walk(node: dict, ids: list[str]) -> None:
+        if node and node.get("id"):
+            ids.append(node["id"])
+            for child in node.get("children") or []:
+                _walk(child, ids)
+
+    ns_ids: list[str] = []
+    _walk(tree, ns_ids)
+    zpl_map = await db.get_namespace_zpl_batch(ns_ids)
+
+    names: set[str] = set()
+    for text in zpl_map.values():
+        if text:
+            try:
+                raw = zpl_parser.parse(text)
+                names.update(c["class"] for c in raw.get("classes", []))
+            except Exception:
+                pass
+    _class_cache[root_ns_id] = names
+    return names
+
+
+async def _get_root_ns_id(login_user_id: str) -> str | None:
+    return await _tree_root_ns_id(login_user_id)
+
+
+async def _login_namespace(user_id: str) -> dict | None:
+    """Return the namespace to activate on login.
+    Prefers the user's root namespace; falls back to the first namespace they own.
+    Returns None only if the user owns no namespaces at all."""
+    ns = await db.get_root_namespace(user_id)
+    if ns:
+        return ns
+    owned = await db.get_namespaces_owned_by(user_id)
+    return owned[0] if owned else None
+
+
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
@@ -113,15 +202,17 @@ if STATIC_DIR.exists():
 # ── Session helpers ───────────────────────────────────────────────────────────
 
 def _make_session(login_user_id: str, login_username: str, login_display_name: str,
-                  active_user_id: str, active_username: str, active_display_name: str) -> str:
+                  active_namespace_id: str, active_display_name: str) -> str:
     return _signer.dumps({
         "authenticated": True,
         "login_user_id": login_user_id,
         "login_username": login_username,
         "login_display_name": login_display_name,
-        "active_user_id": active_user_id,
-        "active_username": active_username,
+        "active_namespace_id": active_namespace_id,
         "active_display_name": active_display_name,
+        # backward compat: active_user_id = active_namespace_id so existing ZPL callers work
+        "active_user_id": active_namespace_id,
+        "active_username": active_display_name,
     })
 
 
@@ -163,14 +254,18 @@ async def get_session_or_token(request: Request) -> dict:
         user = await db.get_user_by_token(token)
         if user:
             dn = user.get("display_name") or user["username"]
+            ns = await _login_namespace(user["id"])
+            if not ns:
+                raise HTTPException(status_code=403, detail="No namespace assigned")
             return {
                 "authenticated": True,
                 "login_user_id": user["id"],
                 "login_username": user["username"],
                 "login_display_name": dn,
-                "active_user_id": user["id"],
-                "active_username": user["username"],
-                "active_display_name": dn,
+                "active_namespace_id": ns["id"],
+                "active_display_name": ns["display_name"],
+                "active_user_id": ns["id"],
+                "active_username": ns["display_name"],
             }
     raise HTTPException(status_code=401, detail="Not authenticated")
 
@@ -193,9 +288,10 @@ async def setup_submit(request: Request):
     password = form.get("password") or ""
     if not username or not password:
         return HTMLResponse(_setup_html(error="Username and password required."), status_code=400)
-    user = await db.create_user(username, password, created_by_id=None)
-    token = _make_session(user["id"], user["username"], user["display_name"],
-                          user["id"], user["username"], user["display_name"])
+    user = await db.create_user(username, password)
+    dn = user.get("display_name") or user["username"]
+    root_ns = await db.get_or_create_root_namespace(user["id"], dn)
+    token = _make_session(user["id"], user["username"], dn, root_ns["id"], root_ns["display_name"])
     response = Response(status_code=302, headers={"Location": "/"})
     response.set_cookie("session", token, httponly=True, samesite="lax")
     return response
@@ -219,7 +315,10 @@ async def login(request: Request):
     if not user or not db.verify_password(password, user["password_hash"]):
         return HTMLResponse(_login_html(error=True), status_code=401)
     dn = user.get("display_name") or user["username"]
-    token = _make_session(user["id"], user["username"], dn, user["id"], user["username"], dn)
+    ns = await _login_namespace(user["id"])
+    if not ns:
+        return HTMLResponse(_login_html(error=True), status_code=403)
+    token = _make_session(user["id"], user["username"], dn, ns["id"], ns["display_name"])
     response = Response(status_code=302, headers={"Location": "/"})
     response.set_cookie("session", token, httponly=True, samesite="lax")
     return response
@@ -230,59 +329,6 @@ async def logout():
     response = Response(status_code=302, headers={"Location": "/login"})
     response.delete_cookie("session")
     return response
-
-
-# ── User management ───────────────────────────────────────────────────────────
-
-@app.get("/api/users")
-async def list_users(session: dict = Depends(get_session)):
-    """List sub-namespaces created by the LOGIN owner (always root perspective for the tree)."""
-    return await db.list_users_created_by(session["login_user_id"])
-
-
-class CreateUserRequest(BaseModel):
-    namespace_name: str           # display name / used in ZPL
-    username: str | None = None   # login username; required when delegated=True
-    password: str | None = None   # required when delegated=True
-    email: str = ""
-    delegated: bool = False       # True = separate login; False = creator manages it
-    parent_id: str | None = None  # create under a specific node (must be a descendant of login user)
-
-
-@app.post("/api/users", status_code=201)
-async def create_user(req: CreateUserRequest, session: dict = Depends(get_session)):
-    """Create a new namespace (sub-owner) under the active owner or a specified descendant."""
-    import secrets as _sec
-    ns = req.namespace_name.strip()
-    if not ns:
-        raise HTTPException(400, "namespace_name required")
-
-    # Determine parent
-    parent_id = req.parent_id or session["active_user_id"]
-    if parent_id != session["login_user_id"]:
-        if not await db.can_switch_to(session["login_user_id"], parent_id):
-            raise HTTPException(403, "Not authorised to create under that namespace")
-
-    if req.delegated:
-        login = (req.username or "").strip()
-        password = req.password or ""
-        if not login or not password:
-            raise HTTPException(400, "username and password required for delegated namespace")
-    else:
-        import uuid as _uuid
-        login = f"_ns_{_uuid.uuid4().hex[:12]}"
-        password = _sec.token_urlsafe(32)
-
-    existing = await db.get_user_by_username(login)
-    if existing:
-        raise HTTPException(409, f"Username {login!r} already exists")
-    user = await db.create_user(login, password, display_name=ns,
-                                created_by_id=parent_id,
-                                email=req.email.strip(),
-                                delegated=req.delegated)
-    return {"id": user["id"], "username": user["username"],
-            "display_name": user["display_name"], "email": user["email"],
-            "delegated": user["delegated"], "created_by_id": user["created_by_id"]}
 
 
 # ── Profile & token ───────────────────────────────────────────────────────────
@@ -311,59 +357,6 @@ async def update_profile(req: UpdateProfileRequest, session: dict = Depends(get_
     dn = req.display_name.strip() if req.display_name and req.display_name.strip() else None
     await db.update_profile(session["login_user_id"], req.email.strip(), display_name=dn)
     return {"ok": True}
-
-
-@app.get("/api/users/tree")
-async def get_owner_tree(session: dict = Depends(get_session)):
-    return await db.get_owner_tree(session["login_user_id"])
-
-
-class UpdateUserRequest(BaseModel):
-    display_name: str | None = None
-    username: str | None = None
-    password: str | None = None
-    email: str | None = None
-    delegated: bool | None = None
-
-
-@app.patch("/api/users/{user_id}")
-async def update_user(user_id: str, req: UpdateUserRequest,
-                      session: dict = Depends(get_session)):
-    if not await db.can_switch_to(session["login_user_id"], user_id):
-        raise HTTPException(403, "Not authorised to edit this user")
-    if user_id == session["login_user_id"]:
-        raise HTTPException(400, "Use /api/profile to edit your own account")
-    delegated_to_user_id = None
-    if req.username and req.delegated:
-        existing = await db.get_user_by_username(req.username)
-        if existing and existing["id"] != user_id:
-            # Existing user — delegate to them rather than renaming this namespace's login
-            delegated_to_user_id = existing["id"]
-            await db.update_user(user_id,
-                                 display_name=req.display_name,
-                                 email=req.email,
-                                 delegated=True,
-                                 delegated_to_user_id=delegated_to_user_id)
-            return {"ok": True}
-    await db.update_user(user_id,
-                         display_name=req.display_name,
-                         username=req.username,
-                         password=req.password,
-                         email=req.email,
-                         delegated=req.delegated,
-                         delegated_to_user_id=delegated_to_user_id)
-    return {"ok": True}
-
-
-@app.delete("/api/users/{user_id}", status_code=204)
-async def delete_user(user_id: str, session: dict = Depends(get_session)):
-    if not await db.can_switch_to(session["login_user_id"], user_id):
-        raise HTTPException(403, "Not authorised to delete this user")
-    if user_id == session["login_user_id"]:
-        raise HTTPException(400, "Cannot delete yourself")
-    err = await db.delete_user(user_id)
-    if err:
-        raise HTTPException(409, err)
 
 
 class ChangePasswordRequest(BaseModel):
@@ -499,16 +492,51 @@ def _flatten_tree_nodes(tree: dict) -> list[dict]:
     return nodes
 
 
-async def _merged_policy_set(root_user_id: str) -> PolicySet | None:
-    """Parse and merge ZPL from root_user_id and all descendant namespaces,
-    applying each namespace's prefix via ns_mod.inject."""
-    tree = await db.get_owner_tree(root_user_id)
+async def _ancestor_ns_ids(ns_id: str) -> list[str]:
+    """Walk up the parent chain and return ancestor namespace IDs (excluding ns_id itself)."""
+    ancestors: list[str] = []
+    current = await db.get_namespace(ns_id)
+    while current:
+        parent_id = current.get("parent_namespace_id")
+        if not parent_id:
+            break
+        ancestors.append(parent_id)
+        current = await db.get_namespace(parent_id)
+    return ancestors
+
+
+async def _merged_policy_set(root_namespace_id: str) -> PolicySet | None:
+    """Parse and merge ZPL from root_namespace_id and all descendant namespaces.
+
+    Also loads ancestor namespace ZPL (classes only, no rules) so that
+    cross-namespace parent class references can be resolved by the engine.
+    Stored ZPL already has the namespace prefix injected, so no re-injection needed.
+    """
+    tree = await db.get_namespace_tree(root_namespace_id)
     nodes = _flatten_tree_nodes(tree)
-    user_ids = [n["id"] for n in nodes]
-    dn_map = {n["id"]: n["display_name"] for n in nodes}
-    zpl_map = await db.get_namespace_zpl_batch(user_ids)
+    ns_ids = [n["id"] for n in nodes]
+
+    # Load ancestor ZPL for class hierarchy resolution
+    ancestor_ids = await _ancestor_ns_ids(root_namespace_id)
+    ancestor_zpl = await db.get_namespace_zpl_batch(ancestor_ids) if ancestor_ids else {}
+
+    zpl_map = await db.get_namespace_zpl_batch(ns_ids)
     merged = PolicySet(name="_merged", language="zpl")
-    for uid in user_ids:
+
+    # Ancestor classes first (so parent refs resolve), but skip their rules
+    for uid in ancestor_ids:
+        text = ancestor_zpl.get(uid, "").strip()
+        if not text:
+            continue
+        try:
+            raw = zpl_parser.parse(text)
+            ps, errors = norm.zpl_to_policy_set(raw)
+            if not errors:
+                merged.classes.extend(ps.classes)
+        except Exception:
+            pass
+
+    for uid in ns_ids:
         text = zpl_map.get(uid, "").strip()
         if not text:
             continue
@@ -517,10 +545,6 @@ async def _merged_policy_set(root_user_id: str) -> PolicySet | None:
             ps, errors = norm.zpl_to_policy_set(raw)
             if errors:
                 continue
-            ns = (dn_map.get(uid) or "").strip()
-            if ns and not ns.startswith("_ns_"):
-                injected = ns_mod.inject(ps.model_dump(mode="json"), ns)
-                ps = PolicySet.model_validate(injected)
             merged.classes.extend(ps.classes)
             merged.rules.extend(ps.rules)
         except Exception:
@@ -549,9 +573,9 @@ def _base_payload(rule) -> dict:
 
 
 def _payload_description(payload: dict) -> str:
-    subj = (payload.get("subject_class") or "users").split(".")[-1]
+    subj = payload.get("subject_name") or (payload.get("subject_class") or "users").split(".")[-1]
     verb = payload.get("action") or "access"
-    obj  = (payload.get("object_class") or "services").split(".")[-1]
+    obj  = payload.get("object_name") or (payload.get("object_class") or "services").split(".")[-1]
     parts = [subj, verb, obj]
     if payload.get("accessor_class"):
         parts.append(f"on {payload['accessor_class'].split('.')[-1]}")
@@ -788,12 +812,13 @@ async def zpl_assist(req: ZplAssistRequest, session: dict = Depends(get_session)
     if _STOP_RE.match(msg):
         return {"action": "stop", "reply": "Closing the assistant. Your ZPL is ready."}
 
-    # ZPL-like input: contains Define / Allow / Never keywords
-    if _re.search(r'\b(define|allow|never)\b', msg, _re.IGNORECASE):
+    # ZPL-like input: starts with capital Define/Allow/Never and ends with period.
+    # Only treat as direct ZPL if it looks like a real statement, not natural language.
+    if _re.match(r'^(Define|Allow|Never)\b', msg) and msg.rstrip().endswith('.'):
         raw = zpl_parser.parse(msg)
         errors = raw.get("errors", [])
         if not errors:
-            return {"action": "add", "statement": msg, "reply": "Added. Anything else?"}
+            return {"action": "add", "statement": msg, "reply": "Good. Send to Staging."}
 
         # Has parse errors → AI explains and offers a fix
         errors_text = "\n".join(
@@ -804,10 +829,19 @@ async def zpl_assist(req: ZplAssistRequest, session: dict = Depends(get_session)
             f"The user wrote this ZPL statement:\n\n{msg}\n\n"
             f"Parser reported:\n{errors_text}\n\n"
             "ZPL syntax reference:\n"
-            "- Define: `Define <Name> as a <parent> with <attrs>.`  parents: users, endpoints, services, servers\n"
+            "- Define: `Define <Name> as a <parent>.`  or with attrs: `Define <Name> as a <parent> with <attrs>.`\n"
+            "  Optional AKA alias: `Define employee AKA employees as a users.`\n"
+            "  <parent>: exact class name. Use `.` for cross-namespace (e.g. corp.employee). NEVER `:` as namespace separator.\n"
+            "  Classes in THIS namespace use bare names. Cross-namespace refs use dotted names.\n"
+            "  Class names may contain hyphens and underscores (e.g. baseball-employee, hr_staff).\n"
+            "  Built-in roots: users, endpoints, services, servers (singular also accepted).\n"
             "  attrs: `optional tags <n>, <n>`, `multiple <n>`, `optional <n>`, `<n>:<v>`\n"
-            "- Allow: `Allow [<tag>...] <Class> [on [<tag>...] <End>] to <verb> [<tag>...] <Obj>.`\n"
-            "- Never allow: same shape, starts with `Never allow`\n"
+            "  Attribute names are NEVER namespace-prefixed.\n"
+            "- Allow/Never: `Allow <Class> to <verb> <Obj>.`  `to` always comes before the verb.\n"
+            "  Example: `Allow employee to access gitlab.`\n"
+            "  Example: `Never allow tags:intern employee to access services.`\n"
+            "  Tag filter MUST use `tags:<value>` — bare word before class (e.g. `intern employee`) is a key-presence check, not a tag filter.\n"
+            "  attr:value filter: `Never allow backup:nightly servers to access backup-services.`\n"
             "- Every statement ends with a period.\n\n"
             'Return JSON only: {"explanation": "one plain-English sentence", "fix": "corrected ZPL"}'
         )
@@ -832,27 +866,55 @@ async def zpl_assist(req: ZplAssistRequest, session: dict = Depends(get_session)
 
     # Natural language → classify intent then act
     classes_ctx = "Built-in roots: users, endpoints, services, servers"
+    local_class_names: set[str] = set()
     if req.zpl_so_far.strip():
         try:
             raw_ps = zpl_parser.parse(req.zpl_so_far)
             ps, _ = norm.zpl_to_policy_set(raw_ps)
             classes_ctx = _classes_context(ps)
+            local_class_names = {c.name for c in (ps.classes or [])}
         except Exception:
             pass
+
+    tree_classes = await _known_classes(session["login_user_id"])
+    cross_ns = sorted(tree_classes - local_class_names)
+    cross_ns_ctx = ", ".join(cross_ns) if cross_ns else "none"
 
     nl_prompt = (
         "You are a ZPL (Zero-trust Policy Language) assistant. Determine what the user wants:\n"
         "- 'generate': add one or more new ZPL statements\n"
         "- 'modify': change or delete existing ZPL (e.g. remove a rule, rename a class)\n"
         "- 'answer': answer a question about the policy without changing it\n\n"
-        f"Known classes:\n{classes_ctx}\n\n"
+        f"Classes defined in this namespace:\n{classes_ctx}\n\n"
+        f"Classes available from other namespaces (MUST use full dotted name — in both Define parents AND rules): {cross_ns_ctx}\n\n"
         f"Current ZPL:\n---\n{req.zpl_so_far or '(empty)'}\n---\n\n"
         f"User: {msg}\n\n"
         "ZPL syntax reference:\n"
-        "- Define: `Define <Name> as a <parent> with <attrs>.` (parent: users, endpoints, services, servers)\n"
-        "  attrs: `optional tags <n>, <n>`, `multiple <n>`, `optional <n>`, `<n>:<v>`\n"
-        "- Allow: `Allow [<tag>...] <Class> [on [<tag>...] <End>] to <verb> [<tag>...] <Obj>.`\n"
-        "- Never allow: same shape, starts with `Never allow`\n"
+        "- Define: `Define <Name> as a <parent>.`  <parent> must be an exact class name — never a description.\n"
+        "  AKA alias: `Define employee AKA employees as a users.`  (lets rules use either name)\n"
+        "  NAMESPACE PREFIXES: only use dotted names when referencing a class from ANOTHER namespace.\n"
+        "    Classes defined IN THIS namespace use bare names — never prefix with the current namespace.\n"
+        "    WRONG: `Define hr.contractor as a hr.employee.`  RIGHT: `Define contractor as an employee.`\n"
+        "    Cross-ns parent: WRONG: `Define contractor as employee.`  RIGHT: `Define contractor as a corp.employee.`\n"
+        "  Attribute names in `with` clauses are NEVER namespace-prefixed.\n"
+        "    WRONG: `with hr.team:baseball`  RIGHT: `with team:baseball`\n"
+        "  Use `.` for namespace separator — NEVER `:` (colon is attr:value only).\n"
+        "  Class names may contain hyphens and underscores (e.g. baseball-employee, hr_staff).\n"
+        "  Built-in roots (singular/plural both valid): users, endpoints, services, servers\n"
+        "  attrs: `with optional tags full-time, part-time`, `with multiple roles`, `with department:hr`\n"
+        "  Tags: define a subclass pinned to a tag as `Define contractor as an employee with tags part-time.`\n"
+        "    NEVER invent attrs like `part-time:true` — use `tags <value>` for tag membership.\n"
+        "  Examples:\n"
+        "    `Define gitlab as a services.`\n"
+        "    `Define employee AKA employees as a users with department, optional tags full-time, part-time, intern.`\n"
+        "    `Define contractor as an employee with tags part-time.`\n"
+        "- Allow/Never allow: `Allow <Class> to <verb> <Obj>.`  `to` always comes before the verb.\n"
+        "  Examples:\n"
+        "    `Allow employee to access gitlab.`  NOT `Allow employee access to gitlab.`\n"
+        "    `Never allow tags:intern employee to access services.`\n"
+        "    `Never allow backup:nightly servers to access backup-services.`\n"
+        "  Tag filter MUST use `tags:<value>` — bare word before class (e.g. `intern employee`) is NOT a tag filter.\n"
+        "- Class names in rules must exactly match a defined class name — never substitute a description.\n"
         "- Every statement ends with a period.\n\n"
         "Important rules for 'modify':\n"
         "- When deleting a class, also remove every rule that references that class.\n"
@@ -901,6 +963,204 @@ async def zpl_assist(req: ZplAssistRequest, session: dict = Depends(get_session)
 class AdversarialRequest(BaseModel):
     n_positive: int = 8
     n_adversarial: int = 8
+
+
+def _entity_matches_class(entity: dict, cls_name: str, schema: "ClassSchema") -> bool:
+    """True if entity.class_name is cls_name or a subclass of it."""
+    ecn = entity["class_name"]
+    leaf_cls = cls_name.split(".")[-1]
+    leaf_ecn = ecn.split(".")[-1]
+    if ecn == cls_name or leaf_ecn == leaf_cls:
+        return True
+    try:
+        return schema.is_subclass(ecn, cls_name) or schema.is_subclass(ecn, leaf_cls)
+    except Exception:
+        return False
+
+
+def _entity_payload(rule, subj_entity: dict | None, obj_entity: dict | None) -> dict:
+    """Build a test payload using the rule's qualified class names but entity name/attrs."""
+    s, o, ae = rule.subject, rule.object, rule.accessor_endpoint
+    # Always keep the rule's qualified class name so the engine can resolve it.
+    # The entity contributes its name and attributes only.
+    p: dict = {
+        "subject_class": s.cls if s and s.cls else "users",
+        "subject_attrs": subj_entity["attributes"] if subj_entity else (dict(s.attrs) if s and s.attrs else {}),
+        "action": rule.action,
+        "object_class": o.cls if o and o.cls else "services",
+        "object_attrs": obj_entity["attributes"] if obj_entity else (dict(o.attrs) if o and o.attrs else {}),
+    }
+    if subj_entity:
+        p["subject_name"] = subj_entity["name"]
+    if obj_entity:
+        p["object_name"] = obj_entity["name"]
+    if ae and ae.cls:
+        p["accessor_class"] = ae.cls
+        p["accessor_attrs"] = dict(ae.attrs) if ae.attrs else {}
+    return p
+
+
+@app.post("/api/tests/from-entities")
+async def generate_tests_from_entities(req: AdversarialRequest,
+                                       session: dict = Depends(get_session)):
+    if not ai_client.available():
+        raise HTTPException(503, "ANTHROPIC_API_KEY not set")
+
+    ns_id = session["active_user_id"]
+    entities = await db.get_entities(ns_id)
+    if not entities:
+        raise HTTPException(422, "No entities found in this namespace. Add entities first.")
+
+    ps_parsed = await _merged_policy_set(ns_id)
+    if not ps_parsed:
+        raise HTTPException(422, "No rules found in this namespace or its descendants")
+
+    schema = _build_schema(ps_parsed)
+    rules_compiled = []
+    for s in ps_parsed.rules:
+        try:
+            rules_compiled.append(Rule.from_dict({
+                "id": s.id, "name": s.name,
+                "result": "never" if s.effect == "deny" else "allow",
+                "priority": s.priority, "verb": s.action,
+                "subject": _subject_to_zpl_dict(s.subject),
+                "object": _object_to_zpl_dict(s.object),
+                "accessor_endpoint": _subject_to_zpl_dict(s.accessor_endpoint),
+                "server_endpoint": _object_to_zpl_dict(s.server_endpoint),
+            }))
+        except Exception:
+            continue
+    engine = ZPLEngine(rules_compiled, schema)
+
+    allow_rules = [r for r in ps_parsed.rules if r.effect == "allow"]
+    deny_rules  = [r for r in ps_parsed.rules if r.effect == "deny"]
+    _random.shuffle(allow_rules)
+
+    positive_tests: list[dict] = []
+    seen_keys: set[str] = set()
+
+    def _add(payload: dict, expected: str) -> bool:
+        key = _json.dumps(payload, sort_keys=True)
+        if key in seen_keys:
+            return False
+        seen_keys.add(key)
+        positive_tests.append({
+            "number": len(positive_tests) + 1,
+            "expected": expected,
+            "payload": payload,
+        })
+        return True
+
+    # Allow tests — pair entities with matching rule classes
+    for rule in allow_rules[:req.n_positive * 2]:
+        s_cls = rule.subject.cls if rule.subject and rule.subject.cls else "users"
+        o_cls = rule.object.cls if rule.object and rule.object.cls else "services"
+        subj_entities = [e for e in entities if _entity_matches_class(e, s_cls, schema)]
+        obj_entities  = [e for e in entities if _entity_matches_class(e, o_cls, schema)]
+
+        if subj_entities and obj_entities:
+            # Use one entity pair per rule; pick randomly
+            _random.shuffle(subj_entities); _random.shuffle(obj_entities)
+            _add(_entity_payload(rule, subj_entities[0], obj_entities[0]), "allow")
+        elif subj_entities:
+            _add(_entity_payload(rule, subj_entities[0], None), "allow")
+        elif obj_entities:
+            _add(_entity_payload(rule, None, obj_entities[0]), "allow")
+        else:
+            _add(_base_payload(rule), "allow")
+
+        if len(positive_tests) >= req.n_positive:
+            break
+
+    # Deny tests from explicit deny rules
+    for rule in deny_rules:
+        s_cls = rule.subject.cls if rule.subject and rule.subject.cls else "users"
+        o_cls = rule.object.cls if rule.object and rule.object.cls else "services"
+        subj_entities = [e for e in entities if _entity_matches_class(e, s_cls, schema)]
+        obj_entities  = [e for e in entities if _entity_matches_class(e, o_cls, schema)]
+        if subj_entities and obj_entities:
+            _random.shuffle(subj_entities); _random.shuffle(obj_entities)
+            _add(_entity_payload(rule, subj_entities[0], obj_entities[0]), "deny")
+        else:
+            _add(_base_payload(rule), "deny")
+
+    # Build class hierarchy summary for the prompt
+    classes_summary: dict = {}
+    for cls_name in schema.names():
+        try:
+            classes_summary[cls_name] = {
+                "parent": schema.parent(cls_name),
+                "children": schema.children(cls_name),
+            }
+        except Exception:
+            pass
+
+    # Build entities section: group by class for readability
+    entity_lines: list[str] = []
+    by_class: dict[str, list[dict]] = {}
+    for e in entities:
+        by_class.setdefault(e["class_name"], []).append(e)
+    for cls, items in sorted(by_class.items()):
+        entity_lines.append(f"  {cls}:")
+        for e in items:
+            attr_str = ", ".join(f"{k}={v}" for k, v in (e.get("attributes") or {}).items())
+            entity_lines.append(f"    - {e['name']}" + (f" ({attr_str})" if attr_str else ""))
+    entities_section = "\n".join(entity_lines) if entity_lines else "  (no entities)"
+
+    # Allow tests for AI: use positive_tests that are allow-type
+    allow_tests_for_ai = [t for t in positive_tests if t["expected"] == "allow"]
+
+    prompt_content = (_PROMPTS_DIR / "entity_test.md").read_text()
+    prompt = (prompt_content
+              .replace("{n_adversarial}", str(req.n_adversarial))
+              .replace("{classes_json}", _json.dumps(classes_summary, indent=2))
+              .replace("{entities_section}", entities_section)
+              .replace("{positive_tests_json}", _json.dumps(positive_tests, indent=2))
+              .replace("{allow_tests_json}", _json.dumps(allow_tests_for_ai, indent=2)))
+
+    try:
+        raw_text = ai_client.complete(
+            system="You are a ZPL policy test generator. Return only valid JSON.",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=4096,
+            temperature=0.5,
+        )
+    except Exception as exc:
+        raise HTTPException(500, f"AI call failed: {exc}")
+
+    text = raw_text.strip()
+    text = _re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=_re.DOTALL).strip()
+    try:
+        ai_result = _json.loads(text)
+    except Exception:
+        ai_result = {}
+
+    title_map = {t["number"]: t["title"] for t in (ai_result.get("positive_tests") or [])}
+
+    positive_out = [
+        {**t, "title": title_map.get(t["number"], _payload_description(t["payload"]))}
+        for t in positive_tests
+    ]
+    counter_out = []
+    discarded = 0
+    for ct in (ai_result.get("counter_tests") or []):
+        payload = ct.get("payload")
+        if not payload:
+            continue
+        if _is_deny(engine, payload):
+            counter_out.append({
+                "payload": payload,
+                "title": ct.get("title", _payload_description(payload)),
+                "verified": True,
+            })
+        else:
+            discarded += 1
+
+    return {
+        "positive_tests": positive_out,
+        "counter_tests": counter_out,
+        "discarded_adversarial": discarded,
+    }
 
 
 @app.post("/api/tests/adversarial")
@@ -1018,58 +1278,229 @@ async def generate_adversarial(req: AdversarialRequest, session: dict = Depends(
 
 @app.get("/api/context")
 async def get_context(session: dict = Depends(get_session)):
+    ns_id = session.get("active_namespace_id") or session["active_user_id"]
+    ns_row = await db.get_namespace(ns_id)
+    active_dn = ns_row["display_name"] if ns_row else session.get("active_display_name", session["active_username"])
     return {
         "login_user_id":       session["login_user_id"],
         "login_username":      session["login_username"],
         "login_display_name":  session.get("login_display_name", session["login_username"]),
-        "active_user_id":      session["active_user_id"],
-        "active_username":     session["active_username"],
-        "active_display_name": session.get("active_display_name", session["active_username"]),
+        "active_namespace_id": ns_id,
+        "active_user_id":      ns_id,
+        "active_username":     active_dn,
+        "active_display_name": active_dn,
     }
 
 
 class SwitchContextRequest(BaseModel):
-    user_id: str
+    namespace_id: str
 
 
 @app.post("/api/context/switch")
 async def switch_context(req: SwitchContextRequest, request: Request,
                          session: dict = Depends(get_session)):
-    """Switch active context to a descendant owner."""
-    if not await db.can_switch_to(session["login_user_id"], req.user_id):
-        raise HTTPException(403, "You may only switch to owners you created")
-    target = await db.get_user_by_id(req.user_id)
+    """Switch active context to a namespace the login user owns or manages."""
+    if not await db.can_access_namespace(session["login_user_id"], req.namespace_id):
+        raise HTTPException(403, "You may only switch to namespaces you own or manage")
+    target = await db.get_namespace(req.namespace_id)
     if target is None:
-        raise HTTPException(404, "User not found")
-    tdn = target.get("display_name") or target["username"]
+        raise HTTPException(404, "Namespace not found")
     token = _make_session(session["login_user_id"], session["login_username"],
                           session.get("login_display_name", session["login_username"]),
-                          target["id"], target["username"], tdn)
-    resp = JSONResponse({"active_user_id": target["id"], "active_username": target["username"],
-                         "active_display_name": tdn})
+                          target["id"], target["display_name"])
+    resp = JSONResponse({"active_namespace_id": target["id"],
+                         "active_user_id": target["id"],
+                         "active_display_name": target["display_name"]})
     resp.set_cookie("session", token, httponly=True, samesite="lax")
     return resp
 
 
 @app.post("/api/context/reset")
 async def reset_context(request: Request, session: dict = Depends(get_session)):
-    """Switch back to the login owner."""
+    """Switch back to the login user's home namespace."""
     ldn = session.get("login_display_name", session["login_username"])
+    ns = await _login_namespace(session["login_user_id"])
+    if not ns:
+        raise HTTPException(status_code=404, detail="No namespace found for user")
     token = _make_session(session["login_user_id"], session["login_username"], ldn,
-                          session["login_user_id"], session["login_username"], ldn)
-    resp = JSONResponse({"active_user_id": session["login_user_id"],
-                         "active_username": session["login_username"],
-                         "active_display_name": ldn})
+                          ns["id"], ns["display_name"])
+    resp = JSONResponse({"active_namespace_id": ns["id"],
+                         "active_user_id": ns["id"],
+                         "active_display_name": ns["display_name"]})
     resp.set_cookie("session", token, httponly=True, samesite="lax")
     return resp
+
+
+# ── Namespace CRUD ───────────────────────────────────────────────────────────
+
+@app.get("/api/users/check")
+async def check_user_exists(username: str, session: dict = Depends(get_session)):
+    user = await db.get_user_by_username(username.strip())
+    return {"exists": user is not None}
+
+
+def _collect_tree_ids(node: dict) -> set[str]:
+    ids = {node["id"]} if node.get("id") else set()
+    for child in node.get("children", []):
+        ids |= _collect_tree_ids(child)
+    return ids
+
+
+@app.get("/api/namespaces/tree")
+async def get_namespace_tree_endpoint(session: dict = Depends(get_session)):
+    """Namespace tree rooted at the login user's root namespace.
+
+    Also includes 'external_owned': namespaces the user owns that live outside
+    their root subtree (e.g. assigned as owner of a namespace under another user's tree).
+    """
+    root_ns = await db.get_root_namespace(session["login_user_id"])
+    all_owned = await db.get_namespaces_owned_by(session["login_user_id"])
+    if not root_ns:
+        # No root namespace — return only the namespaces this user owns elsewhere.
+        return {"external_owned": all_owned} if all_owned else {}
+    tree = await db.get_namespace_tree(root_ns["id"])
+    in_tree = _collect_tree_ids(tree)
+    external = [ns for ns in all_owned if ns["id"] not in in_tree]
+    if external:
+        tree["external_owned"] = external
+    return tree
+
+
+class CreateNamespaceRequest(BaseModel):
+    display_name: str
+    parent_id: str | None = None
+    owner_user_id: str | None = None
+    owner_username: str | None = None
+    owner_password: str | None = None
+    owner_email: str = ""
+
+
+@app.post("/api/namespaces", status_code=201)
+async def create_namespace_endpoint(req: CreateNamespaceRequest,
+                                    session: dict = Depends(get_session)):
+    display_name = req.display_name.strip()
+    if not display_name:
+        raise HTTPException(400, "display_name required")
+
+    parent_id = req.parent_id or session.get("active_namespace_id") or session["active_user_id"]
+    if not await db.can_access_namespace(session["login_user_id"], parent_id):
+        raise HTTPException(403, "Not authorised to create under that namespace")
+
+    if req.owner_user_id:
+        owner = await db.get_user_by_id(req.owner_user_id)
+        if not owner:
+            raise HTTPException(404, "Owner user not found")
+        owner_id = owner["id"]
+    elif req.owner_username:
+        uname = req.owner_username.strip()
+        existing = await db.get_user_by_username(uname)
+        if existing:
+            owner_id = existing["id"]
+        elif req.owner_password:
+            new_user = await db.create_user(
+                uname, req.owner_password,
+                display_name=uname,
+                email=req.owner_email.strip(),
+            )
+            owner_id = new_user["id"]
+        else:
+            raise HTTPException(400, f"User {uname!r} not found; provide owner_password to create")
+    else:
+        owner_id = session["login_user_id"]
+
+    ns = await db.create_namespace(display_name, owner_id, parent_id)
+    return {"id": ns["id"], "display_name": ns["display_name"],
+            "owner_user_id": ns["owner_user_id"],
+            "parent_namespace_id": ns["parent_namespace_id"]}
+
+
+class UpdateNamespaceRequest(BaseModel):
+    display_name: str | None = None
+    owner_user_id: str | None = None
+    owner_username: str | None = None   # resolved to owner_user_id server-side
+    owner_password: str | None = None   # if owner_username not found, create new user
+    owner_email: str = ""
+
+
+@app.patch("/api/namespaces/{namespace_id}")
+async def update_namespace_endpoint(namespace_id: str, req: UpdateNamespaceRequest,
+                                    session: dict = Depends(get_session)):
+    if not await db.can_access_namespace(session["login_user_id"], namespace_id):
+        raise HTTPException(403, "Not authorised to update this namespace")
+    ns = await db.get_namespace(namespace_id)
+    if not ns:
+        raise HTTPException(404, "Namespace not found")
+
+    owner_id: str | None = None
+    if req.owner_user_id:
+        owner = await db.get_user_by_id(req.owner_user_id)
+        if not owner:
+            raise HTTPException(404, "Owner user not found")
+        owner_id = owner["id"]
+    elif req.owner_username:
+        uname = req.owner_username.strip()
+        existing = await db.get_user_by_username(uname)
+        if existing:
+            owner_id = existing["id"]
+        elif req.owner_password:
+            new_owner = await db.create_user(uname, req.owner_password,
+                                             display_name=uname,
+                                             email=req.owner_email.strip())
+            owner_id = new_owner["id"]
+        else:
+            raise HTTPException(400, f"User {uname!r} not found; provide owner_password to create")
+
+    new_name = req.display_name.strip() if req.display_name else None
+    if new_name and new_name != ns["display_name"]:
+        old_text = await db.get_namespace_zpl(namespace_id) or ""
+        if old_text:
+            try:
+                raw = zpl_parser.parse(old_text)
+                ps, _ = norm.zpl_to_policy_set(raw, name="ns")
+                pd = ns_mod.strip(ps.model_dump(mode="json"), ns["display_name"])
+                pd = ns_mod.inject(pd, new_name)
+                re_prefixed = (
+                    zpl_serializer.classes_to_zpl(pd.get("classes", [])) + "\n\n" +
+                    zpl_serializer.rules_to_zpl(pd.get("rules", []))
+                ).strip()
+                await db.save_namespace_zpl(namespace_id, re_prefixed)
+            except Exception:
+                pass
+
+    await db.update_namespace(namespace_id,
+                              display_name=new_name,
+                              owner_user_id=owner_id)
+    root_ns_id = await _get_root_ns_id(session["login_user_id"])
+    if root_ns_id:
+        _cache_invalidate(root_ns_id)
+    return {"ok": True}
+
+
+@app.delete("/api/namespaces/{namespace_id}", status_code=204)
+async def delete_namespace_endpoint(namespace_id: str, session: dict = Depends(get_session)):
+    if not await db.can_access_namespace(session["login_user_id"], namespace_id):
+        raise HTTPException(403, "Not authorised to delete this namespace")
+    root_ns = await db.get_root_namespace(session["login_user_id"])
+    if root_ns and root_ns["id"] == namespace_id:
+        raise HTTPException(400, "Cannot delete your own root namespace")
+    err = await db.delete_namespace(namespace_id)
+    if err:
+        raise HTTPException(409, err)
+    if root_ns:
+        _cache_invalidate(root_ns["id"])
 
 
 # ── Namespace ZPL ────────────────────────────────────────────────────────────
 
 @app.get("/api/namespace/zpl")
 async def get_namespace_zpl(session: dict = Depends(get_session)):
-    text = await db.get_namespace_zpl(session["active_user_id"]) or ""
-    ns = ns_mod.active_ns(session)
+    ns_id = session["active_user_id"]
+    text = await db.get_namespace_zpl(ns_id) or ""
+    # Always fetch fresh display_name from DB — session may be stale after a rename.
+    ns_row = await db.get_namespace(ns_id)
+    ns = (ns_row.get("display_name") or "").strip() if ns_row else ""
+    if not ns or ns.startswith("_ns_"):
+        ns = ""
     if text and ns:
         try:
             raw = zpl_parser.parse(text)
@@ -1087,30 +1518,185 @@ async def get_namespace_zpl(session: dict = Depends(get_session)):
 @app.get("/api/namespace/zpl/all")
 async def get_namespace_zpl_all(session: dict = Depends(get_session)):
     """Return combined ZPL for the active namespace and all its descendants."""
-    tree = await db.get_owner_tree(session["active_user_id"])
+    active_ns_id = session.get("active_namespace_id") or session["active_user_id"]
+    tree = await db.get_namespace_tree(active_ns_id)
 
     # Depth-aware traversal preserving tree order, building full dotted path
     def _walk(node: dict, depth: int, parent_path: str, out: list) -> None:
         if node and node.get("id"):
             name = node.get("display_name", "")
             full_path = f"{parent_path}.{name}" if parent_path else name
-            out.append((node["id"], full_path, depth))
+            out.append((node["id"], full_path, depth, name))
             for child in node.get("children") or []:
                 _walk(child, depth + 1, full_path, out)
 
-    ordered: list[tuple[str, str, int]] = []
+    ordered: list[tuple[str, str, int, str]] = []
     _walk(tree, 0, "", ordered)
 
-    user_ids = [uid for uid, _, _ in ordered]
+    user_ids = [uid for uid, _, _, _ in ordered]
     zpl_map = await db.get_namespace_zpl_batch(user_ids)
 
     sections = []
-    for uid, label, depth in ordered:
+    for uid, label, depth, leaf_ns in ordered:
         text = (zpl_map.get(uid) or "").strip()
-        if text:
-            indent = "  " * depth
+        if not text:
+            continue
+        indent = "  " * depth
+        # leaf_ns is what was used when saving (active_ns strips _ns_ prefixes)
+        effective_leaf = leaf_ns if (leaf_ns and not leaf_ns.startswith("_ns_")) else ""
+        try:
+            raw = zpl_parser.parse(text)
+            ps, _ = norm.zpl_to_policy_set(raw, name="ns")
+            pd = ps.model_dump(mode="json")
+            if effective_leaf:
+                # DB stores ZPL pre-qualified with leaf ns; strip it then inject full path
+                pd = ns_mod.strip(pd, effective_leaf)
+            injected = ns_mod.inject(pd, label) if label else pd
+            qualified = (
+                zpl_serializer.classes_to_zpl(injected.get("classes", [])) + "\n\n" +
+                zpl_serializer.rules_to_zpl(injected.get("rules", []))
+            ).strip()
+            sections.append(f"{indent}# {label}\n{qualified}")
+        except Exception:
             sections.append(f"{indent}# {label}\n{text}")
     return {"text": "\n\n".join(sections)}
+
+
+@app.get("/api/zpl/export/markdown")
+async def export_zpl_markdown(session: dict = Depends(get_session)):
+    """Download all namespaces as Markdown. Headers use full dotted path (Corp, Corp.Hr, Corp.Ws)."""
+    root_ns_id = await _get_root_ns_id(session["login_user_id"])
+    if not root_ns_id:
+        raise HTTPException(404, "No root namespace found")
+
+    tree = await db.get_namespace_tree(root_ns_id)
+
+    def _walk(node: dict, parent_path: str, out: list) -> None:
+        if node and node.get("id"):
+            name = node.get("display_name", "")
+            full_path = f"{parent_path}.{name}" if parent_path else name
+            out.append((node["id"], name, full_path))
+            for child in node.get("children") or []:
+                _walk(child, full_path, out)
+
+    ordered: list[tuple[str, str, str]] = []
+    _walk(tree, "", ordered)
+
+    ns_ids = [uid for uid, _, _ in ordered]
+    zpl_map = await db.get_namespace_zpl_batch(ns_ids)
+
+    sections = []
+    for ns_id, ns_name, full_path in ordered:
+        text = (zpl_map.get(ns_id) or "").strip()
+        if not text or not ns_name or ns_name.startswith("_ns_"):
+            continue
+        try:
+            raw = zpl_parser.parse(text)
+            ps, _ = norm.zpl_to_policy_set(raw, name="ns")
+            pd = ns_mod.strip(ps.model_dump(mode="json"), ns_name)
+            stripped = (
+                zpl_serializer.classes_to_zpl(pd.get("classes", [])) + "\n\n" +
+                zpl_serializer.rules_to_zpl(pd.get("rules", []))
+            ).strip()
+        except Exception:
+            stripped = text
+        sections.append(f"## {full_path}\n\n```\n{stripped}\n```")
+
+    md = "# ZPL Policy Export\n\n" + "\n\n".join(sections) + "\n"
+    return Response(
+        content=md,
+        media_type="text/markdown",
+        headers={"Content-Disposition": "attachment; filename=\"zpl-policy.md\""},
+    )
+
+
+class ImportMarkdownRequest(BaseModel):
+    text: str
+
+
+@app.post("/api/zpl/import/markdown")
+async def import_zpl_markdown(req: ImportMarkdownRequest, session: dict = Depends(get_session)):
+    """Import namespaces from a markdown file produced by export.
+    Headers must use full dotted paths (Corp, Corp.Hr, Corp.Ws).
+    Namespaces are created if missing; ZPL is overwritten if they exist.
+    All created namespaces are owned by the login user."""
+    import re as _re2
+
+    # Parse: find ## <path> followed by ```...``` blocks
+    pattern = _re2.compile(
+        r'^## ([A-Za-z][A-Za-z0-9._-]*)\s*\n+```[^\n]*\n(.*?)```',
+        _re2.MULTILINE | _re2.DOTALL,
+    )
+    entries = [(m.group(1).strip(), m.group(2).strip()) for m in pattern.finditer(req.text)]
+    if not entries:
+        raise HTTPException(400, "No namespace sections found in markdown")
+
+    # Sort by depth so parents are created before children
+    entries.sort(key=lambda e: e[0].count("."))
+
+    login_user_id = session["login_user_id"]
+
+    # Build path→id map from existing tree (if root exists)
+    path_to_id: dict[str, str] = {}
+    root_ns = await db.get_root_namespace(login_user_id)
+    if root_ns:
+        tree = await db.get_namespace_tree(root_ns["id"])
+        def _index(node: dict, parent_path: str) -> None:
+            if node and node.get("id"):
+                name = node.get("display_name", "")
+                fp = f"{parent_path}.{name}" if parent_path else name
+                path_to_id[fp] = node["id"]
+                for child in node.get("children") or []:
+                    _index(child, fp)
+        _index(tree, "")
+
+    results = []
+    for full_path, zpl_text in entries:
+        parts = full_path.rsplit(".", 1)
+        leaf_name = parts[-1]
+        parent_path = parts[0] if len(parts) == 2 else None
+
+        # Resolve parent id
+        parent_id: str | None = None
+        if parent_path:
+            parent_id = path_to_id.get(parent_path)
+            if not parent_id:
+                results.append({"path": full_path, "status": "skip", "reason": f"parent '{parent_path}' not found"})
+                continue
+
+        # Find or create this namespace
+        if full_path in path_to_id:
+            ns_id = path_to_id[full_path]
+            action = "updated"
+        else:
+            new_ns = await db.create_namespace(leaf_name, login_user_id, parent_namespace_id=parent_id)
+            ns_id = new_ns["id"]
+            path_to_id[full_path] = ns_id
+            action = "created"
+
+        # Inject leaf prefix and save ZPL
+        if zpl_text:
+            try:
+                raw = zpl_parser.parse(zpl_text)
+                ps, errors = norm.zpl_to_policy_set(raw, name="ns")
+                if errors:
+                    results.append({"path": full_path, "status": "zpl_error", "reason": str(errors[:2])})
+                    continue
+                pd = ns_mod.inject(ps.model_dump(mode="json"), leaf_name)
+                stored = (
+                    zpl_serializer.classes_to_zpl(pd.get("classes", [])) + "\n\n" +
+                    zpl_serializer.rules_to_zpl(pd.get("rules", []))
+                ).strip()
+                await db.save_namespace_zpl(ns_id, stored)
+            except Exception as e:
+                results.append({"path": full_path, "status": "error", "reason": str(e)})
+                continue
+
+        _cache_invalidate(await _get_root_ns_id(login_user_id) or ns_id)
+        results.append({"path": full_path, "status": action})
+
+    return {"imported": len([r for r in results if r["status"] in ("created", "updated")]),
+            "results": results}
 
 
 class SaveNamespaceZplRequest(BaseModel):
@@ -1120,7 +1706,11 @@ class SaveNamespaceZplRequest(BaseModel):
 @app.put("/api/namespace/zpl")
 async def save_namespace_zpl(req: SaveNamespaceZplRequest, session: dict = Depends(get_session)):
     text = req.text
-    ns = ns_mod.active_ns(session)
+    ns_id = session["active_user_id"]
+    ns_row = await db.get_namespace(ns_id)
+    ns = (ns_row.get("display_name") or "").strip() if ns_row else ""
+    if not ns or ns.startswith("_ns_"):
+        ns = ""
     if text.strip() and ns:
         try:
             raw = zpl_parser.parse(text)
@@ -1134,6 +1724,9 @@ async def save_namespace_zpl(req: SaveNamespaceZplRequest, session: dict = Depen
         except Exception:
             pass  # store raw text if injection fails
     await db.save_namespace_zpl(session["active_user_id"], text)
+    root_ns_id = await _get_root_ns_id(session["login_user_id"])
+    if root_ns_id:
+        _cache_invalidate(root_ns_id)
     return {"ok": True}
 
 
@@ -1151,10 +1744,12 @@ async def parse_text(req: ParseRequest, session: dict = Depends(get_session)):
     if lang == "zpl":
         raw = zpl_parser.parse(req.text)
         ps, errors = norm.zpl_to_policy_set(raw, name=req.name)
-        inferred = zpl_parser.infer_missing_classes(raw)
+        known = await _known_classes(session["login_user_id"])
+        inferred = zpl_parser.infer_missing_classes(raw, known_classes=known)
         inferred_zpl = zpl_parser.inferred_to_zpl(inferred) if inferred else ""
         inferred_verbs = zpl_parser.infer_missing_verbs(raw)
         inferred_verbs_zpl = "\n".join(f"Define {v} as a verb." for v in inferred_verbs)
+        undefined_parents = zpl_parser.infer_undefined_parents(raw, known_classes=known)
     elif lang == "zpel":
         raw = zpel_parser.parse(req.text)
         ps, errors = norm.zpel_to_policy_set(raw, name=req.name)
@@ -1181,6 +1776,7 @@ async def parse_text(req: ParseRequest, session: dict = Depends(get_session)):
         "inferred_zpl": inferred_zpl,
         "inferred_verbs": inferred_verbs,
         "inferred_verbs_zpl": inferred_verbs_zpl,
+        "undefined_parents": undefined_parents if lang == "zpl" else [],
         "serialized_zpl": serialized_zpl,
     }
 
@@ -1543,6 +2139,171 @@ async def delete_policy_set(policy_set_id: str, session: dict = Depends(get_sess
         raise HTTPException(404, "Not found")
 
 
+# ── Entities ─────────────────────────────────────────────────────────────────
+
+class CreateEntityRequest(BaseModel):
+    class_name: str
+    name: str
+    attributes: dict = {}
+
+
+class UpdateEntityRequest(BaseModel):
+    class_name: str | None = None
+    name: str | None = None
+    attributes: dict | None = None
+
+
+@app.get("/api/entities")
+async def list_entities(session: dict = Depends(get_session)):
+    ns_id = session["active_user_id"]
+    return await db.get_entities(ns_id)
+
+
+@app.post("/api/entities", status_code=201)
+async def create_entity(req: CreateEntityRequest, session: dict = Depends(get_session)):
+    ns_id = session["active_user_id"]
+    if not req.class_name.strip():
+        raise HTTPException(400, "class_name is required")
+    if not req.name.strip():
+        raise HTTPException(400, "name is required")
+    return await db.create_entity(ns_id, req.class_name.strip(), req.name.strip(), req.attributes)
+
+
+@app.put("/api/entities/{entity_id}")
+async def update_entity(entity_id: str, req: UpdateEntityRequest,
+                        session: dict = Depends(get_session)):
+    ns_id = session["active_user_id"]
+    ok = await db.update_entity(
+        entity_id, ns_id,
+        class_name=req.class_name,
+        name=req.name,
+        attributes=req.attributes,
+    )
+    if not ok:
+        raise HTTPException(404, "Entity not found")
+    return {"ok": True}
+
+
+@app.delete("/api/entities/{entity_id}", status_code=204)
+async def delete_entity(entity_id: str, session: dict = Depends(get_session)):
+    ns_id = session["active_user_id"]
+    ok = await db.delete_entity(entity_id, ns_id)
+    if not ok:
+        raise HTTPException(404, "Entity not found")
+
+
+@app.delete("/api/entities", status_code=200)
+async def delete_all_entities(session: dict = Depends(get_session)):
+    ns_id = session["active_user_id"]
+    count = await db.delete_all_entities(ns_id)
+    return {"deleted": count}
+
+
+@app.get("/api/entities/export/yaml")
+async def export_entities_yaml(session: dict = Depends(get_session)):
+    import yaml as _yaml
+    ns_id = session["active_user_id"]
+    entities = await db.get_entities(ns_id)
+    content = _yaml.dump(entities, default_flow_style=False, allow_unicode=True)
+    return Response(
+        content=content,
+        media_type="text/yaml",
+        headers={"Content-Disposition": "attachment; filename=entities.yaml"},
+    )
+
+
+@app.post("/api/entities/import/yaml")
+async def import_entities_yaml(file: UploadFile = File(...),
+                               session: dict = Depends(get_session)):
+    import yaml as _yaml
+    ns_id = session["active_user_id"]
+    raw = await file.read()
+    try:
+        data = _yaml.safe_load(raw)
+    except Exception as exc:
+        raise HTTPException(400, f"Invalid YAML: {exc}")
+    # Accept either a bare list or {"entities": [...]}
+    if isinstance(data, dict):
+        data = data.get("entities") or []
+    if not isinstance(data, list):
+        raise HTTPException(400, "YAML must be a list of entity objects (or a dict with an 'entities' key)")
+    created = 0
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        # Accept both "class_name" and "class" as the class field
+        cn = str(item.get("class_name") or item.get("class") or "").strip()
+        nm = str(item.get("name") or "").strip()
+        attrs = item.get("attributes") or {}
+        if not cn or not nm:
+            continue
+        await db.create_entity(ns_id, cn, nm, attrs if isinstance(attrs, dict) else {})
+        created += 1
+    return {"imported": created}
+
+
+@app.get("/api/entities/export/ldif")
+async def export_entities_ldif(session: dict = Depends(get_session)):
+    ns_id = session["active_user_id"]
+    entities = await db.get_entities(ns_id)
+    lines = []
+    for e in entities:
+        lines.append(f"dn: cn={e['name']},ou={e['class_name']},dc=zpr,dc=policy")
+        lines.append(f"cn: {e['name']}")
+        lines.append(f"objectClass: {e['class_name']}")
+        for k, v in (e.get("attributes") or {}).items():
+            lines.append(f"{k}: {v}")
+        lines.append("")
+    content = "\n".join(lines)
+    return Response(
+        content=content,
+        media_type="text/plain",
+        headers={"Content-Disposition": "attachment; filename=entities.ldif"},
+    )
+
+
+@app.post("/api/entities/import/ldif")
+async def import_entities_ldif(file: UploadFile = File(...),
+                               session: dict = Depends(get_session)):
+    ns_id = session["active_user_id"]
+    raw = (await file.read()).decode("utf-8", errors="replace")
+    entries = []
+    current: dict | None = None
+    for line in raw.splitlines():
+        line = line.rstrip()
+        if line.startswith("dn:"):
+            if current:
+                entries.append(current)
+            current = {"attrs": {}}
+        elif current is None:
+            continue
+        elif line == "":
+            if current:
+                entries.append(current)
+            current = None
+        elif ":" in line:
+            key, _, val = line.partition(":")
+            key, val = key.strip(), val.strip()
+            if key == "cn":
+                current["name"] = val
+            elif key == "objectClass":
+                current["class_name"] = val
+            else:
+                current["attrs"][key] = val
+    if current:
+        entries.append(current)
+
+    created = 0
+    for e in entries:
+        cn = str(e.get("class_name") or "").strip()
+        nm = str(e.get("name") or "").strip()
+        if not cn or not nm:
+            continue
+        await db.create_entity(ns_id, cn, nm, e.get("attrs") or {})
+        created += 1
+    return {"imported": created}
+
+
 # ── Agent chat ────────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
@@ -1639,23 +2400,29 @@ _RULE_AGENT_PROMPT  = Path(__file__).parent / "prompts" / "rule_agent.md"
 
 
 def _classes_context(ps: PolicySet | None) -> str:
-    roots = {"users", "endpoints", "services"}
     if not ps or not ps.classes:
         return "None yet — only the built-in roots: users, endpoints, services."
     lines = ["Built-in roots: users, endpoints, services", ""]
     for c in ps.classes:
-        attrs = []
+        regular_attrs = []
+        tag_values: list[str] = []
         for k, spec in (c.attributes or {}).items():
-            if spec.type == "multi":
-                vals = ",".join(spec.values[:4]) + ("…" if len(spec.values) > 4 else "")
-                attrs.append(f"{k}:multi[{vals}]")
-            elif spec.type == "enum":
-                vals = ",".join(spec.values[:4]) + ("…" if len(spec.values) > 4 else "")
-                attrs.append(f"{k}:enum[{vals}]")
+            if k == "tags" and spec.type == "multi":
+                tag_values = spec.values[:8]
+            elif spec.type == "multi":
+                regular_attrs.append(f"{k} (multi)")
             else:
-                attrs.append(f"{k}:single")
-        attr_str = "  —  " + ", ".join(attrs) if attrs else ""
-        lines.append(f"  {c.name} (extends {c.parent}){attr_str}")
+                v = f"={spec.value}" if spec.value else ""
+                regular_attrs.append(f"{k}{v}")
+        parts = []
+        if regular_attrs:
+            parts.append("attrs: " + ", ".join(regular_attrs))
+        if tag_values:
+            parts.append("tags: " + ", ".join(tag_values))
+        detail = "  —  " + "; ".join(parts) if parts else ""
+        lines.append(f"  {c.name} (extends {c.parent}){detail}")
+    lines.append("")
+    lines.append("Tag usage: `Define X as a Y with tags <value>.`  Filter in rules: `tags:<value> Y`")
     return "\n".join(lines)
 
 

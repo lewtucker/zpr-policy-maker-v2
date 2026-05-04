@@ -1,0 +1,76 @@
+# ZPR entities export
+
+entities:
+  - id: f9a860f9b5864c04aea81e2f31f8d050
+    class: employee
+    name: Ted
+    attributes:
+      department: sales
+      employment-type: full-time
+      roles: [manager]
+      clearance: confidential
+  - id: 53bba2bde12d4df3abb0a128c50c5753
+    class: employee
+    name: Alice
+    attributes:
+      department: engineering
+      employment-type: full-time
+      roles: [admin]
+      clearance: secret
+  - id: b1d48ca6153c4a4cb30666cbc54303e5
+    class: employee
+    name: Sam
+    attributes:
+      department: engineering
+      employment-type: intern
+      roles: [developer]
+      clearance: none
+  - id: 0bf4d44cd6524ebfa1ef44137b826a9b
+    class: partner
+    name: Bob
+    attributes:
+      organisation: Acme-Corp
+      clearance: none
+  - id: 2b44ab7632ee425cbb1995d1c0a650da
+    class: database
+    name: Timesheet-database
+    attributes:
+      data: hr
+      classification: internal
+      env: production
+  - id: fed16a902672442585ece3778f808942
+    class: database
+    name: Customer-database
+    attributes:
+      data: customer
+      classification: confidential
+      env: production
+  - id: 20e5b024e43940e78aa70ee3c6bd0b8f
+    class: internal-service
+    name: Timesheet-load-balancer
+    attributes:
+      classification: internal
+      env: production
+  - id: 346dda158bae4185b222a8a698ee6345
+    class: external-api
+    name: Partner-API
+    attributes:
+      classification: public
+      env: production
+  - id: 8cd96882e4774d96b8362a9ca9a64db5
+    class: laptop
+    name: Ted-laptop
+    attributes:
+      os: macos
+      tags: [managed]
+  - id: a07ac4e1d63e43f18a2d29ecc3f36726
+    class: laptop
+    name: Sam-laptop
+    attributes:
+      os: linux
+  - id: 23cdb4e607a0421e91e1827687258c8e
+    class: servers
+    name: App-server-1
+    attributes:
+      services: [Timesheet-database, Timesheet-load-balancer]
+      tags: [managed]

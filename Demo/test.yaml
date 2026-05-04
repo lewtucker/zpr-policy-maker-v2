@@ -1,0 +1,128 @@
+# ZPR classes export — user-defined only
+
+classes:
+  -     class: employee
+    parent: users
+    aka: employees
+    description: "A person employed by or contracted to the organisation"
+    attributes:
+      Employee_ID:
+        type: single
+      roles:
+        type: multi
+        values: [engineer, developer, manager, analyst, designer, support, admin]
+      department:
+        type: single
+        values: [sales, marketing, engineering, finance, hr, legal, operations, admin]
+      employment-type:
+        type: single
+        values: [full-time, part-time, contract, intern]
+      clearance:
+        type: single
+        values: [none, confidential, secret, top-secret]
+  -     class: partner
+    parent: users
+    aka: partners
+    description: "A user from an external partner organisation"
+    attributes:
+      organisation:
+        type: single
+      clearance:
+        type: single
+        values: [none, confidential, secret, top-secret]
+  -     class: mobile-device
+    parent: endpoints
+    aka: mobile-devices
+    description: "A mobile device; device-type distinguishes phones, tablets, etc."
+    attributes:
+      device-type:
+        type: single
+        values: [phone, tablet, wearable]
+      owner:
+        type: single
+        values: [corporate, personal]
+  -     class: mobile-phone
+    parent: mobile-device
+    aka: mobile-phones
+    description: "A mobile phone; device-type is fixed to phone"
+    attributes:
+      phone-number:
+        type: single
+      device-type:
+        type: single
+        value: phone
+  -     class: laptop
+    parent: endpoints
+    aka: laptops
+    description: "A laptop device"
+    attributes:
+      device-type:
+        type: single
+        value: laptop
+      os:
+        type: single
+        values: [macos, windows, linux]
+  -     class: gateway
+    parent: endpoints
+    aka: gateways
+    description: "An endpoint that bridges the ZPRnet to an external network"
+    attributes:
+      external-network-connection:
+        type: single
+  -     class: internet-gateway
+    parent: gateway
+    aka: internet-gateways
+    description: "An internet-facing gateway; external-network-connection fixed to public-internet"
+    attributes:
+      external-network-connection:
+        type: single
+        value: public-internet
+  -     class: load-balancer
+    parent: servers
+    aka: load-balancers
+    description: "A server that distributes traffic across multiple backend services"
+    attributes:
+      services:
+        type: multi
+  -     class: database
+    parent: services
+    aka: databases
+    description: "A database service"
+    attributes:
+      data:
+        type: single
+        values: [customer, hr, finance, legal, engineering, operations]
+      classification:
+        type: single
+        values: [public, internal, confidential, secret, top-secret]
+      env:
+        type: single
+        values: [development, staging, production]
+  -     class: internal-service
+    parent: services
+    aka: internal-services
+    description: "A service accessible only within the organisation"
+    attributes:
+      access:
+        type: single
+        value: internal
+      classification:
+        type: single
+        values: [public, internal, confidential, secret, top-secret]
+      env:
+        type: single
+        values: [development, staging, production]
+  -     class: external-api
+    parent: services
+    aka: external-apis
+    description: "An API exposed to external callers"
+    attributes:
+      access:
+        type: single
+        value: external
+      classification:
+        type: single
+        values: [public, internal, confidential]
+      env:
+        type: single
+        values: [development, staging, production]

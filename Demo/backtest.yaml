@@ -1,0 +1,126 @@
+# ZPR entities — reconstructed from Acme.ldap
+#
+# Attribute mappings applied:
+#   LDAP employeeType     → ZPL employment-type
+#   LDAP title            → ZPL roles  (multi-value: one title: line per role)
+#   LDAP businessCategory → ZPL clearance     (employees)
+#                         → ZPL classification (infrastructure)
+#   LDAP description      → ZPL os   (devices)
+#                         → ZPL data (databases — description holds the data-domain value)
+#   LDAP l                → ZPL tags: [managed]  (devices / servers)
+#                         → ZPL env              (services — l holds the environment value)
+#   LDAP member (full DN) → ZPL services  (cn extracted from DN)
+#
+# Fields present in LDAP but dropped on import (no ZPL equivalent):
+#   sn, givenName, mail, serialNumber, owner
+#
+# Class inference — ZPL class name is NOT stored in LDAP; derived from OU + objectClass:
+#   ou=Employees + inetOrgPerson              → employee
+#   ou=Devices + device                       → laptop  *
+#   ou=Infrastructure + device (description present) → database
+#   ou=Infrastructure + device (businessCategory:internal, no description) → internal-service  **
+#   ou=Infrastructure + device (businessCategory:public,   no description) → external-api      **
+#   ou=Servers,ou=Infrastructure + groupOfNames → servers
+#
+#   *  LDAP cannot distinguish laptop from mobile-device or gateway; requires out-of-band
+#      class mapping or an additional LDAP attribute (e.g. extensionAttribute1: laptop).
+#   ** internal-service vs external-api is inferred here from businessCategory value;
+#      a real importer would need an explicit class attribute or service-registry lookup.
+
+entities:
+
+  # ── Employees ────────────────────────────────────────────────────────────────
+
+  - id:
+    class: employee
+    name: Bob
+    attributes:
+      department: sales
+      employment-type: full-time
+      roles: [manager]
+      clearance: confidential
+
+  - id:
+    class: employee
+    name: Ted
+    attributes:
+      department: engineering
+      employment-type: full-time
+      roles: [engineer]
+      clearance: secret
+
+  - id:
+    class: employee
+    name: Carol
+    attributes:
+      department: engineering
+      employment-type: intern
+      roles: [developer]
+      clearance: none
+
+  # ── Laptops ───────────────────────────────────────────────────────────────────
+
+  - id:
+    class: laptop
+    name: Bob-laptop
+    attributes:
+      os: windows
+      tags: [managed]
+
+  - id:
+    class: laptop
+    name: Ted-laptop
+    attributes:
+      os: macos
+      tags: [managed]
+
+  - id:
+    class: laptop
+    name: Carol-laptop
+    attributes:
+      os: linux
+
+  # ── Databases ─────────────────────────────────────────────────────────────────
+
+  - id:
+    class: database
+    name: Acme-HR-database
+    attributes:
+      data: hr
+      classification: confidential
+      env: production
+
+  - id:
+    class: database
+    name: Acme-Sales-database
+    attributes:
+      data: customer
+      classification: confidential
+      env: production
+
+  # ── Internal services ─────────────────────────────────────────────────────────
+
+  - id:
+    class: internal-service
+    name: Acme-intranet
+    attributes:
+      classification: internal
+      env: production
+
+  # ── External APIs ─────────────────────────────────────────────────────────────
+
+  - id:
+    class: external-api
+    name: Acme-partner-api
+    attributes:
+      classification: public
+      env: production
+
+  # ── Servers ───────────────────────────────────────────────────────────────────
+
+  - id:
+    class: servers
+    name: Acme-app-server
+    attributes:
+      services: [Acme-HR-database, Acme-intranet]
+      tags: [managed]

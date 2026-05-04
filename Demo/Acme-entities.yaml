@@ -1,0 +1,99 @@
+# ZPR entities export — Acme Corp demo
+
+entities:
+
+  # ── Employees ────────────────────────────────────────────────────────────────
+
+  - id: 3a1f8c2d4e0b4f9aab12cc73de841507
+    class: employee
+    name: Bob
+    attributes:
+      department: sales
+      employment-type: full-time
+      roles: [manager]
+      clearance: confidential
+
+  - id: 7b2e9f1c3d054a8bb023dd84ef952618
+    class: employee
+    name: Ted
+    attributes:
+      department: engineering
+      employment-type: full-time
+      roles: [engineer]
+      clearance: secret
+
+  - id: c4d3a0e2f1764b7cc134ee95f0a63729
+    class: employee
+    name: Carol
+    attributes:
+      department: engineering
+      employment-type: intern
+      roles: [developer]
+      clearance: none
+
+  # ── Laptops ───────────────────────────────────────────────────────────────────
+
+  - id: 2f5b7e0d8c194c6dd245ff06a1b7483a
+    class: laptop
+    name: Bob-laptop
+    attributes:
+      os: windows
+      tags: [managed]
+
+  - id: 9e1c4a3f6b024d8ee356aa17b2c8594b
+    class: laptop
+    name: Ted-laptop
+    attributes:
+      os: macos
+      tags: [managed]
+
+  - id: 6d8f2b1e5a034c7ff467bb28c3d96a5c
+    class: laptop
+    name: Carol-laptop
+    attributes:
+      os: linux
+
+  # ── Databases ─────────────────────────────────────────────────────────────────
+
+  - id: 1a9e3c5f7d264b0aa578cc39d4e07b6d
+    class: database
+    name: Acme-HR-database
+    attributes:
+      data: hr
+      classification: confidential
+      env: production
+
+  - id: 8b0d4e2f6a374c1bb689dd4ae5f18c7e
+    class: database
+    name: Acme-Sales-database
+    attributes:
+      data: customer
+      classification: confidential
+      env: production
+
+  # ── Internal services ─────────────────────────────────────────────────────────
+
+  - id: 5c7f1a3e9b484d2cc790ee5bf6a29d8f
+    class: internal-service
+    name: Acme-intranet
+    attributes:
+      classification: internal
+      env: production
+
+  # ── External APIs ─────────────────────────────────────────────────────────────
+
+  - id: 4e2b8d0f7c594e3dd8a1ff6ca7b30e9a
+    class: external-api
+    name: Acme-partner-api
+    attributes:
+      classification: public
+      env: production
+
+  # ── Servers ───────────────────────────────────────────────────────────────────
+
+  - id: 0f3d6a8b2e104f5ee9b2aa7db8c41f0b
+    class: servers
+    name: Acme-app-server
+    attributes:
+      services: [Acme-HR-database, Acme-intranet]
+      tags: [managed]

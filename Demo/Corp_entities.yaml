@@ -1,0 +1,68 @@
+# ZPR entities export
+
+entities:
+  - id: 84d6b1365b894c6b904e4b784bfbd56d
+    class: employee
+    name: Ted
+    attributes:
+      department: sales
+      employment-type: full-time
+      roles: [manager]
+      clearance: confidential
+  - id: 42af560326d44cddb331ccc5603bfcab
+    class: employee
+    name: Alice
+    attributes:
+      department: engineering
+      employment-type: full-time
+      roles: [admin]
+      clearance: secret
+  - id: 50d20604ac4b4e46ae0843d643a5727c
+    class: employee
+    name: Sam
+    attributes:
+      department: engineering
+      employment-type: intern
+      roles: [developer]
+      clearance: none
+  - id: 0225944fc0e946b98d266ca8bcc99050
+    class: partner
+    name: Bob
+    attributes:
+      organisation: Acme-Corp
+      clearance: none
+  - id: b58d2f0beb5548b38bba747b6a3ec0ca
+    class: database
+    name: Timesheet-database
+    attributes:
+      data: hr
+      classification: internal
+      env: production
+  - id: 99ed4b3498024b29ac959eec5e6677de
+    class: database
+    name: Customer-database
+    attributes:
+      data: customer
+      classification: confidential
+      env: production
+  - id: cb3e164e8b2d4ebfa88b74b148f9c54c
+    class: internal-service
+    name: Timesheet-load-balancer
+    attributes:
+      classification: internal
+      env: production
+  - id: a0dfbff0648547a8a8b299d9cbae22d9
+    class: external-api
+    name: Partner-API
+    attributes:
+      classification: public
+      env: production
+  - id: f63d884a8d5941d595329bb1eab73f88
+    class: endpoints
+    name: Visitor-laptop
+    attributes: {}
+  - id: d6449a0d170549198f5910d87d8046ba
+    class: laptop
+    name: Sam-laptop
+    attributes:
+      os: linux

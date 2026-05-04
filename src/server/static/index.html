@@ -507,6 +507,7 @@
   <div class="app-title">ZPR <span>Policy Maker</span></div>
   <div class="hdr-spacer"></div>
   <span class="hdr-user" id="hdr-user"></span>
+  <button class="hdr-btn" onclick="openReleaseNotes()">Release Notes</button>
   <button class="hdr-btn" onclick="openProfilePanel()">Profile</button>
   <button class="hdr-btn" onclick="doLogout()">Sign out</button>
 </header>
@@ -551,6 +552,8 @@
           <div class="io-menu" id="io-menu">
             <div class="io-menu-item" onclick="doUploadZpl()">↑ Upload ZPL file</div>
             <div class="io-menu-item" onclick="doDownloadZpl()">↓ Download ZPL file</div>
+            <div class="io-menu-item" onclick="doDownloadAllMd()">↓ Export all namespaces (.md)</div>
+            <div class="io-menu-item" onclick="doImportAllMd()">↑ Import all namespaces (.md)</div>
             <div class="io-menu-item" onclick="doUploadZplc()">↑ Import .zplc definitions</div>
           </div>
         </div>
@@ -561,7 +564,7 @@
       <span id="infer-msg"></span>
       <div class="infer-actions">
         <button class="infer-insert" onclick="askAssistantAboutInferred()">Ask Assistant</button>
-        <button class="infer-insert" onclick="insertInferredClasses()" style="opacity:0.7">Insert all</button>
+        <button class="infer-insert" id="infer-insert-btn" onclick="insertInferredClasses()" style="opacity:0.7">Insert all</button>
         <button class="infer-dismiss" onclick="dismissInferBar()" title="Dismiss">✕</button>
       </div>
     </div>
@@ -613,6 +616,7 @@
         <button class="schema-tab active" onclick="setSchemaTab('tests',this)">Tests</button>
         <button class="schema-tab" onclick="setSchemaTab('classes',this)">Classes</button>
         <button class="schema-tab" onclick="setSchemaTab('rules',this)">Rules</button>
+        <button class="schema-tab" onclick="setSchemaTab('entities',this)">Entities</button>
         <button class="schema-tab" onclick="setSchemaTab('zpl',this)">ZPL</button>
       </div>
       <button class="panel-toggle" id="schema-expand" onclick="toggleSchemaExpand()" title="Expand schema panel">⊞</button>
@@ -630,6 +634,64 @@
 </div>
 
 <!-- ── Test generate modal ──────────────────────────────────────────── -->
+<div class="modal-backdrop" id="release-notes-modal" onclick="if(event.target===this)closeReleaseNotes()">
+  <div class="modal" style="max-width:640px;max-height:80vh;overflow-y:auto">
+    <div class="profile-modal-header" style="margin-bottom:1rem">
+      <h3>Release Notes &amp; ZPL Extensions</h3>
+      <button class="json-close" onclick="closeReleaseNotes()">✕</button>
+    </div>
+
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:1.25rem">
+      ZPR Policy Maker v3 implements RFC-15.5 ZPL with the following documented extensions.
+    </p>
+
+    <h4 style="font-size:0.8rem;font-weight:600;margin-bottom:0.5rem">Extension 1 — <code>attr:value</code> filters in Allow / Never rules</h4>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem">
+      <strong>RFC-15.5 baseline:</strong> rule qualifiers support bare tag words only.<br>
+      <strong>This extension:</strong> <code>attr:value</code> pairs are also accepted as qualifiers before the class name in Allow and Never rules.
+      The value is matched against the class's attribute at rule-evaluation time — equality for single-valued attributes, containment for multi-valued ones.
+    </p>
+    <pre style="font-size:0.78rem;background:var(--surface2);padding:0.6rem 0.75rem;border-radius:4px;margin-bottom:1.25rem;overflow-x:auto">Never allow backup:nightly servers to access backup-services.
+Allow role:engineer employees to access code-repos.
+Never allow clearance:low users to access classified services.</pre>
+
+    <h4 style="font-size:0.8rem;font-weight:600;margin-bottom:0.5rem">Extension 2 — Cross-namespace dotted class references</h4>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem">
+      <strong>RFC-15.5 baseline:</strong> class names are single unqualified identifiers.<br>
+      <strong>This extension:</strong> fully-qualified dotted names (e.g. <code>corp.employee</code>) are valid as class names and parent references in both Define and Allow/Never statements.
+      The active namespace prefix is stripped on load and injected on save; cross-namespace references keep their full dotted path in the editor.
+    </p>
+    <pre style="font-size:0.78rem;background:var(--surface2);padding:0.6rem 0.75rem;border-radius:4px;margin-bottom:1.25rem;overflow-x:auto">Define employee as a corp.employee with department:hr.
+Allow corp.contractors to access corp.hr.employee-db.</pre>
+
+    <h4 style="font-size:0.8rem;font-weight:600;margin-bottom:0.5rem">Extension 3 — <code>aka</code> aliases and singular/plural class names</h4>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem">
+      <strong>RFC-15.5 baseline:</strong> class names are exact identifiers.<br>
+      <strong>This extension:</strong> class definitions may declare an <code>aka</code> alias (typically a singular or plural variant).
+      Both forms are accepted interchangeably throughout ZPL statements.
+      Built-in roots: <code>users</code>/<code>user</code>, <code>endpoints</code>/<code>endpoint</code>, <code>services</code>/<code>service</code>, <code>servers</code>/<code>server</code>.
+    </p>
+    <pre style="font-size:0.78rem;background:var(--surface2);padding:0.6rem 0.75rem;border-radius:4px;margin-bottom:1.5rem;overflow-x:auto">Define employee aka employees as a user.
+Allow employees to access gitlab.   # both forms valid</pre>
+
+    <div class="modal-actions">
+      <button class="btn primary" onclick="closeReleaseNotes()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="unsaved-modal">
+  <div class="modal" style="max-width:320px">
+    <h3 style="margin-bottom:0.5rem">Save changes?</h3>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1.25rem">You have unsaved changes in this namespace.</p>
+    <div class="modal-actions">
+      <button class="btn" id="unsaved-cancel-btn">Cancel</button>
+      <button class="btn danger" id="unsaved-discard-btn">Discard</button>
+      <button class="btn primary" id="unsaved-save-btn">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="tr-gen-modal">
   <div class="modal" style="max-width:340px">
     <h3 style="margin-bottom:1rem">Generate tests</h3>
@@ -647,9 +709,12 @@
         <div style="font-size:0.68rem;color:var(--muted);margin-top:0.2rem">Near-miss cases (AI)</div>
       </div>
     </div>
-    <div class="modal-actions">
-      <button class="btn" onclick="closeTrGenModal()">Cancel</button>
-      <button class="btn primary" onclick="trStartGenerate()">⚡ Generate</button>
+    <div class="modal-actions" style="flex-direction:column;gap:0.5rem;align-items:stretch">
+      <div style="display:flex;gap:0.5rem">
+        <button class="btn" onclick="closeTrGenModal()" style="flex:0 0 auto">Cancel</button>
+        <button class="btn primary" onclick="trStartGenerate()" style="flex:1">⚡ Generate from rules</button>
+      </div>
+      <button class="btn" onclick="trGenerateWithEntities()" style="width:100%;background:var(--surface2)">⚡ Generate using entities</button>
     </div>
   </div>
 </div>
@@ -658,21 +723,10 @@
 <div class="modal-backdrop" id="new-owner-modal">
   <div class="modal">
     <h3>Create sub-namespace</h3>
-    <p>Creates a namespace under yours. Optionally delegate it to a new user with their own login.</p>
+    <p>Creates a namespace under the active namespace.</p>
     <div class="modal-err" id="new-owner-err"></div>
     <label>Namespace name (used in ZPL, e.g. Marketing)</label>
     <input type="text" id="new-ns-name" placeholder="e.g. Marketing" autocomplete="off">
-    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;margin-bottom:0.75rem">
-      <input type="checkbox" id="new-delegate-toggle" onchange="toggleDelegate(this.checked)"
-             style="width:auto;margin:0;padding:0">
-      Delegate to a new user (give someone else login access)
-    </label>
-    <div id="new-delegate-fields" style="display:none">
-      <label>Login username</label>
-      <input type="text" id="new-owner-username" placeholder="e.g. alice" autocomplete="off">
-      <label>Password</label>
-      <input type="password" id="new-owner-password" placeholder="Choose a password">
-    </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeNewOwnerModal()">Cancel</button>
       <button class="btn primary" onclick="submitNewOwner()">Create</button>
@@ -704,9 +758,11 @@ const S = {
   lastParsed: null,
   inferredZpl: '',
   inferredClasses: [],
+  undefinedParents: [],
   inferredVerbs: [],
   serializedZpl: '',
   profile: null,
+  entities: [],
   showAll: false,
   panelOpen: true,
   panelExpanded: false,
@@ -718,7 +774,7 @@ const S = {
 // ── API ────────────────────────────────────────────────────────────────────
 
 async function api(method, path, body, signal) {
-  const opts = { method, headers: {} };
+  const opts = { method, headers: {}, cache: 'no-store' };
   if (body !== undefined) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
@@ -761,7 +817,6 @@ async function loadContext() {
 function renderHeader() {
   const ctx = S.context;
   if (!ctx) return;
-  const isDefault = ctx.active_user_id === ctx.login_user_id;
   const nsLabel = ctx.active_display_name || ctx.active_username;
   document.getElementById('hdr-user').textContent = ctx.login_username;
   document.getElementById('ns-editor-label').textContent = nsLabel;
@@ -770,9 +825,13 @@ function renderHeader() {
 // ── Sub-owners (namespace tree) ────────────────────────────────────────────
 
 async function loadSubOwners() {
-  const tree = await api('GET', '/api/users/tree');
+  const tree = await api('GET', '/api/namespaces/tree');
   S._ownerTree = tree || {};
-  S.subOwners = flattenTree(tree ? tree.children || [] : []);
+  const hasRoot = tree && tree.id;
+  const external = (tree && tree.external_owned)
+    ? tree.external_owned.map(ns => ({ ...ns, _depth: 0, _external: !hasRoot ? false : true, children: [] }))
+    : [];
+  S.subOwners = [...flattenTree(tree ? tree.children || [] : []), ...external];
   renderNsTree();
   refreshOwnersPanel();
 }
@@ -826,9 +885,10 @@ function toggleRootNsEdit() {
   if (!wrap) return;
   if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
   const p = S.profile;
+  const rootNsName = (S._ownerTree && S._ownerTree.display_name) || p.display_name;
   wrap.innerHTML = `<div class="cfg-ns-edit-form" style="padding-top:0.4rem">
     <div class="cfg-row"><label>Namespace name</label>
-      <input id="ns-root-name" value="${esc(p.display_name)}" placeholder="Namespace name"></div>
+      <input id="ns-root-name" value="${esc(rootNsName)}" placeholder="Namespace name"></div>
     <div style="display:flex;gap:0.4rem;margin-top:0.4rem">
       <button class="cfg-btn" onclick="doSaveRootNs()">Save</button>
       <button class="cfg-btn" onclick="document.getElementById('ns-root-edit').innerHTML=''">Cancel</button>
@@ -838,15 +898,16 @@ function toggleRootNsEdit() {
 }
 
 async function doSaveRootNs() {
-  const name = document.getElementById('ns-root-name')?.value.trim();
-  const msg  = document.getElementById('ns-root-msg');
-  if (!name) { msg.className = 'cfg-msg err'; msg.textContent = 'Name required.'; return; }
+  const name   = document.getElementById('ns-root-name')?.value.trim();
+  const msg    = document.getElementById('ns-root-msg');
+  const rootId = S._ownerTree && S._ownerTree.id;
+  if (!name)   { msg.className = 'cfg-msg err'; msg.textContent = 'Name required.'; return; }
+  if (!rootId) { msg.className = 'cfg-msg err'; msg.textContent = 'Root namespace not loaded.'; return; }
   try {
-    await api('POST', '/api/profile', { display_name: name, email: S.profile.email || '' });
-    S.profile.display_name = name;
+    await api('PATCH', `/api/namespaces/${rootId}`, { display_name: name });
     msg.className = 'cfg-msg ok'; msg.textContent = 'Saved.';
     setTimeout(async () => {
-      await loadSubOwners();
+      await Promise.all([loadSubOwners(), loadContext(), loadNamespaceZpl()]);
     }, 600);
   } catch(e) {
     msg.className = 'cfg-msg err'; msg.textContent = e.message || 'Save failed.';
@@ -871,27 +932,34 @@ function renderNsTree() {
 
   let html = '';
 
-  const rootActive = ctx.active_user_id === ctx.login_user_id;
-  const rootName = ctx.login_display_name || ctx.login_username;
-  html += `<div class="ns-tree-item${rootActive ? ' active' : ''}"
-               onclick="switchToOwner('${esc(ctx.login_user_id)}')">
-    <span class="ns-tree-dot${rootActive ? ' active' : ''}"></span>
-    <span class="ns-tree-name${rootActive ? ' active' : ''}">${esc(rootName)}</span>
-    ${rootActive ? '<span class="ns-tree-badge">active</span>' : ''}
-  </div>`;
+  const rootNsId = S._ownerTree && S._ownerTree.id;
+  const activeNsId = ctx.active_namespace_id || ctx.active_user_id;
+
+  if (rootNsId) {
+    // User has a root namespace — show it as the top-level item.
+    const rootActive = activeNsId === rootNsId;
+    const rootName = S._ownerTree.display_name;
+    html += `<div class="ns-tree-item${rootActive ? ' active' : ''}"
+                 onclick="switchToNamespace('${esc(rootNsId)}')">
+      <span class="ns-tree-dot${rootActive ? ' active' : ''}"></span>
+      <span class="ns-tree-name${rootActive ? ' active' : ''}">${esc(rootName)}</span>
+      ${rootActive ? '<span class="ns-tree-badge">active</span>' : ''}
+    </div>`;
+  }
 
   // All descendant namespaces, flattened with depth for indentation
   for (const u of S.subOwners) {
-    const isActive = ctx.active_user_id === u.id;
-    const dn = u.display_name || u.username;
-    const indent = '&nbsp;&nbsp;'.repeat(u._depth) + '└ ';
+    const isActive = activeNsId === u.id;
+    const dn = u.display_name;
+    const indent = u._external ? '' : '&nbsp;&nbsp;'.repeat(u._depth) + '└ ';
     const ownerBadge = u.owner_username ? `<span class="ns-tree-badge">${esc(u.owner_username)}</span>` : '';
+    const extBadge = u._external ? '<span class="ns-tree-badge">assigned</span>' : '';
     html += `<div class="ns-tree-item child${isActive ? ' active' : ''}"
-                 onclick="switchToOwner('${esc(u.id)}')">
+                 onclick="switchToNamespace('${esc(u.id)}')">
       <span class="ns-tree-indent">${indent}</span>
       <span class="ns-tree-dot${isActive ? ' active' : ''}"></span>
       <span class="ns-tree-name${isActive ? ' active' : ''}">${esc(dn)}</span>
-      ${ownerBadge}
+      ${ownerBadge}${extBadge}
       ${isActive ? '<span class="ns-tree-badge">active</span>' : ''}
     </div>`;
   }
@@ -899,19 +967,49 @@ function renderNsTree() {
   tree.innerHTML = html;
 }
 
-async function switchToOwner(userId) {
+// Returns 'save', 'discard', or 'cancel'
+function confirmUnsaved() {
+  return new Promise(resolve => {
+    const modal = document.getElementById('unsaved-modal');
+    modal.classList.add('open');
+    const cleanup = (result) => {
+      modal.classList.remove('open');
+      document.getElementById('unsaved-save-btn').removeEventListener('click', onSave);
+      document.getElementById('unsaved-discard-btn').removeEventListener('click', onDiscard);
+      document.getElementById('unsaved-cancel-btn').removeEventListener('click', onCancel);
+      resolve(result);
+    };
+    const onSave    = () => cleanup('save');
+    const onDiscard = () => cleanup('discard');
+    const onCancel  = () => cleanup('cancel');
+    document.getElementById('unsaved-save-btn').addEventListener('click', onSave);
+    document.getElementById('unsaved-discard-btn').addEventListener('click', onDiscard);
+    document.getElementById('unsaved-cancel-btn').addEventListener('click', onCancel);
+  });
+}
+
+async function switchToNamespace(nsId) {
   const ctx = S.context;
-  if (userId === ctx.active_user_id) return;
-  if (S.dirty && !confirm('Discard unsaved changes?')) return;
+  const activeNsId = ctx.active_namespace_id || ctx.active_user_id;
+  if (nsId === activeNsId) return;
+  if (S.dirty) {
+    const choice = await confirmUnsaved();
+    if (choice === 'cancel') return;
+    if (choice === 'save') await doSave();
+  }
   try {
-    if (userId === ctx.login_user_id) {
+    const rootNsId = S._ownerTree && S._ownerTree.id;
+    if (nsId === rootNsId) {
       await api('POST', '/api/context/reset');
     } else {
-      await api('POST', '/api/context/switch', { user_id: userId });
+      await api('POST', '/api/context/switch', { namespace_id: nsId });
     }
+    if (S.panelExpanded) toggleSchemaExpand();
     await loadContext();
     _exitShowAll();
-    await Promise.all([loadSubOwners(), loadNamespaceZpl()]);
+    const switchLoads = [loadSubOwners(), loadNamespaceZpl()];
+    if (S.schemaTab === 'entities') switchLoads.push(loadEntities());
+    await Promise.all(switchLoads);
   } catch(e) { alert('Could not switch namespace: ' + e.message); }
 }
 
@@ -919,11 +1017,7 @@ async function switchToOwner(userId) {
 
 function openNewOwnerModal() {
   document.getElementById('new-ns-name').value = '';
-  document.getElementById('new-owner-username').value = '';
-  document.getElementById('new-owner-password').value = '';
   document.getElementById('new-owner-err').textContent = '';
-  document.getElementById('new-delegate-toggle').checked = false;
-  document.getElementById('new-delegate-fields').style.display = 'none';
   document.getElementById('new-owner-modal').classList.add('open');
   setTimeout(() => document.getElementById('new-ns-name').focus(), 50);
 }
@@ -932,32 +1026,23 @@ function closeNewOwnerModal() {
   document.getElementById('new-owner-modal').classList.remove('open');
 }
 
-function toggleDelegate(on) {
-  document.getElementById('new-delegate-fields').style.display = on ? 'block' : 'none';
-}
-
 async function submitNewOwner() {
-  const namespace_name = document.getElementById('new-ns-name').value.trim();
-  const delegated = document.getElementById('new-delegate-toggle').checked;
-  const username = delegated ? document.getElementById('new-owner-username').value.trim() : null;
-  const password = delegated ? document.getElementById('new-owner-password').value : null;
+  const display_name = document.getElementById('new-ns-name').value.trim();
   const errEl = document.getElementById('new-owner-err');
   errEl.textContent = '';
-  if (!namespace_name) { errEl.textContent = 'Namespace name required.'; return; }
-  if (delegated && (!username || !password)) { errEl.textContent = 'Login username and password required for delegation.'; return; }
+  if (!display_name) { errEl.textContent = 'Namespace name required.'; return; }
   try {
-    const newUser = await api('POST', '/api/users', { namespace_name, username, password, delegated });
+    const newNs = await api('POST', '/api/namespaces', { display_name });
     closeNewOwnerModal();
-    // Switch into the new namespace immediately
-    await api('POST', '/api/context/switch', { user_id: newUser.id });
+    await api('POST', '/api/context/switch', { namespace_id: newNs.id });
     await loadContext();
     await Promise.all([loadSubOwners(), loadNamespaceZpl()]);
   } catch(e) {
-    errEl.textContent = e.message.includes('already exists') ? `Username "${username}" is already taken.` : e.message;
+    errEl.textContent = e.message || 'Failed.';
   }
 }
 
-document.getElementById('new-owner-password').addEventListener('keydown', e => {
+document.getElementById('new-ns-name').addEventListener('keydown', e => {
   if (e.key === 'Enter') submitNewOwner();
 });
 
@@ -997,6 +1082,7 @@ function _editorText() {
 
 function onEditorInput() {
   markDirty();
+  clearErrors();
   scheduleAutoParse();
 }
 
@@ -1014,14 +1100,13 @@ function scheduleAutoParse() {
 
 async function autoParse() {
   const text = _editorText().trim();
-  if (!text) { S.lastParsed = null; clearErrors(); clearInferBar(); renderSchemaBody(); return; }
+  if (!text) { S.lastParsed = null; clearInferBar(); renderSchemaBody(); return; }
   try {
     const res = await api('POST', '/api/parse', { text, language: 'zpl' });
     S.lastParsed = res.policy_set;
     S.serializedZpl = res.serialized_zpl || '';
-    if (res.errors && res.errors.length) showErrors(res.errors);
-    else clearErrors();
-    showInferBar(res.inferred_classes || [], res.inferred_zpl || '', null, res.inferred_verbs || [], res.inferred_verbs_zpl || '');
+    // Errors only shown on explicit Check ZPL — not during live typing.
+    showInferBar(res.inferred_classes || [], res.inferred_zpl || '', null, res.inferred_verbs || [], res.inferred_verbs_zpl || '', res.undefined_parents || []);
     renderSchemaBody();
   } catch(e) { /* silent */ }
 }
@@ -1041,7 +1126,7 @@ async function doParse() {
       clearErrors();
       setStatus('ok', `${(res.policy_set?.classes||[]).length} classes · ${(res.policy_set?.rules||[]).length} rules`);
     }
-    showInferBar(res.inferred_classes || [], res.inferred_zpl || '', null, res.inferred_verbs || [], res.inferred_verbs_zpl || '');
+    showInferBar(res.inferred_classes || [], res.inferred_zpl || '', null, res.inferred_verbs || [], res.inferred_verbs_zpl || '', res.undefined_parents || []);
     renderSchemaBody();
   } catch(e) { setStatus('error', 'Parse failed'); }
 }
@@ -1124,6 +1209,39 @@ function doDownloadZpl() {
   URL.revokeObjectURL(url);
 }
 
+function doDownloadAllMd() {
+  document.getElementById('io-menu').classList.remove('open');
+  const a = document.createElement('a');
+  a.href = '/api/zpl/export/markdown';
+  a.download = 'zpl-policy.md';
+  a.click();
+}
+
+function doImportAllMd() {
+  document.getElementById('io-menu').classList.remove('open');
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.md,text/markdown,text/plain';
+  input.onchange = async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    try {
+      const r = await fetch('/api/zpl/import/markdown', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text}),
+      });
+      const data = await r.json();
+      if (!r.ok) { alert('Import failed: ' + (data.detail || r.status)); return; }
+      const lines = data.results.map(x => `${x.status}: ${x.path}${x.reason ? ' — ' + x.reason : ''}`);
+      alert(`Imported ${data.imported} namespace(s).\n\n` + lines.join('\n'));
+      await loadSubOwners();
+      await loadContext();
+    } catch(err) { alert('Import error: ' + err); }
+  };
+  input.click();
+}
+
 function doUploadZplc() {
   document.getElementById('io-menu').classList.remove('open');
   document.getElementById('zplc-file-input').click();
@@ -1147,10 +1265,13 @@ async function onZplcFileSelected(e) {
   }
 }
 
-function doReset() {
-  if (S.dirty && !confirm('Clear the editor and discard unsaved changes?')) return;
-  if (!S.dirty && document.getElementById('zpl-editor').value.trim() &&
-      !confirm('Clear the editor?')) return;
+async function doReset() {
+  if (S.dirty) {
+    const choice = await confirmUnsaved();
+    if (choice === 'cancel') return;
+    if (choice === 'save') { await doSave(); return; }
+  } else if (document.getElementById('zpl-editor').value.trim() &&
+             !confirm('Clear the editor?')) return;
   document.getElementById('zpl-editor').value = '';
   S.dirty = false;
   S.lastParsed = null;
@@ -1203,14 +1324,18 @@ async function toggleShowAll() {
 
 // ── Infer bar ──────────────────────────────────────────────────────────────
 
-function showInferBar(classes, zpl, label, verbs, verbsZpl) {
+function showInferBar(classes, zpl, label, verbs, verbsZpl, undefinedParents) {
   verbs = verbs || [];
   verbsZpl = verbsZpl || '';
+  undefinedParents = undefinedParents || [];
   const bar = document.getElementById('infer-bar');
-  if (!classes.length && !verbs.length) { clearInferBar(); return; }
+  if (!classes.length && !verbs.length && !undefinedParents.length) { clearInferBar(); return; }
   S.inferredZpl = [zpl, verbsZpl].filter(Boolean).join('\n');
   S.inferredClasses = classes;
   S.inferredVerbs = verbs;
+  S.undefinedParents = undefinedParents;
+  const insertBtn = document.getElementById('infer-insert-btn');
+  if (insertBtn) insertBtn.style.display = S.inferredZpl ? '' : 'none';
   const parts = [];
   if (classes.length) {
     const names = classes.map(c => c.class).join(', ');
@@ -1220,6 +1345,10 @@ function showInferBar(classes, zpl, label, verbs, verbsZpl) {
   if (verbs.length) {
     parts.push(`<strong>${verbs.length} undefined verb${verbs.length > 1 ? 's' : ''}:</strong> ${esc(verbs.join(', '))}`);
   }
+  if (undefinedParents.length) {
+    const items = undefinedParents.map(p => p.suggestion ? `${esc(p.parent)} (use ${esc(p.suggestion)})` : esc(p.parent));
+    parts.push(`<strong>undefined parent${undefinedParents.length > 1 ? 's' : ''}:</strong> ${items.join(', ')}`);
+  }
   document.getElementById('infer-msg').innerHTML = parts.join(' &nbsp;·&nbsp; ');
   bar.classList.add('visible');
 }
@@ -1228,6 +1357,7 @@ function clearInferBar() {
   document.getElementById('infer-bar').classList.remove('visible');
   S.inferredZpl = '';
   S.inferredClasses = [];
+  S.undefinedParents = [];
   S.inferredVerbs = [];
 }
 
@@ -1236,7 +1366,19 @@ function dismissInferBar() { clearInferBar(); }
 function askAssistantAboutInferred() {
   const classes = S.inferredClasses || [];
   const verbs = S.inferredVerbs || [];
-  if (!classes.length && !verbs.length) return;
+  const parents = S.undefinedParents || [];
+  if (!classes.length && !verbs.length && !parents.length) return;
+
+  if (!classes.length && !verbs.length && parents.length) {
+    // Only undefined parents — ask assistant to fix the parent references.
+    clearInferBar();
+    if (!S.assist?.active) openAssist();
+    const items = parents.map(p => p.suggestion
+      ? `'${p.parent}' in '${p.used_in}' (suggested: '${p.suggestion}')`
+      : `'${p.parent}' in '${p.used_in}'`).join('; ');
+    _assistAppendMsg('system', `Undefined parent class${parents.length > 1 ? 'es' : ''}: ${items}. Please fix by using the fully-qualified name.`);
+    return;
+  }
 
   const stmts = (S.inferredZpl || '').split('\n').map(s => s.trim()).filter(Boolean);
   clearInferBar();
@@ -1630,6 +1772,7 @@ function setSchemaTab(tab, btn) {
   S.schemaTab = tab;
   document.querySelectorAll('.schema-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  if (tab === 'entities') { loadEntities(); return; }
   renderSchemaBody();
 }
 
@@ -1637,6 +1780,7 @@ function renderSchemaBody() {
   const body = document.getElementById('schema-body');
   const ps = S.lastParsed;
   if (S.schemaTab === 'tests') { renderTests(body); return; }
+  if (S.schemaTab === 'entities') { renderEntities(body); return; }
   if (!ps) {
     body.innerHTML = '<div class="empty-state">Parse ZPL to see<br>classes and rules here.</div>';
     return;
@@ -1655,6 +1799,282 @@ function renderZpl(body) {
   body.innerHTML = `<pre class="zpl-canon">${esc(comment + S.serializedZpl)}</pre>`;
 }
 
+// ── Entities tab ───────────────────────────────────────────────────────────
+
+async function loadEntities() {
+  try {
+    S.entities = await api('GET', '/api/entities');
+  } catch(e) {
+    S.entities = [];
+  }
+  if (S.schemaTab === 'entities') renderSchemaBody();
+}
+
+function renderEntities(body) {
+  const entities = S.entities || [];
+
+  // Group by class_name
+  const groups = {};
+  for (const e of entities) {
+    const k = e.class_name;
+    if (!groups[k]) groups[k] = [];
+    groups[k].push(e);
+  }
+
+  // Collect available class names from last parsed ZPL
+  const ps = S.lastParsed;
+  const classNames = ps ? (ps.classes || []).map(c => c.name).filter(Boolean).sort() : [];
+
+  let html = `
+    <div style="padding:0.6rem 0.75rem 0.4rem;display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+      <button class="tool-btn" onclick="openEntityModal(null)" style="font-size:0.75rem">+ New Entity</button>
+      <div style="position:relative;display:inline-block">
+        <button class="tool-btn" onclick="toggleEntityMenu('yaml-menu')" style="font-size:0.75rem">YAML ▾</button>
+        <div id="yaml-menu" class="io-menu" style="display:none">
+          <div class="io-menu-item" onclick="doShowEntities('yaml');closeEntityMenus()">Show (.yaml)</div>
+          <div class="io-menu-item" onclick="document.getElementById('yaml-import-input').click();closeEntityMenus()">Upload (.yaml)</div>
+          <div class="io-menu-item" onclick="doExportYaml();closeEntityMenus()">Download (.yaml)</div>
+        </div>
+        <input type="file" id="yaml-import-input" accept=".yaml,.yml" style="display:none" onchange="doImportYaml(this)">
+      </div>
+      <div style="position:relative;display:inline-block">
+        <button class="tool-btn" onclick="toggleEntityMenu('ldap-menu')" style="font-size:0.75rem">LDAP ▾</button>
+        <div id="ldap-menu" class="io-menu" style="display:none">
+          <div class="io-menu-item" onclick="doShowEntities('ldif');closeEntityMenus()">Show (.ldif)</div>
+          <div class="io-menu-item" onclick="document.getElementById('ldif-import-input').click();closeEntityMenus()">Upload (.ldif)</div>
+          <div class="io-menu-item" onclick="doExportLdif();closeEntityMenus()">Download (.ldif)</div>
+        </div>
+        <input type="file" id="ldif-import-input" accept=".ldif,.ldap,.txt" style="display:none" onchange="doImportLdif(this)">
+      </div>
+      <button class="tool-btn" onclick="doDeleteAllEntities()" style="font-size:0.75rem;margin-left:auto;color:#ef4444">Delete all</button>
+    </div>`;
+
+  if (entities.length === 0) {
+    html += '<div class="empty-state">No entities defined.<br>Click + New Entity to add one.</div>';
+  } else {
+    for (const [cls, items] of Object.entries(groups).sort()) {
+      html += `<div style="padding:0.3rem 0.75rem 0;font-size:0.72rem;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em">${esc(cls)}</div>`;
+      html += `<table style="width:100%;border-collapse:collapse;font-size:0.8rem">`;
+      for (const e of items) {
+        const attrStr = Object.entries(e.attributes || {}).map(([k,v])=>`${k}:${v}`).join(', ');
+        html += `<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:0.35rem 0.75rem;vertical-align:top">
+            <div style="font-weight:500">${esc(e.name)}</div>
+            ${attrStr ? `<div style="color:var(--text-dim);font-size:0.72rem">${esc(attrStr)}</div>` : ''}
+          </td>
+          <td style="padding:0.35rem 0.5rem;text-align:right;white-space:nowrap;vertical-align:top">
+            <button class="tool-btn" onclick="openEntityModal('${e.id}')" style="font-size:0.7rem;padding:0.15rem 0.4rem">Edit</button>
+            <button class="tool-btn" onclick="deleteEntity('${e.id}')" style="font-size:0.7rem;padding:0.15rem 0.4rem;color:#ef4444">×</button>
+          </td>
+        </tr>`;
+      }
+      html += `</table>`;
+    }
+  }
+
+  body.innerHTML = html;
+}
+
+function toggleEntityMenu(id) {
+  const el = document.getElementById(id);
+  const wasOpen = el.style.display !== 'none';
+  closeEntityMenus();
+  if (!wasOpen) el.style.display = 'block';
+}
+
+function closeEntityMenus() {
+  document.querySelectorAll('#yaml-menu,#ldap-menu').forEach(m => m.style.display = 'none');
+}
+
+async function deleteEntity(id) {
+  if (!confirm('Delete this entity?')) return;
+  try {
+    await api('DELETE', `/api/entities/${id}`);
+    await loadEntities();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function doDeleteAllEntities() {
+  if (!confirm('Delete ALL entities in this namespace?')) return;
+  try {
+    await api('DELETE', '/api/entities');
+    await loadEntities();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function doShowEntities(fmt) {
+  try {
+    const res = await fetch(fmt === 'yaml' ? '/api/entities/export/yaml' : '/api/entities/export/ldif');
+    if (!res.ok) throw new Error(await res.text());
+    const text = await res.text();
+    const ext = fmt === 'yaml' ? '.yaml' : '.ldif';
+    const html = `
+      <div class="modal-backdrop" id="entities-show-modal" onclick="if(event.target===this)this.remove()" style="display:flex">
+        <div class="modal" style="max-width:640px;width:100%;max-height:80vh;display:flex;flex-direction:column">
+          <div class="profile-modal-header" style="margin-bottom:0.75rem">
+            <h3 style="margin:0">Entities (${ext})</h3>
+            <button class="close-btn" onclick="document.getElementById('entities-show-modal').remove()">✕</button>
+          </div>
+          <pre style="flex:1;overflow:auto;background:var(--surface2);border:1px solid var(--border);border-radius:0.375rem;padding:0.75rem;font-size:0.78rem;margin:0;white-space:pre-wrap;word-break:break-all">${esc(text)}</pre>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function doExportYaml() {
+  const a = document.createElement('a');
+  a.href = '/api/entities/export/yaml';
+  a.download = 'entities.yaml';
+  a.click();
+}
+
+async function doImportYaml(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  input.value = '';
+  try {
+    const res = await fetch('/api/entities/import/yaml', { method: 'POST', body: fd });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    await loadEntities();
+    alert(`Imported ${data.imported} entities.`);
+  } catch(e) { alert('Import failed: ' + e.message); }
+}
+
+async function doExportLdif() {
+  const a = document.createElement('a');
+  a.href = '/api/entities/export/ldif';
+  a.download = 'entities.ldif';
+  a.click();
+}
+
+async function doImportLdif(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  input.value = '';
+  try {
+    const res = await fetch('/api/entities/import/ldif', { method: 'POST', body: fd });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    await loadEntities();
+    alert(`Imported ${data.imported} entities.`);
+  } catch(e) { alert('Import failed: ' + e.message); }
+}
+
+// ── Entity modal ──────────────────────────────────────────────────────────
+
+function openEntityModal(entityId) {
+  const entity = entityId ? (S.entities || []).find(e => e.id === entityId) || null : null;
+  const ps = S.lastParsed;
+  const classNames = ps ? (ps.classes || []).map(c => c.name).filter(Boolean).sort() : [];
+
+  const classOptions = classNames.map(n =>
+    `<option value="${esc(n)}" ${entity && entity.class_name === n ? 'selected' : ''}>${esc(n)}</option>`
+  ).join('');
+
+  const attrRows = entity
+    ? Object.entries(entity.attributes || {}).map(([k,v]) => entityAttrRow(k, v)).join('')
+    : '';
+
+  const html = `
+    <div class="modal-backdrop" id="entity-modal" onclick="if(event.target===this)closeEntityModal()" style="display:flex">
+      <div class="modal" style="max-width:480px;width:100%">
+        <div class="profile-modal-header" style="margin-bottom:1rem">
+          <h3 style="margin:0">${entity ? 'Edit Entity' : 'New Entity'}</h3>
+          <button class="close-btn" onclick="closeEntityModal()">✕</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.75rem">
+          <div>
+            <label style="display:block;font-size:0.8rem;margin-bottom:0.25rem;color:var(--text-dim)">Class</label>
+            <select id="entity-class" style="width:100%;padding:0.45rem 0.6rem;border-radius:0.375rem;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:0.875rem">
+              <option value="">-- select class --</option>
+              ${classOptions}
+              ${entity && !classNames.includes(entity.class_name) ? `<option value="${esc(entity.class_name)}" selected>${esc(entity.class_name)}</option>` : ''}
+            </select>
+            <input id="entity-class-custom" type="text" placeholder="Or type a class name"
+              style="margin-top:0.4rem;width:100%;box-sizing:border-box;padding:0.45rem 0.6rem;border-radius:0.375rem;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:0.875rem"
+              value="${entity && !classNames.includes(entity.class_name) ? esc(entity.class_name) : ''}">
+          </div>
+          <div>
+            <label style="display:block;font-size:0.8rem;margin-bottom:0.25rem;color:var(--text-dim)">Name</label>
+            <input id="entity-name" type="text" value="${entity ? esc(entity.name) : ''}"
+              placeholder="e.g. Ted"
+              style="width:100%;box-sizing:border-box;padding:0.45rem 0.6rem;border-radius:0.375rem;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:0.875rem">
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem">
+              <label style="font-size:0.8rem;color:var(--text-dim)">Attributes</label>
+              <button class="tool-btn" onclick="addEntityAttrRow()" style="font-size:0.7rem;padding:0.15rem 0.5rem">+ Add</button>
+            </div>
+            <div id="entity-attrs">${attrRows}</div>
+          </div>
+          <div id="entity-modal-error" style="color:#ef4444;font-size:0.8rem;display:none"></div>
+          <div style="display:flex;gap:0.5rem;justify-content:flex-end">
+            <button class="tool-btn" onclick="closeEntityModal()">Cancel</button>
+            <button class="tool-btn" onclick="saveEntity('${entity ? entity.id : ''}')" style="background:var(--accent);color:white">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function entityAttrRow(k='', v='') {
+  return `<div class="entity-attr-row" style="display:flex;gap:0.4rem;margin-bottom:0.3rem">
+    <input type="text" placeholder="key" value="${esc(k)}" style="flex:1;padding:0.35rem 0.5rem;border-radius:0.3rem;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:0.8rem">
+    <input type="text" placeholder="value" value="${esc(v)}" style="flex:2;padding:0.35rem 0.5rem;border-radius:0.3rem;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:0.8rem">
+    <button onclick="this.closest('.entity-attr-row').remove()" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:1rem;padding:0 0.2rem">×</button>
+  </div>`;
+}
+
+function addEntityAttrRow() {
+  document.getElementById('entity-attrs').insertAdjacentHTML('beforeend', entityAttrRow());
+}
+
+function closeEntityModal() {
+  const m = document.getElementById('entity-modal');
+  if (m) m.remove();
+}
+
+async function saveEntity(entityId) {
+  const classSelect = document.getElementById('entity-class').value.trim();
+  const classCustom = document.getElementById('entity-class-custom').value.trim();
+  const className = classCustom || classSelect;
+  const name = document.getElementById('entity-name').value.trim();
+  const errEl = document.getElementById('entity-modal-error');
+
+  if (!className) { errEl.textContent = 'Class is required'; errEl.style.display='block'; return; }
+  if (!name) { errEl.textContent = 'Name is required'; errEl.style.display='block'; return; }
+  errEl.style.display = 'none';
+
+  const attrs = {};
+  document.querySelectorAll('#entity-attrs .entity-attr-row').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const k = inputs[0].value.trim();
+    const v = inputs[1].value.trim();
+    if (k) attrs[k] = v;
+  });
+
+  try {
+    if (entityId) {
+      await api('PUT', `/api/entities/${entityId}`, { class_name: className, name, attributes: attrs });
+    } else {
+      await api('POST', '/api/entities', { class_name: className, name, attributes: attrs });
+    }
+    closeEntityModal();
+    await loadEntities();
+  } catch(e) {
+    errEl.textContent = 'Error: ' + e.message;
+    errEl.style.display = 'block';
+  }
+}
+
 // ── Profile tab ────────────────────────────────────────────────────────────
 
 async function openProfilePanel() {
@@ -1664,6 +2084,14 @@ async function openProfilePanel() {
 
 function closeProfilePanel() {
   document.getElementById('profile-modal').classList.remove('open');
+}
+
+function openReleaseNotes() {
+  document.getElementById('release-notes-modal').classList.add('open');
+}
+
+function closeReleaseNotes() {
+  document.getElementById('release-notes-modal').classList.remove('open');
 }
 
 async function loadProfile() {
@@ -1685,10 +2113,10 @@ function renderOwnerTree(node, depth) {
     : '';
   const uid = node.id;
   const ownerMeta = node.owner_username
-    ? `<div class="cfg-ns-meta">owner: ${esc(node.owner_username)}${node.owner_email ? ' · ' + esc(node.owner_email) : ''}</div>`
+    ? `<div class="cfg-ns-meta">owner: ${esc(node.owner_username)}</div>`
     : `<div class="cfg-ns-unowned">No owner assigned</div>`;
   const nodeData = JSON.stringify({ id: node.id, display_name: node.display_name,
-    username: node.username, email: node.email || '', delegated: !!node.delegated });
+    owner_username: node.owner_username || '' });
   return `<div class="cfg-ns-node" id="ns-node-${uid}">
     <div class="cfg-ns-item">
       <div class="cfg-ns-hdr">
@@ -1720,8 +2148,10 @@ function renderProfile(profile) {
       <h4>Profile</h4>
       <div class="cfg-row"><label>Username (login)</label>
         <input value="${esc(profile.username)}" readonly></div>
-      <div class="cfg-row"><label>Namespace name</label>
+      <div class="cfg-row"><label>Display name</label>
         <input value="${esc(profile.display_name)}" readonly></div>
+      ${S._ownerTree && S._ownerTree.id ? `<div class="cfg-row"><label>Root namespace</label>
+        <input value="${esc(S._ownerTree.display_name)}" readonly></div>` : ''}
       <div class="cfg-row"><label>Email</label>
         <input id="cfg-email" type="email" value="${esc(profile.email || '')}" placeholder="email@example.com"></div>
       <button class="cfg-btn" onclick="doSaveProfile()">Save</button>
@@ -1752,22 +2182,6 @@ function renderProfile(profile) {
         <input id="cfg-pw-confirm" type="password" placeholder="Confirm new password"></div>
       <button class="cfg-btn" onclick="doChangePassword()">Update Password</button>
       <div id="cfg-pw-msg"></div>
-    </div>
-
-    <div class="cfg-section">
-      <h4>Test Rule Match</h4>
-      <div class="cfg-row"><label>Subject class</label>
-        <input id="m-subj-cls" value="employee" placeholder="e.g. employee"></div>
-      <div class="cfg-row"><label>Subject attrs (JSON)</label>
-        <input id="m-subj-attrs" value="{}" placeholder='{"dept":"sales"}'></div>
-      <div class="cfg-row"><label>Action</label>
-        <input id="m-action" value="access"></div>
-      <div class="cfg-row"><label>Object class</label>
-        <input id="m-obj-cls" value="services" placeholder="e.g. services"></div>
-      <div class="cfg-row"><label>Object attrs (JSON)</label>
-        <input id="m-obj-attrs" value="{}" placeholder='{"content":"red"}'></div>
-      <button class="cfg-btn" onclick="doMatch()">Test</button>
-      <div id="cfg-match-result"></div>
     </div>
 
   </div>`;
@@ -1870,67 +2284,79 @@ async function doMatch() {
   }
 }
 
-function toggleProfileTopNew() {
-  const wrap = document.getElementById('profile-top-new');
-  if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
-  const uid = '_top';
-  wrap.innerHTML = `
+function _nsNewFormHtml(uid, title, createCall, cancelCall) {
+  return `
     <div class="cfg-ns-inline" style="margin-top:0.4rem">
-      <h6>New top-level namespace</h6>
+      <h6>${title}</h6>
       <div class="cfg-row"><label>Namespace name</label>
         <input id="nn-ns-${uid}" placeholder="e.g. Marketing"></div>
       <div class="cfg-row"><label>Owner username (optional)</label>
-        <input id="nn-user-${uid}" placeholder="leave blank — assign later"></div>
-      <div class="cfg-row"><label>Password</label>
-        <input id="nn-pw-${uid}" type="password" placeholder="required if username given"></div>
+        <input id="nn-user-${uid}" placeholder="leave blank — assign later"
+               onblur="checkOwnerExists('${uid}')"></div>
+      <div id="nn-pw-row-${uid}" class="cfg-row"><label>Password <span id="nn-pw-label-${uid}" style="font-weight:400;color:var(--muted)">(required for new accounts)</span></label>
+        <input id="nn-pw-${uid}" type="password" placeholder="required for new accounts"></div>
       <div class="cfg-row"><label>Email</label>
         <input id="nn-email-${uid}" type="email" placeholder="owner@example.com"></div>
       <div style="display:flex;gap:0.4rem">
-        <button class="cfg-btn" onclick="doCreateUnder(null)">Create</button>
-        <button class="cfg-btn" onclick="document.getElementById('profile-top-new').innerHTML=''">Cancel</button>
+        <button class="cfg-btn" onclick="${createCall}">Create</button>
+        <button class="cfg-btn" onclick="${cancelCall}">Cancel</button>
       </div>
       <div id="nn-msg-${uid}"></div>
     </div>`;
 }
 
+async function checkOwnerExists(uid) {
+  const username = document.getElementById(`nn-user-${uid}`)?.value.trim();
+  const pwRow    = document.getElementById(`nn-pw-row-${uid}`);
+  const pwLabel  = document.getElementById(`nn-pw-label-${uid}`);
+  const pwInput  = document.getElementById(`nn-pw-${uid}`);
+  const msg      = document.getElementById(`nn-msg-${uid}`);
+  if (!pwRow) return;
+  if (!username) { pwRow.style.display = ''; return; }
+  try {
+    const res = await api('GET', `/api/users/check?username=${encodeURIComponent(username)}`);
+    if (res.exists) {
+      pwRow.style.display = 'none';
+      pwInput.value = '';
+      msg.className = 'cfg-msg ok'; msg.textContent = `"${username}" is an existing user — no password needed.`;
+    } else {
+      pwRow.style.display = '';
+      pwLabel.textContent = '(required — new account will be created)';
+      msg.className = 'cfg-msg'; msg.textContent = '';
+    }
+  } catch(_) {}
+}
+
+function toggleProfileTopNew() {
+  const wrap = document.getElementById('profile-top-new');
+  if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = _nsNewFormHtml('_top', 'New top-level namespace',
+    "doCreateUnder(null)",
+    "document.getElementById('profile-top-new').innerHTML=''");
+}
+
 function toggleNsNew(uid) {
   const wrap = document.getElementById(`ns-new-${uid}`);
   if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
-  wrap.innerHTML = `
-    <div class="cfg-ns-inline">
-      <h6>New sub-namespace</h6>
-      <div class="cfg-row"><label>Namespace name</label>
-        <input id="nn-ns-${uid}" placeholder="e.g. West Coast"></div>
-      <div class="cfg-row"><label>Owner username (optional)</label>
-        <input id="nn-user-${uid}" placeholder="leave blank — assign later"></div>
-      <div class="cfg-row"><label>Password</label>
-        <input id="nn-pw-${uid}" type="password" placeholder="required if username given"></div>
-      <div class="cfg-row"><label>Email</label>
-        <input id="nn-email-${uid}" type="email" placeholder="owner@example.com"></div>
-      <div style="display:flex;gap:0.4rem">
-        <button class="cfg-btn" onclick="doCreateUnder('${uid}')">Create</button>
-        <button class="cfg-btn" onclick="document.getElementById('ns-new-${uid}').innerHTML=''">Cancel</button>
-      </div>
-      <div id="nn-msg-${uid}"></div>
-    </div>`;
+  wrap.innerHTML = _nsNewFormHtml(uid, 'New sub-namespace',
+    `doCreateUnder('${uid}')`,
+    `document.getElementById('ns-new-${uid}').innerHTML=''`);
 }
 
 async function doCreateUnder(uid) {
   const key  = uid || '_top';
   const ns   = document.getElementById(`nn-ns-${key}`).value.trim();
   const user = document.getElementById(`nn-user-${key}`).value.trim();
-  const pw   = document.getElementById(`nn-pw-${key}`).value;
+  const pw   = document.getElementById(`nn-pw-${key}`)?.value || '';
   const email= document.getElementById(`nn-email-${key}`).value.trim();
   const msg  = document.getElementById(`nn-msg-${key}`);
   if (!ns) { msg.className='cfg-msg err'; msg.textContent='Namespace name required.'; return; }
-  if (user && !pw) { msg.className='cfg-msg err'; msg.textContent='Password required when username is set.'; return; }
-  const delegated = !!(user && pw);
-  const body = { namespace_name: ns, email, delegated };
-  if (user) body.username = user;
-  if (pw)   body.password = pw;
-  body.parent_id = uid || S.context.login_user_id;
+  const body = { display_name: ns, owner_email: email };
+  if (user) body.owner_username = user;
+  if (pw)   body.owner_password = pw;
+  body.parent_id = uid || (S._ownerTree && S._ownerTree.id);
   try {
-    await api('POST', '/api/users', body);
+    await api('POST', '/api/namespaces', body);
     msg.className='cfg-msg ok'; msg.textContent=`"${ns}" created.`;
     setTimeout(async () => { await loadSubOwners(); }, 600);
   } catch(e) {
@@ -1942,21 +2368,15 @@ function toggleNsEdit(uid, nodeDataJson) {
   const wrap = document.getElementById(`ns-edit-${uid}`);
   if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
   const node = JSON.parse(nodeDataJson);
-  const delegatedCheck = node.delegated
-    ? `<input type="checkbox" id="ed-del-${uid}" checked> <label for="ed-del-${uid}" style="font-size:0.75rem">Has independent login</label>`
-    : `<input type="checkbox" id="ed-del-${uid}"> <label for="ed-del-${uid}" style="font-size:0.75rem">Assign an owner login</label>`;
   wrap.innerHTML = `
     <div class="cfg-ns-inline">
       <h6>Edit namespace</h6>
       <div class="cfg-row"><label>Namespace name</label>
         <input id="ed-ns-${uid}" value="${esc(node.display_name)}"></div>
-      <div style="display:flex;align-items:center;gap:0.4rem;margin:0.1rem 0">${delegatedCheck}</div>
-      <div class="cfg-row"><label>Login username</label>
-        <input id="ed-user-${uid}" value="${node.delegated ? esc(node.username) : ''}"></div>
-      <div class="cfg-row"><label>New password</label>
-        <input id="ed-pw-${uid}" type="password" placeholder="${node.delegated ? 'blank = keep current' : 'set a password'}"></div>
-      <div class="cfg-row"><label>Email</label>
-        <input id="ed-email-${uid}" type="email" value="${esc(node.email)}"></div>
+      <div class="cfg-row"><label>Owner username</label>
+        <input id="ed-user-${uid}" value="${esc(node.owner_username)}" placeholder="leave blank to keep current owner"></div>
+      <div class="cfg-row"><label>Password <span style="font-weight:400;color:var(--muted)">(if creating new owner)</span></label>
+        <input id="ed-pw-${uid}" type="password" placeholder="required only for new accounts"></div>
       <div style="display:flex;gap:0.4rem;flex-wrap:wrap">
         <button class="cfg-btn" onclick="doSaveOwner('${uid}')">Save</button>
         <button class="cfg-btn" onclick="document.getElementById('ns-edit-${uid}').innerHTML=''">Cancel</button>
@@ -1966,18 +2386,16 @@ function toggleNsEdit(uid, nodeDataJson) {
 }
 
 async function doSaveOwner(uid) {
-  const ns       = document.getElementById(`ed-ns-${uid}`).value.trim();
-  const user     = document.getElementById(`ed-user-${uid}`).value.trim();
-  const pw       = document.getElementById(`ed-pw-${uid}`).value;
-  const email    = document.getElementById(`ed-email-${uid}`).value.trim();
-  const delegated= document.getElementById(`ed-del-${uid}`).checked;
-  const msg      = document.getElementById(`ed-msg-${uid}`);
-  if (delegated && !user) { msg.className='cfg-msg err'; msg.textContent='Username required when owner login is enabled.'; return; }
-  const body = { display_name: ns, email, delegated };
-  if (user)  body.username = user;
-  if (pw)    body.password = pw;
+  const ns   = document.getElementById(`ed-ns-${uid}`).value.trim();
+  const user = document.getElementById(`ed-user-${uid}`).value.trim();
+  const pw   = document.getElementById(`ed-pw-${uid}`).value;
+  const msg  = document.getElementById(`ed-msg-${uid}`);
+  const body = {};
+  if (ns)   body.display_name = ns;
+  if (user) body.owner_username = user;
+  if (pw)   body.owner_password = pw;
   try {
-    await api('PATCH', `/api/users/${uid}`, body);
+    await api('PATCH', `/api/namespaces/${uid}`, body);
     msg.className='cfg-msg ok'; msg.textContent='Saved.';
     setTimeout(async () => { await loadSubOwners(); }, 600);
   } catch(e) {
@@ -1986,9 +2404,9 @@ async function doSaveOwner(uid) {
 }
 
 async function doDeleteOwner(uid, displayName) {
-  if (!confirm(`Delete namespace "${displayName}"?\n\nThis will also delete their ZPL and cannot be undone.`)) return;
+  if (!confirm(`Delete namespace "${displayName}"?\n\nThis will also delete its ZPL and cannot be undone.`)) return;
   try {
-    await api('DELETE', `/api/users/${uid}`);
+    await api('DELETE', `/api/namespaces/${uid}`);
     await loadSubOwners();
   } catch(e) {
     alert(e.message||'Delete failed.');
@@ -2162,10 +2580,10 @@ function toggleSchemaExpand() {
 
 function initResizers() {
   setupResizer('resizer-left', (dx) => {
-    S.sidebarWidth = Math.max(140, Math.min(480, S.sidebarWidth + dx));
+    S.sidebarWidth = Math.max(60, Math.min(480, S.sidebarWidth + dx));
   });
   setupResizer('resizer-right', (dx) => {
-    S.panelWidth = Math.max(150, Math.min(600, S.panelWidth - dx));
+    S.panelWidth = Math.max(60, Math.min(600, S.panelWidth - dx));
   });
 }
 
@@ -2299,6 +2717,49 @@ async function trStartGenerate() {
 
     const discarded = suite.discarded_adversarial || 0;
     if (discarded > 0) toast(`${discarded} adversarial test${discarded !== 1 ? 's' : ''} discarded — mutation still allowed by policy`);
+  } catch(e) {
+    if (e.name === 'AbortError') {
+      toast('Generation stopped.');
+    } else {
+      toast(`Generation failed: ${e.message || e}`);
+    }
+  }
+  TR.abortController = null;
+  trBusy(null);
+  renderSchemaBody();
+}
+
+async function trGenerateWithEntities() {
+  const nPositive    = Math.max(1, parseInt(document.getElementById('tr-gen-positive')?.value)    || 8);
+  const nAdversarial = Math.max(0, parseInt(document.getElementById('tr-gen-adversarial')?.value) || 8);
+  closeTrGenModal();
+
+  TR.abortController = new AbortController();
+  trBusy(`Generating ${nPositive} entity-based tests…`, true);
+  try {
+    const suite = await api('POST', '/api/tests/from-entities', {
+      n_positive: nPositive,
+      n_adversarial: nAdversarial,
+    }, TR.abortController.signal);
+
+    const positive = (suite.positive_tests || []).map((t, i) => ({
+      number: i + 1,
+      title: t.title || _trPayloadLabel(t.payload),
+      expected: t.expected || 'allow',
+      payload: t.payload,
+      result: null,
+      adversarial: false,
+    }));
+    const counter = (suite.counter_tests || []).map((ct, i) => ({
+      number: positive.length + i + 1,
+      title: ct.title || _trPayloadLabel(ct.payload),
+      expected: 'deny',
+      payload: ct.payload,
+      result: null,
+      adversarial: true,
+      verified: ct.verified,
+    }));
+    TR.tests = [...positive, ...counter];
   } catch(e) {
     if (e.name === 'AbortError') {
       toast('Generation stopped.');
@@ -2655,11 +3116,10 @@ function renderTests(body) {
 
   if (!TR.tests.length) {
     body.innerHTML = manualHtml + `<div class="tr-empty-state" style="padding-top:1rem;">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <button class="tool-btn" onclick="trGenerate()">⚡ Generate from rules</button>
-        <button class="tool-btn" onclick="trTogglePrompt()">Prompt</button>
+      <div style="display:flex;align-items:center">
+        <button class="tool-btn" onclick="trGenerate()">⚡ Generate…</button>
       </div>
-    </div>` + (TR.promptOpen ? _trPromptSection() : '');
+    </div>`;
     return;
   }
 
@@ -2702,12 +3162,13 @@ function renderTests(body) {
         <button class="tool-btn" onclick="trExport()">↓ Export</button>
         <button class="tool-btn" onclick="trReset()" title="Clear tests">✕ Reset</button>
       </div>
-      <button class="tool-btn" onclick="trTogglePrompt()" title="Edit adversarial prompt">Prompt</button>
     </div>
-    ${TR.promptOpen ? _trPromptSection() : ''}
     ${summaryLine}
     <div id="tr-summary" class="tr-summary"></div>
     <div id="tr-progress" class="tr-progress" style="display:none"></div>
+    <div style="display:flex;align-items:center;padding:0.2rem 0.6rem 0;font-size:0.65rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">
+      <span style="width:1.4rem;flex-shrink:0">Run</span>
+    </div>
     <div class="tr-body">${listHtml}</div>`;
 }
 

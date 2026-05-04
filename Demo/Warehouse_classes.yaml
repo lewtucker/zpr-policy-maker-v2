@@ -1,0 +1,119 @@
+# ZPR classes export — user-defined only
+
+classes:
+  - class: warehouse-worker
+    parent: users
+    aka: warehouse-workers
+    attributes:
+      department:
+        type: single
+      shift:
+        type: single
+      employment-type:
+        type: single
+      tags:
+        type: multi
+        values: [managed, compliant]
+  - class: floor-worker
+    parent: warehouse-worker
+    aka: floor-workers
+    attributes:
+      zone:
+        type: single
+  - class: shift-supervisor
+    parent: warehouse-worker
+    aka: shift-supervisors
+    attributes: {}
+  - class: warehouse-manager
+    parent: warehouse-worker
+    aka: warehouse-managers
+    attributes: {}
+  - class: maintenance-tech
+    parent: warehouse-worker
+    aka: maintenance-techs
+    attributes:
+      zone:
+        type: single
+  - class: warehouse-service
+    parent: services
+    aka: warehouse-services
+    attributes:
+      classification:
+        type: single
+      env:
+        type: single
+  - class: inventory-system
+    parent: warehouse-service
+    aka: inventory-systems
+    attributes:
+      classification:
+        type: single
+        value: internal
+  - class: payroll-system
+    parent: warehouse-service
+    aka: payroll-systems
+    attributes:
+      classification:
+        type: single
+        value: confidential
+  - class: scheduling-system
+    parent: warehouse-service
+    aka: scheduling-systems
+    attributes:
+      classification:
+        type: single
+        value: internal
+  - class: hr-system
+    parent: warehouse-service
+    aka: hr-systems
+    attributes:
+      classification:
+        type: single
+        value: confidential
+  - class: safety-monitor
+    parent: warehouse-service
+    aka: safety-monitors
+    attributes:
+      classification:
+        type: single
+        value: internal
+  - class: fulfillment-system
+    parent: warehouse-service
+    aka: fulfillment-systems
+    attributes:
+      classification:
+        type: single
+        value: internal
+  - class: warehouse-machine
+    parent: endpoints
+    aka: warehouse-machines
+    attributes:
+      zone:
+        type: single
+      status:
+        type: single
+  - class: packing-machine
+    parent: warehouse-machine
+    aka: packing-machines
+    attributes:
+      zone:
+        type: single
+      status:
+        type: single
+  - class: conveyor-system
+    parent: warehouse-machine
+    aka: conveyor-systems
+    attributes:
+      zone:
+        type: single
+      status:
+        type: single
+  - class: system-controller
+    parent: warehouse-machine
+    aka: system-controllers
+    attributes:
+      zone:
+        type: single
+      status:
+        type: single
+        value: active

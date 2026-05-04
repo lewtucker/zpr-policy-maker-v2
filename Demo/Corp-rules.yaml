@@ -1,0 +1,133 @@
+version: 2
+policies:
+- id: deny-intern-production
+  result: never
+  priority: 200
+  name: Block interns from development
+  description: Prevents interns from accessing any development-status services.
+  subject:
+    role: intern
+  resource:
+    status: development
+- id: deny-low-trust-agent-secret
+  result: never
+  priority: 200
+  name: Block low-trust agents from secret services
+  description: Denies low-trust AI agents access to services classified as secret.
+  subject:
+    trust-level: low
+  resource:
+    classification: secret
+- id: deny-unmanaged-endpoint-hr-data
+  result: never
+  priority: 200
+  name: Block sales, marketing, and engineering from HR apps
+  description: Prevents sales, marketing, and engineering groups from access to HR
+    data
+  subject:
+    users: employees
+    group:
+    - sales
+    - engineering
+    - marketing
+  resource:
+    data: hr-data
+  endpoint:
+    managed: 'False'
+- id: deny-contractor-finance-db
+  result: never
+  priority: 200
+  name: Block contractors from employee records
+  description: Denies contractor employees access to employee records
+  subject:
+    role: contractor
+  resource:
+    type: database
+    data: employee-records
+- id: '1'
+  result: never
+  priority: 200
+  name: Block employees on un-managed endpoints from corporate services
+  description: Block employees on un-managed endpoints from corporate services
+  subject:
+    users: employees
+  resource:
+    classification: corporate
+  endpoint:
+    managed: 'false'
+  verb: access
+- id: allow-internal-system-employee-web-app
+  result: allow
+  priority: 140
+  name: Allow employees access to corporate production systems
+  description: Allow employees access to corporate production systems
+  subject:
+    users: employees
+  resource:
+    type: web-app
+    status: production
+    classification: corporate
+- id: allow-secret-clearance-secret-service
+  result: allow
+  priority: 130
+  name: Allow secret-cleared users to access secret managed services
+  description: Permits users holding secret clearance to access secret-classified
+    services on managed endpoints.
+  subject:
+    clearance: secret
+  resource:
+    classification: secret
+  endpoint:
+    managed: 'True'
+- id: allow-high-trust-agent-corporate
+  result: allow
+  priority: 125
+  name: Allow high-trust agents on corporate services
+  description: Permits high-trust AI agents with corporate classification to access
+    corporate services.
+  subject:
+    trust-level: high
+    classification: corporate
+  resource:
+    classification: corporate
+- id: allow-hr-employee-records
+  result: allow
+  priority: 120
+  name: Allow HR access to employee records
+  description: Permits HR department employees to access services holding employee
+    records.
+  subject:
+    department: hr
+  resource:
+    data: employee-records
+- id: allow-finance-finance-data
+  result: allow
+  priority: 115
+  name: Allow finance team to access finance data
+  description: Permits finance department users to access services containing finance
+    data.
+  subject:
+    department: finance
+  resource:
+    data: finance-data
+- id: allow-engineering-staging-db
+  result: allow
+  priority: 110
+  name: Allow engineering access to staging databases
+  description: Permits engineering department employees to access database services
+    in staging.
+  subject:
+    department: engineering
+  resource:
+    type: database
+    status: staging
+- id: allow-admin-all-services
+  result: allow
+  priority: 100
+  name: Allow admins full service access
+  description: Permits users with the admin role to access any corporate-classified
+    service.
+  subject:
+    role: admin
+  resource:
+    classification: corporate
