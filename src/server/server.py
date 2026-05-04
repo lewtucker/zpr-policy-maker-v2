@@ -403,6 +403,11 @@ async def get_admin_session(session: dict = Depends(get_session)) -> dict:
     return session
 
 
+@app.get("/help", response_class=HTMLResponse)
+async def help_page():
+    return HTMLResponse((STATIC_DIR / "help.html").read_text())
+
+
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(session: dict = Depends(get_admin_session)):
     admin_html_path = STATIC_DIR / "admin.html"

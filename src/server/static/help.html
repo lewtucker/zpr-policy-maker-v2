@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZPR Policy Maker — User Guide</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :root {
+    --bg: #f8fafc; --surface: #ffffff; --surface2: #f1f5f9;
+    --border: #e2e8f0; --text: #1e293b; --muted: #64748b;
+    --accent: #2563eb; --accent-light: #dbeafe;
+    --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 0.9rem; line-height: 1.7; }
+
+  /* ── Layout ── */
+  .layout { display: flex; min-height: 100vh; }
+  nav { width: 240px; min-width: 240px; background: var(--surface); border-right: 1px solid var(--border); padding: 1.5rem 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+  main { flex: 1; max-width: 820px; padding: 2.5rem 3rem; }
+
+  /* ── Nav ── */
+  nav .nav-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); padding: 0 1.25rem 0.5rem; }
+  nav a { display: block; padding: 0.3rem 1.25rem; font-size: 0.82rem; color: var(--muted); text-decoration: none; border-left: 2px solid transparent; }
+  nav a:hover { color: var(--accent); background: var(--surface2); }
+  nav a.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-light); }
+  nav .nav-section { margin-top: 1.25rem; }
+
+  /* ── Typography ── */
+  h1 { font-size: 1.75rem; font-weight: 700; margin: 0 0 0.25rem; }
+  h2 { font-size: 1.2rem; font-weight: 700; margin: 2.5rem 0 0.75rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+  h2:first-of-type { border-top: none; margin-top: 1.5rem; }
+  h3 { font-size: 1rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: var(--text); }
+  p { margin: 0 0 0.9rem; }
+  ul, ol { margin: 0 0 0.9rem 1.25rem; }
+  li { margin-bottom: 0.3rem; }
+  a { color: var(--accent); }
+  code { font-family: var(--mono); font-size: 0.82rem; background: var(--surface2); padding: 0.1em 0.35em; border-radius: 3px; border: 1px solid var(--border); }
+  pre { background: var(--surface2); border: 1px solid var(--border); border-radius: 0.4rem; padding: 1rem 1.25rem; overflow-x: auto; margin: 0 0 1rem; }
+  pre code { background: none; border: none; padding: 0; font-size: 0.8rem; }
+  .subtitle { color: var(--muted); font-size: 0.95rem; margin-bottom: 2rem; }
+  .note { background: var(--accent-light); border-left: 3px solid var(--accent); padding: 0.6rem 1rem; border-radius: 0 0.3rem 0.3rem 0; margin: 0 0 1rem; font-size: 0.85rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 0 0 1rem; }
+  th { text-align: left; padding: 0.4rem 0.75rem; background: var(--surface2); border: 1px solid var(--border); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  td { padding: 0.4rem 0.75rem; border: 1px solid var(--border); vertical-align: top; }
+  .kbd { display: inline-block; background: var(--surface2); border: 1px solid #cbd5e1; border-radius: 3px; padding: 0.1em 0.4em; font-family: var(--mono); font-size: 0.78rem; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ── Sidebar nav ── -->
+<nav id="nav">
+  <div class="nav-title">User Guide</div>
+  <a href="#overview">Overview</a>
+  <a href="#getting-started">Getting Started</a>
+  <div class="nav-section">
+    <div class="nav-title">Interface</div>
+    <a href="#layout">Layout</a>
+    <a href="#namespace-selector">Namespace Selector</a>
+    <a href="#zpl-editor">ZPL Editor</a>
+    <a href="#right-panel">Right Panel</a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-title">Features</div>
+    <a href="#writing-zpl">Writing ZPL</a>
+    <a href="#namespaces">Namespaces</a>
+    <a href="#entities">Entities</a>
+    <a href="#tests">Tests</a>
+    <a href="#ai-assist">AI Assist</a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-title">Reference</div>
+    <a href="#profile">Profile &amp; API Token</a>
+    <a href="#admin">Admin</a>
+    <a href="#zpl-reference">ZPL Quick Reference</a>
+  </div>
+</nav>
+
+<!-- ── Main content ── -->
+<main>
+
+<h1>ZPR Policy Maker</h1>
+<p class="subtitle">User Guide &mdash; <a href="https://zpr.org" target="_blank">ZPR.org</a> &middot; Applied Invention, LLC</p>
+
+<!-- Overview -->
+<h2 id="overview">Overview</h2>
+<p>ZPR Policy Maker is a browser-based editor for writing and testing <strong>ZPL (Zero-trust Policy Language)</strong> policies. ZPL is defined in <a href="https://zpr.org" target="_blank">ZPR RFC-15.5</a> and provides a structured, human-readable way to express access control rules across services, users, and endpoints.</p>
+<p>With ZPR Policy Maker you can:</p>
+<ul>
+  <li>Write ZPL directly in an editor and see parsed classes and rules instantly</li>
+  <li>Organize policies into a namespace tree with delegated ownership</li>
+  <li>Define named entity instances (e.g. specific users, databases) for realistic testing</li>
+  <li>Generate and run policy test suites — including AI-generated adversarial tests</li>
+  <li>Use AI assistance to help author or explain ZPL</li>
+</ul>
+
+<!-- Getting Started -->
+<h2 id="getting-started">Getting Started</h2>
+<h3>First Run</h3>
+<p>When no accounts exist, the application redirects to <code>/setup</code>. Enter a username and password to create the root admin account. This account is automatically granted admin privileges and becomes the owner of the root namespace.</p>
+
+<h3>Logging In</h3>
+<p>Use your username and password at the login page. Your session is maintained via a secure cookie.</p>
+
+<h3>Your Root Namespace</h3>
+<p>Every account has a root namespace named after your display name (e.g. <code>Corp</code>). All your ZPL is scoped within this namespace. Sub-namespaces can be created underneath it, each optionally owned by a different user.</p>
+
+<!-- Layout -->
+<h2 id="layout">Layout</h2>
+<p>The interface is a three-column layout:</p>
+<table>
+  <tr><th>Column</th><th>Contents</th></tr>
+  <tr><td><strong>Left sidebar</strong></td><td>Namespace Selector and Namespace Management</td></tr>
+  <tr><td><strong>Center</strong></td><td>ZPL Editor with toolbar</td></tr>
+  <tr><td><strong>Right panel</strong></td><td>Tests, Classes, Rules, Entities, ZPL tabs</td></tr>
+</table>
+<p>The dividers between columns are draggable. Both sidebars can be collapsed.</p>
+
+<!-- Namespace Selector -->
+<h2 id="namespace-selector">Namespace Selector</h2>
+<p>The left sidebar shows your namespace tree. Click any namespace to switch the active context — the editor and all API operations apply to the selected namespace.</p>
+<p>The currently active namespace is highlighted and shown in the editor toolbar.</p>
+<p>To expand the <strong>Namespace Management</strong> panel, click the <strong>Edit</strong> button at the bottom of the sidebar. This reveals controls to create, rename, and delete namespaces, and to reassign ownership.</p>
+
+<!-- ZPL Editor -->
+<h2 id="zpl-editor">ZPL Editor</h2>
+<p>The center column is a full-height text editor for ZPL. The toolbar contains:</p>
+<table>
+  <tr><th>Button</th><th>Action</th></tr>
+  <tr><td><strong>Check ZPL</strong></td><td>Parse the current editor content without saving. Errors are shown inline.</td></tr>
+  <tr><td><strong>Save</strong></td><td>Parse and save ZPL to the active namespace. The namespace prefix is injected automatically on save.</td></tr>
+  <tr><td><strong>Reset</strong></td><td>Discard unsaved changes and reload the saved ZPL from the server.</td></tr>
+  <tr><td><strong>Show All</strong></td><td>Load a read-only combined view of ZPL for the active namespace and all sub-namespaces.</td></tr>
+  <tr><td><strong>⊕ Assist</strong></td><td>Open the AI assistant panel (see <a href="#ai-assist">AI Assist</a>).</td></tr>
+  <tr><td><strong>↑↓</strong></td><td>Upload a ZPL file from disk, or download the current editor content.</td></tr>
+  <tr><td><strong>⊟</strong></td><td>Collapse the right panel to give the editor more room.</td></tr>
+</table>
+
+<div class="note">ZPL in the editor uses relative (un-prefixed) class names. The namespace prefix (e.g. <code>Corp.</code>) is added automatically when saving and stripped when loading.</div>
+
+<!-- Right Panel -->
+<h2 id="right-panel">Right Panel</h2>
+<p>The right panel has five tabs:</p>
+<table>
+  <tr><th>Tab</th><th>Contents</th></tr>
+  <tr><td><strong>Tests</strong></td><td>Manual test runner and generated test suite</td></tr>
+  <tr><td><strong>Classes</strong></td><td>Parsed class hierarchy from the current ZPL</td></tr>
+  <tr><td><strong>Rules</strong></td><td>Parsed allow/never rules</td></tr>
+  <tr><td><strong>Entities</strong></td><td>Named entity instances (see <a href="#entities">Entities</a>)</td></tr>
+  <tr><td><strong>ZPL</strong></td><td>Canonical round-trip output from the parser/serializer</td></tr>
+</table>
+<p>Click <strong>⊞</strong> in the panel header to expand the right panel to full width.</p>
+
+<!-- Writing ZPL -->
+<h2 id="writing-zpl">Writing ZPL</h2>
+<p>ZPL uses three statement types: <code>define</code>, <code>allow</code>, and <code>never allow</code>.</p>
+
+<h3>Defining Classes</h3>
+<pre><code>Define employee as a user with an ID-number, roles
+    and optional tags full-time, part-time, and intern.
+
+Define database as a service with content
+    and optional tags corporate, employee, financial.</code></pre>
+<p>The base classes are <code>user</code>, <code>service</code>, and <code>endpoint</code>. Subclasses inherit attributes and can add their own. The <code>optional tags</code> clause defines allowed tag values for instances.</p>
+
+<h3>Allow Rules</h3>
+<pre><code>Allow full-time employees to access databases.
+Allow HR employees to access Payroll-DB.
+Allow department:sales employees on managed laptops to access customer databases.</code></pre>
+<p>Rules can match by class, attribute value (<code>department:sales</code>), tag, named entity (capitalized), or endpoint context (<code>on managed laptops</code>).</p>
+
+<h3>Never Rules</h3>
+<pre><code>Never allow intern users to access services.
+Never allow internet-gateways to access internal services.</code></pre>
+<p><code>never allow</code> takes precedence over any matching <code>allow</code> rule.</p>
+
+<h3>Subclasses</h3>
+<pre><code>Define senior-employee as an employee with clearance-level.
+Define internet-gateway as a gateway with external-network-connection:public-internet.</code></pre>
+<p>Subclasses inherit all attributes of their parent. Attribute values can be fixed in a subclass definition.</p>
+
+<!-- Namespaces -->
+<h2 id="namespaces">Namespaces</h2>
+<p>Namespaces scope ZPL definitions and rules. Every class and rule you write belongs to the active namespace. Sub-namespaces allow you to partition a large policy across teams or systems.</p>
+<p>To create a sub-namespace, open Namespace Management (Edit button) and click <strong>+ New</strong> under the desired parent. You can specify a different user as the owner — that user can then edit ZPL within that namespace independently.</p>
+<p>Renaming a namespace cascades: all stored ZPL in that namespace and its descendants is re-prefixed automatically.</p>
+
+<!-- Entities -->
+<h2 id="entities">Entities</h2>
+<p>Entities are named instances of ZPL classes — concrete subjects and objects that exist in your actual environment. For example, <code>Alice</code> as an <code>employee</code> with <code>department: engineering</code>, or <code>Payroll-DB</code> as a <code>database</code> with <code>tags: financial</code>.</p>
+
+<h3>Creating Entities</h3>
+<p>In the <strong>Entities</strong> tab, click <strong>+ New entity</strong>. Enter the class name, a display name, and any attributes as key/value pairs.</p>
+
+<h3>Importing and Exporting</h3>
+<p>Use the <strong>YAML</strong> or <strong>LDIF</strong> menus to import or export entities. The YAML format:</p>
+<pre><code>entities:
+  - class_name: employee
+    name: Alice
+    attributes:
+      department: engineering
+      roles: developer
+      tags: full-time
+  - class_name: database
+    name: Payroll-DB
+    attributes:
+      tags: financial, employee</code></pre>
+<p>LDIF format uses standard LDAP attribute notation.</p>
+
+<h3>Using Entities in Tests</h3>
+<p>Once entities are defined, the <strong>Generate using Entities</strong> button in the Tests tab creates a test suite using real entity names and attributes, including AI-generated adversarial tests that should be denied.</p>
+
+<!-- Tests -->
+<h2 id="tests">Tests</h2>
+<p>The <strong>Tests</strong> tab lets you verify that your ZPL policy behaves as expected.</p>
+
+<h3>Manual Test</h3>
+<p>Enter a <code>subject class</code>, <code>action</code>, and <code>object class</code> (and optionally attributes) and click <strong>Run</strong>. The result shows <strong>allow</strong> or <strong>deny</strong> with the matching rule.</p>
+<p>Click <strong>+ Add</strong> to save the current test to the test suite.</p>
+
+<h3>Generating Tests</h3>
+<p>Click <strong>Generate…</strong> to open the generator modal. Two options:</p>
+<ul>
+  <li><strong>Generate from rules</strong> — creates one allow test and one deny test per rule, using class-level payloads</li>
+  <li><strong>Generate using Entities</strong> — uses your defined entity instances for realistic tests, plus AI-generated adversarial near-miss tests</li>
+</ul>
+<p>Specify how many adversarial tests to generate. The system verifies each adversarial test against the engine and discards any that do not actually result in a deny.</p>
+
+<h3>Running Tests</h3>
+<p>Check the tests you want to run and click <strong>Run</strong>. Each test shows pass or fail with the engine result. Tests expecting <code>allow</code> pass if the engine allows; tests expecting <code>deny</code> pass if the engine denies.</p>
+
+<!-- AI Assist -->
+<h2 id="ai-assist">AI Assist</h2>
+<p>Click <strong>⊕ Assist</strong> in the editor toolbar to open the AI assistant panel. You can ask questions about ZPL, request help authoring rules, or ask the assistant to explain what existing rules do.</p>
+<p>The assistant has access to the current ZPL editor content as context. Suggested edits can be applied directly to the editor.</p>
+
+<!-- Profile -->
+<h2 id="profile">Profile &amp; API Token</h2>
+<p>Click <strong>Profile</strong> in the header to open the profile panel. From here you can:</p>
+<ul>
+  <li>Update your display name and email</li>
+  <li>Change your password</li>
+  <li>View or regenerate your <strong>Bearer token</strong> for API access</li>
+</ul>
+<p>The Bearer token can be used by external systems to call the API without a browser session:</p>
+<pre><code>Authorization: Bearer &lt;your-token&gt;</code></pre>
+
+<!-- Admin -->
+<h2 id="admin">Admin</h2>
+<p>Users with admin privileges can access the admin interface at <code>/admin</code>. The first user created (via <code>/setup</code>) is automatically an admin.</p>
+<p>From the admin interface you can:</p>
+<ul>
+  <li>View all users and their root namespaces</li>
+  <li>Create new users with auto-created root namespaces</li>
+  <li>Grant or revoke admin privileges (checkbox per user)</li>
+  <li>Reset any user's password</li>
+  <li>Delete users (blocked if the user owns a root namespace — delete the namespace first)</li>
+  <li>View the full namespace tree with owners</li>
+</ul>
+
+<!-- ZPL Quick Reference -->
+<h2 id="zpl-reference">ZPL Quick Reference</h2>
+
+<h3>Statement Types</h3>
+<table>
+  <tr><th>Type</th><th>Syntax</th></tr>
+  <tr><td>Define class</td><td><code>Define &lt;name&gt; as a &lt;base-class&gt; with &lt;attrs&gt;.</code></td></tr>
+  <tr><td>Allow rule</td><td><code>Allow &lt;subject&gt; to &lt;verb&gt; &lt;object&gt;.</code></td></tr>
+  <tr><td>Deny rule</td><td><code>Never allow &lt;subject&gt; to &lt;verb&gt; &lt;object&gt;.</code></td></tr>
+</table>
+
+<h3>Base Classes</h3>
+<table>
+  <tr><th>Class</th><th>Role</th></tr>
+  <tr><td><code>user</code></td><td>Human actor (subject)</td></tr>
+  <tr><td><code>service</code></td><td>Software system (subject or object)</td></tr>
+  <tr><td><code>endpoint</code></td><td>Device or network location (context for <code>on</code> clauses)</td></tr>
+</table>
+
+<h3>Verbs</h3>
+<p><code>access</code>, <code>use</code>, <code>call</code>, <code>read</code>, <code>write</code>, <code>connect to</code>, <code>operate</code></p>
+
+<h3>Subject / Object Filters</h3>
+<table>
+  <tr><th>Filter</th><th>Example</th></tr>
+  <tr><td>Class match</td><td><code>Allow employees to access databases.</code></td></tr>
+  <tr><td>Tag filter</td><td><code>Allow full-time employees to access databases.</code></td></tr>
+  <tr><td>Attribute value</td><td><code>Allow department:sales employees to access customer-db.</code></td></tr>
+  <tr><td>Named entity</td><td><code>Allow Alice to access Payroll-DB.</code></td></tr>
+  <tr><td>Endpoint context</td><td><code>Allow employees on managed-laptops to access databases.</code></td></tr>
+</table>
+
+<h3>Attribute Syntax in Define</h3>
+<table>
+  <tr><th>Form</th><th>Meaning</th></tr>
+  <tr><td><code>with department</code></td><td>Required attribute</td></tr>
+  <tr><td><code>with department:engineering</code></td><td>Fixed-value attribute (restricts inherited)</td></tr>
+  <tr><td><code>optional tags full-time, part-time</code></td><td>Allowed tag values</td></tr>
+</table>
+
+<p style="margin-top:2.5rem;font-size:0.78rem;color:var(--muted)">
+  ZPR Policy Maker &mdash; Applied Invention, LLC &mdash; <a href="https://zpr.org" target="_blank">zpr.org</a>
+</p>
+
+</main>
+</div>
+
+<script>
+// Highlight active nav link on scroll
+const sections = document.querySelectorAll('h2[id], h3[id]');
+const navLinks = document.querySelectorAll('nav a');
+function onScroll() {
+  let current = '';
+  sections.forEach(s => { if (window.scrollY >= s.offsetTop - 80) current = s.id; });
+  navLinks.forEach(a => {
+    a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+  });
+}
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+</body>
+</html>
