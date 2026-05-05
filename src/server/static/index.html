@@ -934,29 +934,36 @@
         <h1>Namespace Config</h1>
         <span style="font-size:0.82rem;color:var(--muted);margin-left:0.25rem">Root namespace built-in classes, aliases, and verbs</span>
       </div>
-      <div class="page-body" style="max-width:640px;display:flex;flex-direction:column;gap:1.25rem;padding:1rem">
+      <div class="page-body" style="max-width:640px;display:flex;flex-direction:column;gap:1.5rem;padding:1rem">
         <p style="font-size:0.82rem;color:var(--muted);margin:0">
-          Built-in names are not prefixed with a namespace when ZPL is saved or parsed.
-          Changes take effect on the next Save or Parse. One entry per line.
+          Built-in names are never namespace-prefixed when ZPL is saved or parsed.
+          System entries are read-only. Add your own below them. One entry per line.
         </p>
+
         <div>
-          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.3rem">Built-in Classes</label>
-          <textarea id="nsconfig-classes" rows="8" spellcheck="false"
-            style="width:100%;font-family:monospace;font-size:0.82rem;padding:0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--fg);resize:vertical"></textarea>
-          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.2rem">Class names that are never namespace-prefixed (e.g. <code>users</code>, <code>services</code>)</div>
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.4rem">Built-in Classes</label>
+          <div id="nsconfig-classes-system" style="font-family:monospace;font-size:0.82rem;padding:0.4rem 0.5rem;border:1px solid var(--border);border-bottom:none;border-radius:4px 4px 0 0;background:var(--surface3,#f0f0f0);color:var(--muted);user-select:none"></div>
+          <textarea id="nsconfig-classes" rows="3" spellcheck="false" placeholder="Add more class names, one per line…"
+            style="width:100%;font-family:monospace;font-size:0.82rem;padding:0.5rem;border:1px solid var(--border);border-radius:0 0 4px 4px;background:var(--surface2);color:var(--fg);resize:vertical;box-sizing:border-box"></textarea>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.2rem">Class names that are never namespace-prefixed</div>
         </div>
+
         <div>
-          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.3rem">Built-in Aliases</label>
-          <textarea id="nsconfig-aliases" rows="8" spellcheck="false"
-            style="width:100%;font-family:monospace;font-size:0.82rem;padding:0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--fg);resize:vertical"></textarea>
-          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.2rem">Alias mappings in <code>alias: canonical</code> format (e.g. <code>user: users</code>)</div>
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.4rem">Built-in Aliases</label>
+          <div id="nsconfig-aliases-system" style="font-family:monospace;font-size:0.82rem;padding:0.4rem 0.5rem;border:1px solid var(--border);border-bottom:none;border-radius:4px 4px 0 0;background:var(--surface3,#f0f0f0);color:var(--muted);user-select:none"></div>
+          <textarea id="nsconfig-aliases" rows="3" spellcheck="false" placeholder="Add more aliases in alias: canonical format…"
+            style="width:100%;font-family:monospace;font-size:0.82rem;padding:0.5rem;border:1px solid var(--border);border-radius:0 0 4px 4px;background:var(--surface2);color:var(--fg);resize:vertical;box-sizing:border-box"></textarea>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.2rem">Format: <code>alias: canonical</code> (e.g. <code>employee: Employee</code>)</div>
         </div>
+
         <div>
-          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.3rem">Built-in Verbs</label>
-          <textarea id="nsconfig-verbs" rows="5" spellcheck="false"
-            style="width:100%;font-family:monospace;font-size:0.82rem;padding:0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--fg);resize:vertical"></textarea>
-          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.2rem">Verbs that are considered built-in (e.g. <code>access</code>, <code>read</code>, <code>write</code>)</div>
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:0.4rem">Built-in Verbs</label>
+          <div id="nsconfig-verbs-system" style="font-family:monospace;font-size:0.82rem;padding:0.4rem 0.5rem;border:1px solid var(--border);border-bottom:none;border-radius:4px 4px 0 0;background:var(--surface3,#f0f0f0);color:var(--muted);user-select:none"></div>
+          <textarea id="nsconfig-verbs" rows="2" spellcheck="false" placeholder="Add more verbs, one per line…"
+            style="width:100%;font-family:monospace;font-size:0.82rem;padding:0.5rem;border:1px solid var(--border);border-radius:0 0 4px 4px;background:var(--surface2);color:var(--fg);resize:vertical;box-sizing:border-box"></textarea>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.2rem">Verbs that are considered built-in and not flagged as undefined</div>
         </div>
+
         <div style="display:flex;gap:0.5rem;align-items:center">
           <button class="btn primary" onclick="saveNsConfig()">Save Config</button>
           <button class="btn" onclick="loadNsConfig()">Reset</button>
@@ -4068,13 +4075,30 @@ function toggleReportsPanel() { /* no-op: reports is now a page */ }
 
 // ── NS Config ──────────────────────────────────────────────────────────────
 
+const _NS_SYS_CLASSES = ['user','users','endpoint','endpoints','service','services','server','servers'];
+const _NS_SYS_ALIASES = {user:'users',users:'users',endpoint:'endpoints',endpoints:'endpoints',service:'services',services:'services',server:'servers',servers:'servers'};
+const _NS_SYS_VERBS   = ['access','use','call','read','write'];
+
+function _nsconfigRenderSystem() {
+  document.getElementById('nsconfig-classes-system').textContent = _NS_SYS_CLASSES.join('  ');
+  document.getElementById('nsconfig-verbs-system').textContent   = _NS_SYS_VERBS.join('  ');
+  document.getElementById('nsconfig-aliases-system').textContent =
+    Object.entries(_NS_SYS_ALIASES).map(([k,v]) => `${k}: ${v}`).join('  ');
+}
+
 async function loadNsConfig() {
+  _nsconfigRenderSystem();
   try {
     const cfg = await api('GET', '/api/namespace/config');
-    document.getElementById('nsconfig-classes').value = (cfg.builtin_classes || []).join('\n');
-    document.getElementById('nsconfig-verbs').value   = (cfg.builtin_verbs || []).join('\n');
-    const aliasLines = Object.entries(cfg.builtin_aliases || {}).map(([k, v]) => `${k}: ${v}`);
-    document.getElementById('nsconfig-aliases').value = aliasLines.join('\n');
+    const sysClassSet  = new Set(_NS_SYS_CLASSES);
+    const sysAliasKeys = new Set(Object.keys(_NS_SYS_ALIASES));
+    const sysVerbSet   = new Set(_NS_SYS_VERBS);
+    const extraClasses = (cfg.builtin_classes || []).filter(c => !sysClassSet.has(c));
+    const extraVerbs   = (cfg.builtin_verbs   || []).filter(v => !sysVerbSet.has(v));
+    const extraAliases = Object.entries(cfg.builtin_aliases || {}).filter(([k]) => !sysAliasKeys.has(k));
+    document.getElementById('nsconfig-classes').value = extraClasses.join('\n');
+    document.getElementById('nsconfig-verbs').value   = extraVerbs.join('\n');
+    document.getElementById('nsconfig-aliases').value = extraAliases.map(([k,v]) => `${k}: ${v}`).join('\n');
     document.getElementById('nsconfig-status').textContent = '';
   } catch (e) {
     document.getElementById('nsconfig-status').textContent = `Load failed: ${e.message || e}`;
@@ -4082,25 +4106,24 @@ async function loadNsConfig() {
 }
 
 async function saveNsConfig() {
-  const classLines = (document.getElementById('nsconfig-classes').value || '').split('\n').map(s => s.trim()).filter(Boolean);
-  const verbLines  = (document.getElementById('nsconfig-verbs').value  || '').split('\n').map(s => s.trim()).filter(Boolean);
-  const aliasLines = (document.getElementById('nsconfig-aliases').value || '').split('\n').map(s => s.trim()).filter(Boolean);
-  const builtin_aliases = {};
+  const extraClasses = (document.getElementById('nsconfig-classes').value || '').split('\n').map(s => s.trim()).filter(Boolean);
+  const extraVerbs   = (document.getElementById('nsconfig-verbs').value  || '').split('\n').map(s => s.trim()).filter(Boolean);
+  const aliasLines   = (document.getElementById('nsconfig-aliases').value || '').split('\n').map(s => s.trim()).filter(Boolean);
+  const extraAliases = {};
   for (const line of aliasLines) {
     const idx = line.indexOf(':');
     if (idx < 1) continue;
     const k = line.slice(0, idx).trim();
     const v = line.slice(idx + 1).trim();
-    if (k && v) builtin_aliases[k] = v;
+    if (k && v) extraAliases[k] = v;
   }
+  const builtin_classes = [..._NS_SYS_CLASSES, ...extraClasses.filter(c => !_NS_SYS_CLASSES.includes(c))];
+  const builtin_verbs   = [..._NS_SYS_VERBS,   ...extraVerbs.filter(v => !_NS_SYS_VERBS.includes(v))];
+  const builtin_aliases = {..._NS_SYS_ALIASES, ...extraAliases};
   const status = document.getElementById('nsconfig-status');
   status.textContent = 'Saving…';
   try {
-    await api('PUT', '/api/namespace/config', {
-      builtin_classes: classLines,
-      builtin_aliases,
-      builtin_verbs: verbLines,
-    });
+    await api('PUT', '/api/namespace/config', { builtin_classes, builtin_aliases, builtin_verbs });
     status.textContent = 'Saved.';
     setTimeout(() => { status.textContent = ''; }, 2000);
   } catch (e) {
