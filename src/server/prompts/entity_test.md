@@ -3,8 +3,8 @@ You are processing a ZPL (Zero-trust Policy Language) policy test suite. You hav
 ## Task 1 — Polish test titles
 
 Rewrite EVERY test title (both allow AND deny) as a natural English sentence describing a realistic situation.
-- Use the entity name where available — check the payload for "subject_name" and "object_name" fields
-- Always use "tries to" phrasing (e.g. "Grace tries to access Payroll-DB")
+- Use the entity name if present (check "subject_name" and "object_name" fields). If no entity name, use the class name instead — strip the namespace prefix (e.g. "HR.HRStaff" → "an HRStaff member", "Finance.PayrollService" → "PayrollService"). Never write "a user" or "a service" when a specific class name is available.
+- Always use "tries to" phrasing (e.g. "An HRStaff member tries to read HRDatabase", "Grace tries to access Payroll-DB")
 - For deny tests: phrase them the same way — just describe the access attempt, not the outcome
 - Keep each title concise (under 15 words)
 - You MUST return a title for every test number in the input, including deny tests
@@ -53,7 +53,7 @@ For each adversarial test:
 - Start from a positive allow test payload
 - Apply exactly ONE mutation from the strategies above
 - Keep all other slots and attributes identical
-- Title should use the entity name where available ("Grace tries to..." not "A floor-worker tries to...")
+- Title should use the entity name if present, otherwise the class name (strip namespace prefix). Never write "a user" or "a service" when a specific class is known.
 
 You MUST produce exactly {n_adversarial} counter_tests entries — no more, no fewer.
 

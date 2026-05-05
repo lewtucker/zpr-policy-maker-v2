@@ -179,7 +179,8 @@
 
 <!-- Writing ZPL -->
 <h2 id="writing-zpl">Writing ZPL</h2>
-<p>ZPL uses four statement types: <code>Define</code>, <code>Allow</code>, <code>Never allow</code>, and <code>Declare</code>.</p>
+<p>ZPL uses four statement types: <code>Define</code>, <code>Allow</code>, <code>Never allow</code>, and <code>Declare</code>*.</p>
+<p style="font-size:0.83rem;color:var(--muted)">* <code>Declare</code> is a ZPR Policy Builder extension — see the <a href="#entities">Entities</a> section below.</p>
 
 <h3>Defining Classes</h3>
 <pre><code>Define employee as a user with an ID-number, roles
@@ -215,6 +216,7 @@ Define internet-gateway as a gateway with external-network-connection:public-int
 <!-- Entities -->
 <h2 id="entities">Entities</h2>
 <p>Entities are named instances of ZPL classes — concrete subjects and objects that exist in your actual environment. For example, <code>Alice</code> as a <code>warehouse-manager</code> with <code>department: operations</code>, or <code>Payroll-DB</code> as a <code>database</code> with <code>tags: financial</code>.</p>
+<div class="note"><strong>Note:</strong> In a production ZPR deployment, entity instances are typically defined in an external directory such as LDAP or Active Directory — not in ZPL policy text. The <code>Declare</code> statement is a ZPR Policy Builder extension added specifically to facilitate simulated rule testing. It lets you describe a small set of named instances directly in the policy editor so that the test generator can produce realistic, entity-specific test cases without requiring a live directory integration.</div>
 
 <h3>Creating Entities</h3>
 <p>Click the <strong>Entities</strong> tab in the staging input zone. The textarea switches to entity mode — type one or more <code>Declare</code> statements and click <strong>Save</strong>:</p>

@@ -23,11 +23,13 @@ def active_ns(session: dict) -> str:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _qualify(name: str, ns: str) -> str:
+def _qualify(name: str, ns: str, ancestor_classes: dict[str, str] | None = None) -> str:
     if not name or not ns or "." in name:
         return name
     if name.lower() in _BUILTIN_CLASSES:
         return name
+    if ancestor_classes and name in ancestor_classes:
+        return ancestor_classes[name]
     return f"{ns}.{name}"
 
 
@@ -36,15 +38,15 @@ def _qualify_key(key: str, _ns: str) -> str:
     return key
 
 
-def _inject_spec(spec: dict | None, ns: str) -> dict | None:
+def _inject_spec(spec: dict | None, ns: str, ancestor_classes: dict[str, str] | None = None) -> dict | None:
     if not spec:
         return spec
     out = dict(spec)
     for key in ("class", "cls"):
         if out.get(key):
-            out[key] = _qualify(out[key], ns)
+            out[key] = _qualify(out[key], ns, ancestor_classes)
     if out.get("name"):
-        out["name"] = _qualify(out["name"], ns)
+        out["name"] = _qualify(out["name"], ns, ancestor_classes)
     if out.get("attrs"):
         out["attrs"] = {_qualify_key(k, ns): v for k, v in out["attrs"].items()}
     return out
@@ -75,8 +77,13 @@ def _strip_spec(spec: dict | None, prefix: str) -> dict | None:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def inject(policy: dict, ns: str) -> dict:
-    """Return a copy of the PolicySet dict with bare names prefixed by ns."""
+def inject(policy: dict, ns: str, ancestor_classes: dict[str, str] | None = None) -> dict:
+    """Return a copy of the PolicySet dict with bare names prefixed by ns.
+
+    ancestor_classes: mapping from bare name → fully-qualified name for classes
+    defined in ancestor namespaces. Those names will use the ancestor prefix
+    instead of ns (e.g. 'Manager' → 'Acme.Manager' instead of 'HR.Manager').
+    """
     if not ns:
         return policy
     out = dict(policy)
@@ -87,8 +94,8 @@ def inject(policy: dict, ns: str) -> dict:
             new_classes.append(cls)
             continue
         c = dict(cls)
-        c["name"] = _qualify(c.get("name") or "", ns)
-        c["parent"] = _qualify(c.get("parent") or "", ns)
+        c["name"] = _qualify(c.get("name") or "", ns, ancestor_classes)
+        c["parent"] = _qualify(c.get("parent") or "", ns, ancestor_classes)
         c["attributes"] = {
             _qualify_key(k, ns): v
             for k, v in (c.get("attributes") or {}).items()
@@ -99,10 +106,10 @@ def inject(policy: dict, ns: str) -> dict:
     new_rules = []
     for rule in out.get("rules", []):
         r = dict(rule)
-        r["subject"] = _inject_spec(r.get("subject"), ns)
-        r["accessor_endpoint"] = _inject_spec(r.get("accessor_endpoint"), ns)
-        r["object"] = _inject_spec(r.get("object"), ns)
-        r["server_endpoint"] = _inject_spec(r.get("server_endpoint"), ns)
+        r["subject"] = _inject_spec(r.get("subject"), ns, ancestor_classes)
+        r["accessor_endpoint"] = _inject_spec(r.get("accessor_endpoint"), ns, ancestor_classes)
+        r["object"] = _inject_spec(r.get("object"), ns, ancestor_classes)
+        r["server_endpoint"] = _inject_spec(r.get("server_endpoint"), ns, ancestor_classes)
         new_rules.append(r)
     out["rules"] = new_rules
 

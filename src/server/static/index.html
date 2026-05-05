@@ -265,19 +265,28 @@
       line-height: 1;
     }
     .assist-stmt-btn:hover { border-color: var(--accent); color: var(--accent); }
-    .assist-pane-sep { height: 3px; background: var(--border); flex-shrink: 0; }
+    .assist-pane-sep {
+      height: 6px; flex-shrink: 0; cursor: row-resize;
+      background: var(--border); transition: background 0.1s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .assist-pane-sep:hover, .assist-pane-sep.dragging { background: var(--accent); }
+    .assist-pane-sep::after {
+      content: ''; width: 32px; height: 2px;
+      background: rgba(0,0,0,0.12); border-radius: 2px;
+    }
     .assist-bottom {
       flex: 1 1 62%; display: flex; flex-direction: column; min-height: 0;
       background: var(--surface);
     }
     .assist-bottom-header {
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex; align-items: center; gap: 0.5rem;
       padding: 0.3rem 0.75rem; border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
     .assist-bottom-title {
       font-size: 0.72rem; font-weight: 600; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 0.05em;
+      text-transform: uppercase; letter-spacing: 0.05em; margin-left: auto;
     }
     .assist-history {
       flex: 1; overflow-y: auto; padding: 0.5rem 0.75rem;
@@ -291,16 +300,23 @@
     .assist-msg.assistant { background: rgba(37,99,235,0.07); color: var(--text); align-self: flex-start; max-width: 85%; }
     .assist-msg.system    { color: var(--muted); font-size: 0.74rem; font-style: italic; align-self: center; }
     .assist-input-row {
-      display: flex; gap: 0.4rem; padding: 0.4rem 0.5rem;
-      border-bottom: 1px solid var(--border); flex-shrink: 0; align-items: flex-end;
+      padding: 0.4rem 0.5rem;
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
     }
+    .assist-input-wrap { position: relative; }
     .assist-input {
-      flex: 1; resize: none; border: 1px solid var(--border); border-radius: 5px;
-      padding: 0.4rem 0.55rem; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.5;
+      width: 100%; box-sizing: border-box;
+      resize: none; border: 1px solid var(--border); border-radius: 5px;
+      padding: 0.4rem 3.5rem 0.4rem 0.55rem;
+      font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.5;
       background: var(--surface2); color: var(--text); outline: none;
       min-height: 2rem; max-height: 80px; overflow-y: auto;
     }
     .assist-input:focus { border-color: var(--accent); }
+    .assist-send-btn {
+      position: absolute; bottom: 0.3rem; right: 0.3rem;
+      font-size: 0.72rem; padding: 0.2rem 0.55rem;
+    }
 
     /* ── Schema pane ─────────────────────────────────────────── */
     aside.schema-pane {
@@ -593,6 +609,7 @@
       flex-shrink: 0; min-height: 44px;
     }
     .page-header h1 { font-size: 0.95rem; font-weight: 700; white-space: nowrap; }
+    .page-header h1 span { font-weight: 500; color: var(--accent); }
     .page-body { flex: 1; overflow-y: auto; padding: 1rem; }
 
     /* ── Input zone (upper staging) ─────────────────────────────── */
@@ -721,7 +738,7 @@
     <!-- ══ Policy Editor ══ -->
     <div class="page active" id="page-editor">
       <div class="page-header">
-        <h1>Policy Editor</h1>
+        <h1>Policy Editor for Namespace: <span id="h1-ns-editor">—</span></h1>
         <span class="status-pill idle" id="status-pill"></span>
         <div style="margin-left:auto;display:flex;align-items:center;gap:0.4rem;position:relative">
           <button class="tool-btn" id="show-all-btn" onclick="toggleShowAll()" title="Show ZPL for this namespace and all sub-namespaces">Show All</button>
@@ -735,7 +752,6 @@
               <div class="io-menu-item" onclick="doUploadZplc()">↑ Import .zplc definitions</div>
             </div>
           </div>
-          <span class="ns-editor-label" id="ns-editor-label"></span>
         </div>
       </div>
       <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative" id="editor-split">
@@ -812,25 +828,26 @@
     <!-- ══ AI Assist ══ -->
     <div class="page" id="page-aiassist">
       <div class="page-header">
-        <h1>AI Assist</h1>
-        <span class="ns-editor-label" id="assist-breadcrumb" style="margin-left:0.5rem"></span>
+        <h1>AI Assistant for Namespace: <span id="h1-ns-assist">—</span></h1>
       </div>
       <div class="assist-split" id="assist-split" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
         <div class="assist-bottom">
           <div class="assist-bottom-header">
-            <span class="assist-bottom-title">ZPL Assistant</span>
             <button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="closeAssistPage()">✓ Done — Back to Editor</button>
+            <span class="assist-bottom-title">ZPL Assistant</span>
           </div>
           <div class="assist-input-row">
-            <textarea class="assist-input" id="assist-input"
-              placeholder="Type ZPL or describe what you want… (Enter to send, Shift+Enter for newline)"
-              onkeydown="assistKeydown(event)"
-              spellcheck="false" rows="2"></textarea>
-            <button class="tool-btn primary" onclick="assistSend()" id="assist-send-btn">Send</button>
+            <div class="assist-input-wrap">
+              <textarea class="assist-input" id="assist-input"
+                placeholder="Type ZPL or describe what you want… (Enter to send, Shift+Enter for newline)"
+                onkeydown="assistKeydown(event)"
+                spellcheck="false" rows="2"></textarea>
+              <button class="tool-btn primary assist-send-btn" onclick="assistSend()" id="assist-send-btn">Send</button>
+            </div>
           </div>
           <div class="assist-history" id="assist-history"></div>
         </div>
-        <div class="assist-pane-sep"></div>
+        <div class="assist-pane-sep" id="assist-pane-sep"></div>
         <div class="assist-stmts-wrap">
           <div class="assist-stmts-header">
             <span class="assist-stmts-title">Staged ZPL</span>
@@ -848,7 +865,7 @@
     <!-- ══ Policy Audit ══ -->
     <div class="page" id="page-audit">
       <div class="page-header">
-        <h1>Policy Audit</h1>
+        <h1>Policy Audit for Namespace: <span id="h1-ns-audit">—</span></h1>
         <div id="analyst-ns-label" style="font-size:0.8rem;color:var(--muted);margin-left:0.5rem"></div>
         <div style="margin-left:auto;display:flex;align-items:center;gap:0.4rem">
           <div class="view-toggle">
@@ -863,15 +880,14 @@
         </div>
       </div>
       <div style="flex:1;overflow-y:auto;padding:0.75rem 1rem" id="analyst-body">
-        <div class="empty-state">Run an audit to see results here.</div>
+        <div class="empty-state" id="audit-empty-state">Run a policy audit of the <span id="audit-ns-placeholder">current</span> namespace.</div>
       </div>
     </div>
 
     <!-- ══ Testing ══ -->
     <div class="page" id="page-testing">
       <div class="page-header">
-        <h1>Rule Testing</h1>
-        <span class="ns-editor-label" id="testing-breadcrumb" style="margin-left:0.5rem"></span>
+        <h1>Rule Testing for Namespace: <span id="h1-ns-testing">—</span></h1>
       </div>
       <div id="testing-body" style="flex:1;overflow-y:auto;position:relative">
         <div class="empty-state">Loading tests…</div>
@@ -1259,7 +1275,12 @@ function _initAssistPage() {
   if (!S.assist.history || !S.assist.history.length) {
     const hist = document.getElementById('assist-history');
     if (hist) hist.innerHTML = '';
-    _assistAppendMsg('system', 'Type a ZPL statement or describe what you want.');
+  }
+  // Pre-populate the chat input with whatever the user had typed in the editor
+  const staged = document.getElementById('zpl-upper')?.value.trim();
+  if (staged) {
+    const input = document.getElementById('assist-input');
+    if (input && !input.value.trim()) input.value = staged;
   }
   setTimeout(() => document.getElementById('assist-input')?.focus(), 50);
 }
@@ -1300,6 +1321,42 @@ function _initAssistPage() {
   });
 })();
 
+// ── Assist pane drag ───────────────────────────────────────────────────────
+
+(function initAssistDivider() {
+  document.addEventListener('DOMContentLoaded', () => {
+    const sep = document.getElementById('assist-pane-sep');
+    if (!sep) return;
+    let dragging = false, startY = 0, startChat = 0, startStaged = 0;
+    sep.addEventListener('mousedown', e => {
+      const chat   = sep.previousElementSibling;
+      const staged = sep.nextElementSibling;
+      if (!chat || !staged) return;
+      dragging = true; startY = e.clientY;
+      startChat   = chat.getBoundingClientRect().height;
+      startStaged = staged.getBoundingClientRect().height;
+      sep.classList.add('dragging');
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const dy     = e.clientY - startY;
+      const chat   = sep.previousElementSibling;
+      const staged = sep.nextElementSibling;
+      if (!chat || !staged) return;
+      const newChat   = Math.max(80, startChat + dy);
+      const newStaged = Math.max(60, startStaged - dy);
+      chat.style.flex   = 'none';
+      chat.style.height = newChat + 'px';
+      staged.style.flex = 'none';
+      staged.style.height = newStaged + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (dragging) { dragging = false; sep.classList.remove('dragging'); }
+    });
+  });
+})();
+
 // ── Boot ───────────────────────────────────────────────────────────────────
 
 async function boot() {
@@ -1324,10 +1381,12 @@ function renderHeader() {
   if (!ctx) return;
   const nsLabel = ctx.active_display_name || ctx.active_username;
   document.getElementById('hdr-user').textContent = ctx.login_username;
-  ['ns-editor-label','assist-breadcrumb','testing-breadcrumb'].forEach(id => {
+  ['h1-ns-editor','h1-ns-assist','h1-ns-audit','h1-ns-testing'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = nsLabel;
   });
+  const auditNsEl = document.getElementById('audit-ns-placeholder');
+  if (auditNsEl) auditNsEl.textContent = nsLabel;
 }
 
 // ── Sub-owners (namespace tree) ────────────────────────────────────────────
@@ -3749,7 +3808,7 @@ async function trRunAnalyst(deep = false) {
   if (saveBtn) saveBtn.style.display = 'none';
   try {
     const resp = await api('POST', '/api/namespace/analyze', { deep });
-    if (label) label.textContent = `Namespace: ${resp.namespace}${deep ? ' · deep' : ''}`;
+    if (label) label.textContent = deep ? '· deep analysis' : '';
     body.innerHTML = _analystRender(resp.namespace, resp.result || {});
     S.analyst = {
       ns: resp.namespace,

@@ -316,13 +316,18 @@ def _parse_define_attrs(p: _P) -> dict[str, dict]:
         name = _consume_name(p)
 
         if p.eat_punct(":") or p.eat_punct("="):
-            value = _consume_name(p)
+            value = _parse_attr_value(p)
+            if isinstance(value, list):
+                attrs[name] = {"type": "multi", "values": value}
+            elif multiple:
+                attrs[name] = {"type": "multi"}
+            else:
+                attrs[name] = {"type": "single", "value": value, "optional": optional}
+        else:
             if multiple:
                 attrs[name] = {"type": "multi"}
             else:
-                attrs[name] = {"type": "single", "value": value}
-        else:
-            attrs[name] = {"type": "multi" if multiple else "single"}
+                attrs[name] = {"type": "single", "optional": optional}
 
         need_separator = True
 
@@ -514,10 +519,8 @@ def _parse_spec(p: _P) -> dict:
     key = class_or_name.lower()
     if key in _BUILTIN_ALIASES:
         out["class"] = _BUILTIN_ALIASES[key]
-    elif class_or_name.split(".")[-1][:1].isupper():
-        # Capitalized last component → named entity (handles ns.Alice and bare Alice)
-        out["name"] = class_or_name
     else:
+        # Per ZPL BNF, rule specs always reference class names, not entity names.
         out["class"] = class_or_name
     if attrs:
         out["attrs"] = attrs

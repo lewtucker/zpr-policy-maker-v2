@@ -1394,7 +1394,15 @@ async def analyze_namespace(req: AnalyzeRequest, session: dict = Depends(get_ses
     tree = await db.get_namespace_tree(ns_id)
     nodes = _flatten_tree_nodes(tree)
     zpl_map = await db.get_namespace_zpl_batch([n["id"] for n in nodes])
-    combined_zpl = "\n\n".join(z.strip() for z in zpl_map.values() if z and z.strip())
+
+    # Include ancestor ZPL (class definitions only) so the auditor understands
+    # cross-namespace class references like Acme.Manager in HR rules.
+    ancestor_ids = await _ancestor_ns_ids(ns_id)
+    ancestor_zpl_map = await db.get_namespace_zpl_batch(ancestor_ids) if ancestor_ids else {}
+    ancestor_combined = "\n\n".join(z.strip() for z in ancestor_zpl_map.values() if z and z.strip())
+
+    own_combined = "\n\n".join(z.strip() for z in zpl_map.values() if z and z.strip())
+    combined_zpl = "\n\n".join(filter(None, [ancestor_combined, own_combined]))
 
     if not combined_zpl:
         raise HTTPException(422, "No ZPL found in this namespace or its descendants")
@@ -1987,7 +1995,19 @@ async def save_namespace_zpl(req: SaveNamespaceZplRequest, session: dict = Depen
             entities_to_sync = list(seen.values())
             ps, errors = norm.zpl_to_policy_set(raw, name="ns")
             if not errors:
-                pd = ns_mod.inject(ps.model_dump(mode="json"), ns)
+                # Build ancestor class map so cross-namespace refs use correct prefix
+                anc_ids = await _ancestor_ns_ids(ns_id)
+                anc_zpl = await db.get_namespace_zpl_batch(anc_ids) if anc_ids else {}
+                ancestor_classes: dict[str, str] = {}
+                for uid in anc_ids:
+                    anc_text = anc_zpl.get(uid, "").strip()
+                    if anc_text:
+                        anc_raw = zpl_parser.parse(anc_text)
+                        for cls in anc_raw.get("classes", []):
+                            full = cls.get("class", "")
+                            if full and "." in full:
+                                ancestor_classes[full.split(".")[-1]] = full
+                pd = ns_mod.inject(ps.model_dump(mode="json"), ns, ancestor_classes)
                 rules = _dedup_rules(pd.get("rules", []))
                 text = _zpl_from_parts(pd.get("classes", []), rules, entities_to_sync)
         except Exception:

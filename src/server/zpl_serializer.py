@@ -92,7 +92,11 @@ def _serialize_class_attrs(attributes: dict) -> list[str]:
         optional = spec.get("optional", False)
 
         if attr_type == "multi":
-            parts.append(f"multiple {attr_name}")
+            values = spec.get("values")
+            if values:
+                parts.append(f"{attr_name}:{{{', '.join(str(v) for v in values)}}}")
+            else:
+                parts.append(f"multiple {attr_name}")
         elif value:
             parts.append(f"{attr_name}:{value}")
         elif optional:
