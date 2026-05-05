@@ -608,6 +608,8 @@ def _parse_attr_value(p: _P) -> Any:
         # Presence check (e.g. "name:")
         return "*"
     if t[0] in ("word", "string"):
+        if t[0] == "word" and t[1].lower() in (_SEPARATORS | _STMT_STARTERS):
+            return "*"  # presence check — next token is structural, not a value
         return p.advance()[1]
     return "*"
 
