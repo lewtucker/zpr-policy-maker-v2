@@ -176,6 +176,18 @@ async def _get_root_ns_id(login_user_id: str) -> str | None:
     return await _tree_root_ns_id(login_user_id)
 
 
+async def _get_root_config(login_user_id: str) -> dict:
+    """Return the root namespace config for the login user, or defaults if none set."""
+    root_ns_id = await _get_root_ns_id(login_user_id)
+    if not root_ns_id:
+        return {
+            "builtin_classes": db.DEFAULT_BUILTIN_CLASSES,
+            "builtin_aliases": db.DEFAULT_BUILTIN_ALIASES,
+            "builtin_verbs": db.DEFAULT_BUILTIN_VERBS,
+        }
+    return await db.get_root_config(root_ns_id)
+
+
 async def _login_namespace(user_id: str) -> dict | None:
     """Return the namespace to activate on login.
     Prefers the user's root namespace; falls back to the first namespace they own.
@@ -1479,6 +1491,33 @@ async def delete_report_endpoint(report_id: str, session: dict = Depends(get_ses
     return {"ok": True}
 
 
+@app.get("/api/namespace/config")
+async def get_namespace_config(session: dict = Depends(get_session)):
+    """Return the root namespace built-in config (classes, aliases, verbs)."""
+    return await _get_root_config(session["login_user_id"])
+
+
+class RootConfigRequest(BaseModel):
+    builtin_classes: list[str]
+    builtin_aliases: dict[str, str]
+    builtin_verbs: list[str]
+
+
+@app.put("/api/namespace/config")
+async def save_namespace_config(req: RootConfigRequest, session: dict = Depends(get_session)):
+    """Save the root namespace built-in config. Only the root owner may do this."""
+    root_ns_id = await _get_root_ns_id(session["login_user_id"])
+    if not root_ns_id:
+        raise HTTPException(404, "No root namespace found")
+    await db.save_root_config(
+        root_ns_id,
+        [c.lower().strip() for c in req.builtin_classes if c.strip()],
+        {k.lower().strip(): v.strip() for k, v in req.builtin_aliases.items() if k.strip() and v.strip()},
+        [v.lower().strip() for v in req.builtin_verbs if v.strip()],
+    )
+    return {"ok": True}
+
+
 @app.get("/api/context")
 async def get_context(session: dict = Depends(get_session)):
     ns_id = session.get("active_namespace_id") or session["active_user_id"]
@@ -1990,7 +2029,10 @@ async def save_namespace_zpl(req: SaveNamespaceZplRequest, session: dict = Depen
     entities_to_sync: list[dict] = []
     if text.strip() and ns:
         try:
-            raw = zpl_parser.parse(text)
+            cfg = await _get_root_config(session["login_user_id"])
+            bc_set = set(cfg["builtin_classes"])
+            ba_dict = cfg["builtin_aliases"]
+            raw = zpl_parser.parse(text, builtin_aliases=ba_dict, builtin_classes=bc_set)
             # Deduplicate entities by (name, class_name) — last occurrence wins
             seen: dict[tuple, dict] = {}
             for e in raw.get("entities", []):
@@ -2006,12 +2048,12 @@ async def save_namespace_zpl(req: SaveNamespaceZplRequest, session: dict = Depen
                 for uid in anc_ids:
                     anc_text = anc_zpl.get(uid, "").strip()
                     if anc_text:
-                        anc_raw = zpl_parser.parse(anc_text)
+                        anc_raw = zpl_parser.parse(anc_text, builtin_aliases=ba_dict, builtin_classes=bc_set)
                         for cls in anc_raw.get("classes", []):
                             full = cls.get("class", "")
                             if full and "." in full:
                                 ancestor_classes[full.split(".")[-1]] = full
-                pd = ns_mod.inject(ps.model_dump(mode="json"), ns, ancestor_classes)
+                pd = ns_mod.inject(ps.model_dump(mode="json"), ns, ancestor_classes, frozenset(bc_set))
                 rules = _dedup_rules(pd.get("rules", []))
                 text = _zpl_from_parts(pd.get("classes", []), rules, entities_to_sync)
         except Exception:
@@ -2040,15 +2082,19 @@ class ParseRequest(BaseModel):
 async def parse_text(req: ParseRequest, session: dict = Depends(get_session)):
     lang = req.language.lower()
     if lang == "zpl":
-        raw = zpl_parser.parse(req.text)
+        cfg = await _get_root_config(session["login_user_id"])
+        bc_set = set(cfg["builtin_classes"])
+        ba_dict = cfg["builtin_aliases"]
+        bv_set = set(cfg["builtin_verbs"])
+        raw = zpl_parser.parse(req.text, builtin_aliases=ba_dict, builtin_classes=bc_set)
         entities_raw = raw.get("entities", [])
         ps, errors = norm.zpl_to_policy_set(raw, name=req.name)
         known = await _known_classes(session["login_user_id"])
-        inferred = zpl_parser.infer_missing_classes(raw, known_classes=known)
+        inferred = zpl_parser.infer_missing_classes(raw, known_classes=known, builtin_classes=bc_set)
         inferred_zpl = zpl_parser.inferred_to_zpl(inferred) if inferred else ""
-        inferred_verbs = zpl_parser.infer_missing_verbs(raw)
+        inferred_verbs = zpl_parser.infer_missing_verbs(raw, builtin_verbs=bv_set)
         inferred_verbs_zpl = "\n".join(f"Define {v} as a verb." for v in inferred_verbs)
-        undefined_parents = zpl_parser.infer_undefined_parents(raw, known_classes=known)
+        undefined_parents = zpl_parser.infer_undefined_parents(raw, known_classes=known, builtin_classes=bc_set)
     elif lang == "zpel":
         raw = zpel_parser.parse(req.text)
         entities_raw = []

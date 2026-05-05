@@ -22,6 +22,20 @@ from ir_schema import Conversation, PolicySet
 
 _DB_PATH = os.environ.get("DB_PATH", "zpr_policy.db")
 
+# ── Root namespace config defaults ────────────────────────────────────────────
+
+DEFAULT_BUILTIN_CLASSES: list[str] = [
+    "user", "users", "endpoint", "endpoints",
+    "service", "services", "server", "servers",
+]
+DEFAULT_BUILTIN_ALIASES: dict[str, str] = {
+    "user": "users", "users": "users",
+    "endpoint": "endpoints", "endpoints": "endpoints",
+    "service": "services", "services": "services",
+    "server": "servers", "servers": "servers",
+}
+DEFAULT_BUILTIN_VERBS: list[str] = ["access", "use", "call", "read", "write"]
+
 
 # ── Password hashing (pbkdf2, no extra deps) ──────────────────────────────────
 
@@ -125,6 +139,14 @@ async def init_db() -> None:
                 result_json    TEXT NOT NULL,
                 title          TEXT NOT NULL,
                 created_at     TEXT NOT NULL
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS root_namespace_config (
+                root_namespace_id TEXT PRIMARY KEY,
+                builtin_classes   TEXT NOT NULL,
+                builtin_aliases   TEXT NOT NULL,
+                builtin_verbs     TEXT NOT NULL
             )
         """)
         # Migrations for older schemas
@@ -807,3 +829,51 @@ async def delete_report(report_id: str, user_id: str) -> bool:
         )
         await db.commit()
         return cur.rowcount > 0
+
+
+# ── Root namespace config ─────────────────────────────────────────────────────
+
+async def get_root_config(root_namespace_id: str) -> dict:
+    """Return the builtin config for a root namespace, falling back to defaults."""
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT builtin_classes, builtin_aliases, builtin_verbs FROM root_namespace_config WHERE root_namespace_id = ?",
+            (root_namespace_id,),
+        ) as cur:
+            row = await cur.fetchone()
+    if not row:
+        return {
+            "builtin_classes": DEFAULT_BUILTIN_CLASSES,
+            "builtin_aliases": DEFAULT_BUILTIN_ALIASES,
+            "builtin_verbs": DEFAULT_BUILTIN_VERBS,
+        }
+    return {
+        "builtin_classes": json.loads(row["builtin_classes"]),
+        "builtin_aliases": json.loads(row["builtin_aliases"]),
+        "builtin_verbs": json.loads(row["builtin_verbs"]),
+    }
+
+
+async def save_root_config(
+    root_namespace_id: str,
+    builtin_classes: list[str],
+    builtin_aliases: dict[str, str],
+    builtin_verbs: list[str],
+) -> None:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        await db.execute(
+            """INSERT INTO root_namespace_config (root_namespace_id, builtin_classes, builtin_aliases, builtin_verbs)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(root_namespace_id) DO UPDATE SET
+                 builtin_classes = excluded.builtin_classes,
+                 builtin_aliases = excluded.builtin_aliases,
+                 builtin_verbs   = excluded.builtin_verbs""",
+            (
+                root_namespace_id,
+                json.dumps(builtin_classes),
+                json.dumps(builtin_aliases),
+                json.dumps(builtin_verbs),
+            ),
+        )
+        await db.commit()

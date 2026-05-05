@@ -151,12 +151,36 @@ def _describe(t) -> str:
 # ── Entry point ─────────────────────────────────────────────────────────────
 
 
-def parse(text: str) -> dict:
+def parse(
+    text: str,
+    builtin_aliases: dict[str, str] | None = None,
+    builtin_classes: set[str] | None = None,
+) -> dict:
     """Parse a whole ZPL document.
+
+    builtin_aliases / builtin_classes: per-root overrides that replace the
+    module-level defaults during this parse call.  Safe in a single-threaded
+    async event loop because parse() contains no await points.
 
     Returns ``{"classes": [...], "rules": [...], "entities": [...], "errors": [{"line": N, "message": "..."}]}``.
     Errors on individual statements are collected and parsing continues with the next statement.
     """
+    global _BUILTIN_ALIASES, _BUILTIN_CLASSES
+    _orig_aliases = _BUILTIN_ALIASES
+    _orig_classes = _BUILTIN_CLASSES
+    if builtin_aliases is not None:
+        _BUILTIN_ALIASES = builtin_aliases
+    if builtin_classes is not None:
+        _BUILTIN_CLASSES = builtin_classes
+    try:
+        return _parse_impl(text)
+    finally:
+        _BUILTIN_ALIASES = _orig_aliases
+        _BUILTIN_CLASSES = _orig_classes
+
+
+def _parse_impl(text: str) -> dict:
+    """Internal parse implementation — uses current module-level builtins."""
     text_lines = text.splitlines()
     p = _P(_tokenize(text))
     classes: list[dict] = []
@@ -617,9 +641,14 @@ def build_alias_map(parsed: dict) -> dict[str, str]:
     return alias_map
 
 
-def infer_missing_classes(parsed: dict, known_classes: set[str] | None = None) -> list[dict]:
+def infer_missing_classes(
+    parsed: dict,
+    known_classes: set[str] | None = None,
+    builtin_classes: set[str] | None = None,
+) -> list[dict]:
     """Return define-dicts for classes used in rules but not defined in the document."""
-    defined = {c["class"] for c in parsed.get("classes", [])} | _BUILTIN_CLASSES
+    effective_builtins = builtin_classes if builtin_classes is not None else _BUILTIN_CLASSES
+    defined = {c["class"] for c in parsed.get("classes", [])} | effective_builtins
     if known_classes:
         defined |= known_classes
     resolvable = defined | set(build_alias_map(parsed).keys())
@@ -634,11 +663,16 @@ def infer_missing_classes(parsed: dict, known_classes: set[str] | None = None) -
     return [_build_inferred(name, info) for name, info in inferred.items()]
 
 
-def infer_undefined_parents(parsed: dict, known_classes: set[str] | None = None) -> list[dict]:
+def infer_undefined_parents(
+    parsed: dict,
+    known_classes: set[str] | None = None,
+    builtin_classes: set[str] | None = None,
+) -> list[dict]:
     """Return entries for Define parents that are not built-in, not locally defined,
     and not in known_classes. Each entry: {parent, suggestion} where suggestion is
     a fully-qualified name from known_classes if one matches the bare name."""
-    defined = {c["class"] for c in parsed.get("classes", [])} | _BUILTIN_CLASSES
+    effective_builtins = builtin_classes if builtin_classes is not None else _BUILTIN_CLASSES
+    defined = {c["class"] for c in parsed.get("classes", [])} | effective_builtins
     known = known_classes or set()
     resolvable = defined | known | set(build_alias_map(parsed).keys())
 
@@ -709,8 +743,9 @@ def inferred_to_zpl(classes: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def infer_missing_verbs(parsed: dict) -> list[str]:
+def infer_missing_verbs(parsed: dict, builtin_verbs: set[str] | None = None) -> list[str]:
     """Return verb names used in rules that are not built-in and not declared as a verb."""
+    effective_verbs = builtin_verbs if builtin_verbs is not None else _VERBS
     declared = {
         c.get("class", "").lower() for c in parsed.get("classes", [])
         if c.get("verb") or c.get("parent", "").lower() == "verb"
@@ -719,7 +754,7 @@ def infer_missing_verbs(parsed: dict) -> list[str]:
     seen: set[str] = set()
     for rule in parsed.get("rules", []):
         v = rule.get("verb", "").lower()
-        if v and v not in _VERBS and v not in declared and v not in seen:
+        if v and v not in effective_verbs and v not in declared and v not in seen:
             missing.append(v)
             seen.add(v)
     return missing
