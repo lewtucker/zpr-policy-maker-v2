@@ -3212,8 +3212,9 @@ function renderClasses(body, classes) {
           ${attrs.length ? `<div class="cn-attrs">${attrs.map(([k,v]) => `${esc(k)}: ${esc(v.type)}`).join('  ')}</div>` : ''}
         </div>
         <span class="stmt-actions" onclick="event.stopPropagation()">
-          <button class="stmt-btn" title="Edit" onclick="openStmtEdit(this.closest('.class-node'))">✏</button>
-          <button class="stmt-btn del" title="Delete" onclick="deleteStmt(this.closest('.class-node'))">✕</button>
+          <button class="stmt-btn" title="Edit" onclick="openStmtEdit(this.closest('.class-node'))">Edit</button>
+          <button class="stmt-btn" title="YAML" onclick="toggleYamlDetail(this.closest('.class-node'))">yaml</button>
+          <button class="stmt-btn del" title="Delete" onclick="deleteStmt(this.closest('.class-node'))">Delete</button>
         </span>
       </div>`;
       renderSubtree(c.name, depth + 1);
@@ -3242,8 +3243,9 @@ function renderClasses(body, classes) {
           ${attrs.length ? `<div class="cn-attrs">${attrs.map(([k,v]) => `${esc(k)}: ${esc(v.type)}`).join('  ')}</div>` : ''}
         </div>
         <span class="stmt-actions" onclick="event.stopPropagation()">
-          <button class="stmt-btn" title="Edit" onclick="openStmtEdit(this.closest('.class-node'))">✏</button>
-          <button class="stmt-btn del" title="Delete" onclick="deleteStmt(this.closest('.class-node'))">✕</button>
+          <button class="stmt-btn" title="Edit" onclick="openStmtEdit(this.closest('.class-node'))">Edit</button>
+          <button class="stmt-btn" title="YAML" onclick="toggleYamlDetail(this.closest('.class-node'))">yaml</button>
+          <button class="stmt-btn del" title="Delete" onclick="deleteStmt(this.closest('.class-node'))">Delete</button>
         </span>
       </div>`;
     }
@@ -3280,8 +3282,9 @@ function renderRules(body, rules) {
       <span class="rule-effect ${effect}">${badgeText}</span>
       <span class="rule-name">${esc(desc)}</span>
       <span class="stmt-actions" onclick="event.stopPropagation()">
-        <button class="stmt-btn" title="Edit" onclick="openStmtEdit(this.closest('.rule-item'))">✏</button>
-        <button class="stmt-btn del" title="Delete" onclick="deleteStmt(this.closest('.rule-item'))">✕</button>
+        <button class="stmt-btn" title="Edit" onclick="openStmtEdit(this.closest('.rule-item'))">Edit</button>
+        <button class="stmt-btn" title="YAML" onclick="toggleYamlDetail(this.closest('.rule-item'))">yaml</button>
+        <button class="stmt-btn del" title="Delete" onclick="deleteStmt(this.closest('.rule-item'))">Delete</button>
       </span>
     </div>`;
   }).join('');
