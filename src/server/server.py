@@ -1441,15 +1441,19 @@ class SaveReportRequest(BaseModel):
     namespace_name: str
     mode: str = "fast"
     result: dict
+    title: str = ""
 
 
 @app.post("/api/reports")
 async def create_report(req: SaveReportRequest, session: dict = Depends(get_session)):
     from datetime import date as _date
     user_id = session["login_user_id"]
-    n = await db.count_reports_for_ns(user_id, req.namespace_id)
-    today = _date.today().strftime("%Y-%m-%d")
-    title = f"Policy Audit — {req.namespace_name} — {today} v{n + 1}"
+    if req.title.strip():
+        title = req.title.strip()
+    else:
+        n = await db.count_reports_for_ns(user_id, req.namespace_id)
+        today = _date.today().strftime("%Y-%m-%d")
+        title = f"Policy Audit — {req.namespace_name} — {today} v{n + 1}"
     return await db.save_report(user_id, req.namespace_id, req.namespace_name,
                                 req.mode, req.result, title)
 

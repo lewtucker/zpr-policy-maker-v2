@@ -875,8 +875,14 @@
               onclick="document.getElementById('audit-deep-btn').classList.add('active');document.getElementById('audit-fast-btn').classList.remove('active');S._auditDeep=true">Deep</button>
           </div>
           <button class="tool-btn primary" onclick="trRunAnalyst(S._auditDeep||false)">🔍 Run Audit</button>
-          <button id="analyst-save-btn" class="tool-btn" onclick="analystSaveReport()" style="display:none">💾 Save</button>
+          <button id="analyst-save-btn" class="tool-btn" onclick="analystBeginSave()" style="display:none">💾 Save</button>
+          <span id="analyst-save-inline" style="display:none;align-items:center;gap:0.3rem">
+            <input id="analyst-save-name" type="text" style="font-size:0.78rem;padding:0.2rem 0.4rem;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--text);width:22rem" />
+            <button class="tool-btn primary" style="font-size:0.72rem;padding:0.2rem 0.5rem" onclick="analystConfirmSave()">Save</button>
+            <button class="tool-btn" style="font-size:0.72rem;padding:0.2rem 0.5rem" onclick="analystCancelSave()">Cancel</button>
+          </span>
           <button id="analyst-deep-btn" class="tool-btn" onclick="trRunAnalyst(true)" style="display:none">Deep ▶</button>
+          <button id="analyst-dl-btn" class="tool-btn" onclick="analystDownloadMd()" style="display:none" title="Download as Markdown">⬇ MD</button>
         </div>
       </div>
       <div style="flex:1;overflow-y:auto;padding:0.75rem 1rem" id="analyst-body">
@@ -1381,10 +1387,16 @@ function renderHeader() {
   if (!ctx) return;
   const nsLabel = ctx.active_display_name || ctx.active_username;
   document.getElementById('hdr-user').textContent = ctx.login_username;
-  ['h1-ns-editor','h1-ns-assist','h1-ns-audit','h1-ns-testing'].forEach(id => {
+  // Don't overwrite h1-ns-audit while a saved report is displayed (it shows the report's namespace)
+  const viewingReport = S.analyst?.title != null;
+  ['h1-ns-editor','h1-ns-assist','h1-ns-testing'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = nsLabel;
   });
+  if (!viewingReport) {
+    const el = document.getElementById('h1-ns-audit');
+    if (el) el.textContent = nsLabel;
+  }
   const auditNsEl = document.getElementById('audit-ns-placeholder');
   if (auditNsEl) auditNsEl.textContent = nsLabel;
 }
@@ -3793,6 +3805,55 @@ function _analystRender(ns, data) {
     ${cleanHtml}`;
 }
 
+function _analystMarkdown(title, ns, data) {
+  const today = new Date().toISOString().slice(0, 10);
+  const reportTitle = title || `Policy Audit — ${ns} — ${today}`;
+  const lines = [];
+  lines.push(`# ${reportTitle}`);
+  lines.push(`\n**Namespace:** ${ns}  \n**Date:** ${today}`);
+  if (data.summary) {
+    lines.push(`\n## Summary\n\n${data.summary}`);
+  }
+  const issues = data.issues || [];
+  if (issues.length) {
+    lines.push(`\n## Issues`);
+    issues.forEach(issue => {
+      lines.push(`\n### ${issue.severity}: ${issue.title}`);
+      lines.push(`**Category:** ${issue.category}`);
+      if ((issue.rules || []).length) {
+        lines.push(`\n**Rules cited:**`);
+        issue.rules.forEach(r => lines.push(`\`\`\`\n${r}\n\`\`\``));
+      }
+      if (issue.finding)        lines.push(`\n**Finding:** ${issue.finding}`);
+      if (issue.recommendation) lines.push(`\n**Recommendation:** ${issue.recommendation}`);
+      if ((issue.fix_zpl || []).length) {
+        lines.push(`\n**Suggested fix:**`);
+        issue.fix_zpl.forEach(z => lines.push(`\`\`\`zpl\n${z}\n\`\`\``));
+      }
+    });
+  }
+  if ((data.clean || []).length) {
+    lines.push(`\n## Clean Categories\n`);
+    data.clean.forEach(c => lines.push(`- ${c}`));
+  }
+  return lines.join('\n');
+}
+
+function analystDownloadMd() {
+  const a = S.analyst;
+  if (!a) return;
+  const md = _analystMarkdown(a.title, a.ns, a.result);
+  const slug = (a.title || `policy-audit-${a.ns}`)
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const url  = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `${slug}.md`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 async function trRunAnalyst(deep = false) {
   navigate('audit', document.getElementById('nav-audit'));
   const body    = document.getElementById('analyst-body');
@@ -3815,8 +3876,13 @@ async function trRunAnalyst(deep = false) {
       nsId: S.context?.active_namespace_id || S.context?.active_user_id,
       mode: deep ? 'deep' : 'fast',
       result: resp.result || {},
+      title: null,  // no saved title yet — download will use suggested name
     };
+    const nsAuditEl = document.getElementById('h1-ns-audit');
+    if (nsAuditEl) nsAuditEl.textContent = resp.namespace;
     if (saveBtn) { saveBtn.style.display = ''; saveBtn.textContent = '💾 Save'; saveBtn.disabled = false; }
+    const dlBtn = document.getElementById('analyst-dl-btn');
+    if (dlBtn) dlBtn.style.display = '';
   } catch (e) {
     body.innerHTML = `<div style="padding:1rem;color:#ef4444;font-size:0.83rem">Analysis failed: ${esc(String(e.message || e))}</div>`;
     S.analyst = null;
@@ -3827,22 +3893,56 @@ async function trRunAnalyst(deep = false) {
 
 function closeAnalystModal() { /* no-op: analyst is now a page */ }
 
-async function analystSaveReport() {
+function analystBeginSave() {
   const a = S.analyst;
   if (!a) return;
-  const btn = document.getElementById('analyst-save-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  const today = new Date().toISOString().slice(0, 10);
+  const suggested = `Policy Audit — ${a.ns} — ${today}`;
+  const nameEl = document.getElementById('analyst-save-name');
+  const inlineEl = document.getElementById('analyst-save-inline');
+  const saveBtn = document.getElementById('analyst-save-btn');
+  if (nameEl) nameEl.value = suggested;
+  if (saveBtn) saveBtn.style.display = 'none';
+  if (inlineEl) { inlineEl.style.display = 'flex'; }
+  if (nameEl) setTimeout(() => { nameEl.focus(); nameEl.select(); }, 30);
+}
+
+function analystCancelSave() {
+  document.getElementById('analyst-save-inline').style.display = 'none';
+  const saveBtn = document.getElementById('analyst-save-btn');
+  if (saveBtn) saveBtn.style.display = '';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const nameEl = document.getElementById('analyst-save-name');
+  if (nameEl) nameEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); analystConfirmSave(); }
+    if (e.key === 'Escape') analystCancelSave();
+  });
+});
+
+async function analystConfirmSave() {
+  const a = S.analyst;
+  if (!a) return;
+  const nameEl = document.getElementById('analyst-save-name');
+  const title = (nameEl?.value || '').trim();
+  const inlineEl = document.getElementById('analyst-save-inline');
+  if (inlineEl) inlineEl.style.display = 'none';
+  const saveBtn = document.getElementById('analyst-save-btn');
+  if (saveBtn) { saveBtn.style.display = ''; saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
   try {
     await api('POST', '/api/reports', {
       namespace_id: a.nsId,
       namespace_name: a.ns,
       mode: a.mode,
       result: a.result,
+      title,
     });
-    if (btn) { btn.textContent = '✓ Saved'; }
+    if (title) S.analyst.title = title;
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '✓ Saved'; }
     await loadReports();
   } catch (e) {
-    if (btn) { btn.disabled = false; btn.textContent = '💾 Save'; }
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Save'; }
     toast(`Save failed: ${e.message || e}`);
   }
 }
@@ -3886,17 +3986,32 @@ async function openReport(reportId) {
   const body    = document.getElementById('analyst-body');
   const label   = document.getElementById('analyst-ns-label');
   const saveBtn = document.getElementById('analyst-save-btn');
+  const dlBtn   = document.getElementById('analyst-dl-btn');
   if (!body) return;
   body.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.83rem">Loading…</div>';
   if (saveBtn) saveBtn.style.display = 'none';
+  if (dlBtn) dlBtn.style.display = 'none';
+  analystCancelSave();
   try {
     const r = await api('GET', `/api/reports/${reportId}`);
     const modeLabel = r.mode === 'deep' ? ' · deep' : '';
-    if (label) label.textContent = `${r.title}${modeLabel}`;
+    if (label) label.textContent = modeLabel;
     body.innerHTML = _analystRender(r.namespace_name, r.result || {});
-    S.analyst = null;
+    // Update the page header to reflect the report's namespace, not the active one
+    const nsAuditEl = document.getElementById('h1-ns-audit');
+    if (nsAuditEl) nsAuditEl.textContent = r.namespace_name;
+    // Store enough state for download; no save button (already saved)
+    S.analyst = {
+      ns: r.namespace_name,
+      nsId: r.namespace_id,
+      mode: r.mode,
+      result: r.result || {},
+      title: r.title,
+    };
+    if (dlBtn) dlBtn.style.display = '';
   } catch (e) {
     body.innerHTML = `<div style="padding:1rem;color:#ef4444;font-size:0.83rem">Load failed: ${esc(String(e.message || e))}</div>`;
+    S.analyst = null;
   }
 }
 
