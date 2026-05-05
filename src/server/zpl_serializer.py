@@ -12,27 +12,28 @@ def _serialize_spec(spec: dict | None, fallback: str = "any") -> str:
     name = spec.get("name")
     attrs = spec.get("attrs") or {}
 
-    attr_parts: list[str] = []
+    pre_parts: list[str] = []   # tag qualifiers — bare names before the class
+    with_parts: list[str] = []  # attribute filters — "with k:v" after the class
+
     for k, v in attrs.items():
         if k == "tags":
-            # Tag values serialize as bare names before the class name.
-            # e.g. attrs["tags"] = ["hr"] → "hr WS.employee"
+            # Tag values are bare names before the class: e.g. "hr employee"
             tag_vals = v if isinstance(v, list) else ([v] if v != "*" else [])
             for tag in tag_vals:
-                attr_parts.append(str(tag))
-            if not tag_vals:
-                attr_parts.append("tags:")  # presence-only check fallback
+                pre_parts.append(str(tag))
         elif v == "*":
-            attr_parts.append(k)
+            # Presence check — serialize as "with attr:" after the class
+            with_parts.append(f"{k}:")
         elif isinstance(v, list):
-            attr_parts.append(f"{k}:{{{', '.join(str(x) for x in v)}}}")
+            with_parts.append(f"{k}:{{{', '.join(str(x) for x in v)}}}")
         else:
-            attr_parts.append(f"{k}:{v}")
+            with_parts.append(f"{k}:{v}")
 
     target = name if name else (class_name or fallback)
-    if attr_parts:
-        return " ".join(attr_parts) + " " + target
-    return target
+    result = " ".join(pre_parts + [target])
+    if with_parts:
+        result += " with " + " ".join(with_parts)
+    return result
 
 
 # ── Rules ────────────────────────────────────────────────────────────────────
