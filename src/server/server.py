@@ -1651,13 +1651,11 @@ async def update_namespace_endpoint(namespace_id: str, req: UpdateNamespaceReque
         if old_text:
             try:
                 raw = zpl_parser.parse(old_text)
+                entities = raw.get("entities", [])
                 ps, _ = norm.zpl_to_policy_set(raw, name="ns")
                 pd = ns_mod.strip(ps.model_dump(mode="json"), ns["display_name"])
                 pd = ns_mod.inject(pd, new_name)
-                re_prefixed = (
-                    zpl_serializer.classes_to_zpl(pd.get("classes", [])) + "\n\n" +
-                    zpl_serializer.rules_to_zpl(pd.get("rules", []))
-                ).strip()
+                re_prefixed = _zpl_from_parts(pd.get("classes", []), pd.get("rules", []), entities)
                 await db.save_namespace_zpl(namespace_id, re_prefixed)
             except Exception:
                 pass
@@ -1688,10 +1686,59 @@ async def delete_namespace_endpoint(namespace_id: str, session: dict = Depends(g
 
 # ── Namespace ZPL ────────────────────────────────────────────────────────────
 
+
+def _rule_key(r: dict) -> tuple:
+    """Stable dedup key for a rule based on its semantic fields."""
+    subj = r.get("subject") or {}
+    obj = r.get("object") or {}
+    acc = r.get("accessor_endpoint") or {}
+    srv = r.get("server_endpoint") or {}
+    return (
+        (r.get("result") or r.get("effect") or "allow").lower(),
+        (r.get("verb") or r.get("action") or "").lower(),
+        (subj.get("class") or subj.get("cls") or subj.get("name") or "").lower(),
+        str(sorted((subj.get("attrs") or {}).items())),
+        (obj.get("class") or obj.get("cls") or obj.get("name") or "").lower(),
+        str(sorted((obj.get("attrs") or {}).items())),
+        (acc.get("class") or acc.get("cls") or acc.get("name") or "").lower(),
+        (srv.get("class") or srv.get("cls") or srv.get("name") or "").lower(),
+    )
+
+
+def _dedup_rules(rules: list) -> list:
+    """Deduplicate rules by semantic content (first occurrence wins)."""
+    seen: set[tuple] = set()
+    out: list[dict] = []
+    for r in rules:
+        k = _rule_key(r)
+        if k not in seen:
+            seen.add(k)
+            out.append(r)
+    return out
+
+
+def _zpl_from_parts(classes: list, rules: list, entities: list | None = None) -> str:
+    """Build ZPL text from classes, optional entities, and rules."""
+    parts = []
+    c = zpl_serializer.classes_to_zpl(classes)
+    if c.strip():
+        parts.append(c)
+    if entities:
+        e = zpl_serializer.entities_to_zpl(entities)
+        if e.strip():
+            parts.append(e)
+    r = zpl_serializer.rules_to_zpl(rules)
+    if r.strip():
+        parts.append(r)
+    return "\n\n".join(parts).strip()
+
+
 @app.get("/api/namespace/zpl")
-async def get_namespace_zpl(session: dict = Depends(get_session)):
+async def get_namespace_zpl(raw: bool = False, session: dict = Depends(get_session)):
     ns_id = session["active_user_id"]
     text = await db.get_namespace_zpl(ns_id) or ""
+    if raw:
+        return {"text": text}
     # Always fetch fresh display_name from DB — session may be stale after a rename.
     ns_row = await db.get_namespace(ns_id)
     ns = (ns_row.get("display_name") or "").strip() if ns_row else ""
@@ -1699,13 +1746,11 @@ async def get_namespace_zpl(session: dict = Depends(get_session)):
         ns = ""
     if text and ns:
         try:
-            raw = zpl_parser.parse(text)
-            ps, _ = norm.zpl_to_policy_set(raw, name="ns")
+            parsed = zpl_parser.parse(text)
+            entities = parsed.get("entities", [])
+            ps, _ = norm.zpl_to_policy_set(parsed, name="ns")
             pd = ns_mod.strip(ps.model_dump(mode="json"), ns)
-            text = (
-                zpl_serializer.classes_to_zpl(pd.get("classes", [])) + "\n\n" +
-                zpl_serializer.rules_to_zpl(pd.get("rules", []))
-            ).strip()
+            text = _zpl_from_parts(pd.get("classes", []), pd.get("rules", []), entities)
         except Exception:
             pass  # return raw text if stripping fails
     return {"text": text}
@@ -1742,16 +1787,14 @@ async def get_namespace_zpl_all(session: dict = Depends(get_session)):
         effective_leaf = leaf_ns if (leaf_ns and not leaf_ns.startswith("_ns_")) else ""
         try:
             raw = zpl_parser.parse(text)
+            entities = raw.get("entities", [])
             ps, _ = norm.zpl_to_policy_set(raw, name="ns")
             pd = ps.model_dump(mode="json")
             if effective_leaf:
                 # DB stores ZPL pre-qualified with leaf ns; strip it then inject full path
                 pd = ns_mod.strip(pd, effective_leaf)
             injected = ns_mod.inject(pd, label) if label else pd
-            qualified = (
-                zpl_serializer.classes_to_zpl(injected.get("classes", [])) + "\n\n" +
-                zpl_serializer.rules_to_zpl(injected.get("rules", []))
-            ).strip()
+            qualified = _zpl_from_parts(injected.get("classes", []), injected.get("rules", []), entities)
             sections.append(f"{indent}# {label}\n{qualified}")
         except Exception:
             sections.append(f"{indent}# {label}\n{text}")
@@ -1788,12 +1831,10 @@ async def export_zpl_markdown(session: dict = Depends(get_session)):
             continue
         try:
             raw = zpl_parser.parse(text)
+            entities = raw.get("entities", [])
             ps, _ = norm.zpl_to_policy_set(raw, name="ns")
             pd = ns_mod.strip(ps.model_dump(mode="json"), ns_name)
-            stripped = (
-                zpl_serializer.classes_to_zpl(pd.get("classes", [])) + "\n\n" +
-                zpl_serializer.rules_to_zpl(pd.get("rules", []))
-            ).strip()
+            stripped = _zpl_from_parts(pd.get("classes", []), pd.get("rules", []), entities)
         except Exception:
             stripped = text
         sections.append(f"## {full_path}\n\n```\n{stripped}\n```")
@@ -1874,15 +1915,13 @@ async def import_zpl_markdown(req: ImportMarkdownRequest, session: dict = Depend
         if zpl_text:
             try:
                 raw = zpl_parser.parse(zpl_text)
+                entities = raw.get("entities", [])
                 ps, errors = norm.zpl_to_policy_set(raw, name="ns")
                 if errors:
                     results.append({"path": full_path, "status": "zpl_error", "reason": str(errors[:2])})
                     continue
                 pd = ns_mod.inject(ps.model_dump(mode="json"), leaf_name)
-                stored = (
-                    zpl_serializer.classes_to_zpl(pd.get("classes", [])) + "\n\n" +
-                    zpl_serializer.rules_to_zpl(pd.get("rules", []))
-                ).strip()
+                stored = _zpl_from_parts(pd.get("classes", []), pd.get("rules", []), entities)
                 await db.save_namespace_zpl(ns_id, stored)
             except Exception as e:
                 results.append({"path": full_path, "status": "error", "reason": str(e)})
@@ -1893,6 +1932,35 @@ async def import_zpl_markdown(req: ImportMarkdownRequest, session: dict = Depend
 
     return {"imported": len([r for r in results if r["status"] in ("created", "updated")]),
             "results": results}
+
+
+async def _merge_entities_into_zpl(ns_id: str, new_entities: list[dict]) -> None:
+    """Merge new entities into the stored ZPL, deduplicating by (name, class_name)."""
+    existing = await db.get_namespace_zpl(ns_id) or ""
+    raw = zpl_parser.parse(existing) if existing.strip() else {"classes": [], "rules": [], "entities": []}
+    merged: dict[tuple, dict] = {}
+    for e in raw.get("entities", []):
+        key = (e.get("name", "").lower(), e.get("class_name", "").lower())
+        merged[key] = e
+    for e in new_entities:
+        key = (e.get("name", "").lower(), e.get("class_name", "").lower())
+        merged[key] = e
+    entities = list(merged.values())
+    ns_row = await db.get_namespace(ns_id)
+    ns = (ns_row.get("display_name") or "").strip() if ns_row else ""
+    if not ns or ns.startswith("_ns_"):
+        ns = ""
+    try:
+        ps, errors = norm.zpl_to_policy_set(raw, name="ns")
+        if not errors and ns:
+            pd = ns_mod.inject(ps.model_dump(mode="json"), ns)
+            text = _zpl_from_parts(pd.get("classes", []), pd.get("rules", []), entities)
+        else:
+            text = _zpl_from_parts(raw.get("classes", []), raw.get("rules", []), entities)
+    except Exception:
+        new_stmts = zpl_serializer.entities_to_zpl(new_entities)
+        text = (existing.rstrip() + "\n\n" + new_stmts).strip() if existing.strip() else new_stmts
+    await db.save_namespace_zpl(ns_id, text)
 
 
 class SaveNamespaceZplRequest(BaseModel):
@@ -1907,19 +1975,29 @@ async def save_namespace_zpl(req: SaveNamespaceZplRequest, session: dict = Depen
     ns = (ns_row.get("display_name") or "").strip() if ns_row else ""
     if not ns or ns.startswith("_ns_"):
         ns = ""
+    entities_to_sync: list[dict] = []
     if text.strip() and ns:
         try:
             raw = zpl_parser.parse(text)
+            # Deduplicate entities by (name, class_name) — last occurrence wins
+            seen: dict[tuple, dict] = {}
+            for e in raw.get("entities", []):
+                key = (e.get("name", "").lower(), e.get("class_name", "").lower())
+                seen[key] = e
+            entities_to_sync = list(seen.values())
             ps, errors = norm.zpl_to_policy_set(raw, name="ns")
             if not errors:
                 pd = ns_mod.inject(ps.model_dump(mode="json"), ns)
-                text = (
-                    zpl_serializer.classes_to_zpl(pd.get("classes", [])) + "\n\n" +
-                    zpl_serializer.rules_to_zpl(pd.get("rules", []))
-                ).strip()
+                rules = _dedup_rules(pd.get("rules", []))
+                text = _zpl_from_parts(pd.get("classes", []), rules, entities_to_sync)
         except Exception:
             pass  # store raw text if injection fails
     await db.save_namespace_zpl(session["active_user_id"], text)
+    # Sync declared entities to DB for generate-tests compatibility
+    if entities_to_sync is not None:
+        await db.delete_all_entities(ns_id)
+        for e in entities_to_sync:
+            await db.create_entity(ns_id, e["class_name"], e["name"], e.get("attributes", {}))
     root_ns_id = await _get_root_ns_id(session["login_user_id"])
     if root_ns_id:
         _cache_invalidate(root_ns_id)
@@ -1939,6 +2017,7 @@ async def parse_text(req: ParseRequest, session: dict = Depends(get_session)):
     lang = req.language.lower()
     if lang == "zpl":
         raw = zpl_parser.parse(req.text)
+        entities_raw = raw.get("entities", [])
         ps, errors = norm.zpl_to_policy_set(raw, name=req.name)
         known = await _known_classes(session["login_user_id"])
         inferred = zpl_parser.infer_missing_classes(raw, known_classes=known)
@@ -1948,6 +2027,7 @@ async def parse_text(req: ParseRequest, session: dict = Depends(get_session)):
         undefined_parents = zpl_parser.infer_undefined_parents(raw, known_classes=known)
     elif lang == "zpel":
         raw = zpel_parser.parse(req.text)
+        entities_raw = []
         ps, errors = norm.zpel_to_policy_set(raw, name=req.name)
         inferred = []
         inferred_zpl = ""
@@ -1959,13 +2039,11 @@ async def parse_text(req: ParseRequest, session: dict = Depends(get_session)):
     pd = ps.model_dump(mode="json")
     ns = ns_mod.active_ns(session)
     ns_pd = ns_mod.inject(pd, ns) if ns else pd
-    serialized_zpl = (
-        zpl_serializer.classes_to_zpl(ns_pd.get("classes", [])) + "\n\n" +
-        zpl_serializer.rules_to_zpl(ns_pd.get("rules", []))
-    ).strip()
+    # Entities don't carry namespace prefixes — include them unmodified in serialized output
+    serialized_zpl = _zpl_from_parts(ns_pd.get("classes", []), ns_pd.get("rules", []), entities_raw)
 
-    # Annotate each class/rule with its individual serialized ZPL (unnamespaced,
-    # matching what the editor holds) so the client can do find-and-replace edits.
+    # Annotate each class/rule/entity with its individual serialized ZPL
+    # (unnamespaced, matching what the editor holds) for find-and-replace edits.
     classes_annotated = []
     for c in pd.get("classes", []):
         entry = dict(c)
@@ -1976,10 +2054,16 @@ async def parse_text(req: ParseRequest, session: dict = Depends(get_session)):
         entry = dict(r)
         entry["zpl"] = zpl_serializer.rule_to_zpl(r) or ""
         rules_annotated.append(entry)
+    entities_annotated = []
+    for e in entities_raw:
+        entry = dict(e)
+        entry["zpl"] = zpl_serializer.entity_to_zpl(e) or ""
+        entities_annotated.append(entry)
 
     return {
         "language": lang,
-        "policy_set": {**pd, "classes": classes_annotated, "rules": rules_annotated},
+        "policy_set": {**pd, "classes": classes_annotated, "rules": rules_annotated,
+                       "entities": entities_annotated},
         "errors": [e.model_dump() for e in errors],
         "inferred_classes": inferred,
         "inferred_zpl": inferred_zpl,
@@ -2436,19 +2520,21 @@ async def import_entities_yaml(file: UploadFile = File(...),
         data = data.get("entities") or []
     if not isinstance(data, list):
         raise HTTPException(400, "YAML must be a list of entity objects (or a dict with an 'entities' key)")
-    created = 0
+    imported: list[dict] = []
     for item in data:
         if not isinstance(item, dict):
             continue
-        # Accept both "class_name" and "class" as the class field
         cn = str(item.get("class_name") or item.get("class") or "").strip()
         nm = str(item.get("name") or "").strip()
         attrs = item.get("attributes") or {}
         if not cn or not nm:
             continue
         await db.create_entity(ns_id, cn, nm, attrs if isinstance(attrs, dict) else {})
-        created += 1
-    return {"imported": created}
+        imported.append({"name": nm, "class_name": cn, "attributes": attrs if isinstance(attrs, dict) else {}})
+    # Merge declare statements into namespace ZPL (deduplicating by name+class)
+    if imported:
+        await _merge_entities_into_zpl(ns_id, imported)
+    return {"imported": len(imported)}
 
 
 @app.get("/api/entities/export/ldif")
@@ -2502,15 +2588,19 @@ async def import_entities_ldif(file: UploadFile = File(...),
     if current:
         entries.append(current)
 
-    created = 0
+    imported: list[dict] = []
     for e in entries:
         cn = str(e.get("class_name") or "").strip()
         nm = str(e.get("name") or "").strip()
         if not cn or not nm:
             continue
-        await db.create_entity(ns_id, cn, nm, e.get("attrs") or {})
-        created += 1
-    return {"imported": created}
+        attrs = e.get("attrs") or {}
+        await db.create_entity(ns_id, cn, nm, attrs)
+        imported.append({"name": nm, "class_name": cn, "attributes": attrs})
+    # Merge declare statements into namespace ZPL (deduplicating by name+class)
+    if imported:
+        await _merge_entities_into_zpl(ns_id, imported)
+    return {"imported": len(imported)}
 
 
 # ── Agent chat ────────────────────────────────────────────────────────────────

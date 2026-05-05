@@ -1,11 +1,13 @@
 """ZPL RFC-15.5 text parser.
 
-Parses a ZPL policy document — Define / Allow / Never statements — into
-structured dicts matching the engine's rule and class-input shape.
+Parses a ZPL policy document — Define / Declare / Allow / Never statements —
+into structured dicts matching the engine's rule and class-input shape.
 
 Covered (docs/zpl_rfc15_5.bnf):
-  <define-statement> ::= "define" <name> <aka-clause>? "as" <article>
-                         <class-name> <with-attributes-clause>? "."
+  <define-statement>  ::= "define" <name> <aka-clause>? "as" <article>
+                          <class-name> <with-attributes-clause>? "."
+  <declare-statement> ::= "declare" <name> "as" <article>
+                          <class-name> ("with" <entity-attrs>)? "."
   <permission-statement> ::= "allow" <p-statement>
   <denial-statement> ::= "never" <permission-statement>
   <p-statement> ::= <subject-clause> "to" <verb> <object-clause> "."
@@ -25,7 +27,7 @@ Out of scope (deferred):
 
 The parser produces::
 
-    parse(text) → {"classes": [...], "rules": [...]}
+    parse(text) → {"classes": [...], "rules": [...], "entities": [...]}
 
 ClassDict matches POST /classes; RuleDict matches POST /policies.
 Semantic validation (unknown parent, bad attr type, etc.) is the caller's job.
@@ -41,7 +43,7 @@ from typing import Any
 _ARTICLES = {"a", "an", "the", "any"}
 _VERBS = {"access", "use", "call", "read", "write"}
 _SEPARATORS = {"on", "to", "and"}
-_STMT_STARTERS = {"define", "allow", "never"}
+_STMT_STARTERS = {"define", "declare", "allow", "never"}
 
 _BUILTIN_ALIASES = {
     "user": "users", "users": "users",
@@ -152,7 +154,7 @@ def _describe(t) -> str:
 def parse(text: str) -> dict:
     """Parse a whole ZPL document.
 
-    Returns ``{"classes": [...], "rules": [...], "errors": [{"line": N, "message": "..."}]}``.
+    Returns ``{"classes": [...], "rules": [...], "entities": [...], "errors": [{"line": N, "message": "..."}]}``.
     Errors on individual statements are collected and parsing continues with the next statement.
     """
     text_lines = text.splitlines()
@@ -160,6 +162,7 @@ def parse(text: str) -> dict:
     classes: list[dict] = []
     class_index: dict[str, int] = {}
     rules: list[dict] = []
+    entities: list[dict] = []
     errors: list[dict] = []
 
     while not p.at_end():
@@ -185,13 +188,15 @@ def parse(text: str) -> dict:
                 else:
                     class_index[name] = len(classes)
                     classes.append(new_cls)
+            elif head == "declare":
+                entities.append(_parse_declare(p))
             elif head == "never":
                 rules.append(_parse_denial(p))
             elif head == "allow":
                 rules.append(_parse_permission(p, result="allow"))
             else:
                 raise ValueError(
-                    f"Unexpected word {t[1]!r} (expected Define, Allow, or Never)"
+                    f"Unexpected word {t[1]!r} (expected Define, Declare, Allow, or Never)"
                 )
         except ValueError as exc:
             source = text_lines[start_line - 1].strip() if start_line <= len(text_lines) else ""
@@ -204,7 +209,7 @@ def parse(text: str) -> dict:
                     break
                 p.advance()
 
-    return {"classes": classes, "rules": rules, "errors": errors}
+    return {"classes": classes, "rules": rules, "entities": entities, "errors": errors}
 
 
 # ── Define ──────────────────────────────────────────────────────────────────
@@ -343,6 +348,49 @@ def _eat_separator(p: _P) -> bool:
     if p.eat_word("and"):
         return True
     return False
+
+
+# ── Declare (entity instances) ──────────────────────────────────────────────
+
+
+def _parse_declare(p: _P) -> dict:
+    """Parse: declare <Name> as a <class-name> with <k>: <v>, ...."""
+    p.expect_word("declare")
+    name = _consume_name(p)
+    p.expect_word("as")
+    if _next_is_article(p):
+        p.advance()
+    class_name = _consume_name(p)
+    attributes: dict[str, str] = {}
+    if p.eat_word("with"):
+        attributes = _parse_entity_attrs(p)
+    p.expect_terminator()
+    return {"name": name, "class_name": class_name, "attributes": attributes}
+
+
+def _parse_entity_attrs(p: _P) -> dict[str, str]:
+    """Parse simple key: value attribute pairs for entity declarations."""
+    attrs: dict[str, str] = {}
+    need_sep = False
+    while True:
+        if need_sep and not _eat_separator(p):
+            break
+        t = p.peek()
+        if t is None or t[0] not in ("word", "string"):
+            break
+        if t[0] == "word" and t[1].lower() in _STMT_STARTERS:
+            break
+        attr_name = _consume_name(p)
+        if p.eat_punct(":") or p.eat_punct("="):
+            vt = p.peek()
+            if vt and vt[0] in ("word", "string"):
+                attrs[attr_name] = p.advance()[1]
+            else:
+                attrs[attr_name] = ""
+        else:
+            attrs[attr_name] = ""
+        need_sep = True
+    return attrs
 
 
 # ── Permission / Denial ─────────────────────────────────────────────────────

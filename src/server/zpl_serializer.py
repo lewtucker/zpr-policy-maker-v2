@@ -145,3 +145,25 @@ def class_to_zpl(cls: dict) -> str | None:
 def classes_to_zpl(classes: list[dict]) -> str:
     lines = [class_to_zpl(c) for c in classes if not c.get("builtin")]
     return "\n".join(l for l in lines if l)
+
+
+# ── Entities ─────────────────────────────────────────────────────────────────
+
+def entity_to_zpl(entity: dict) -> str | None:
+    """Convert an entity dict to a ZPL Declare statement."""
+    name = entity.get("name", "")
+    class_name = entity.get("class_name", "")
+    if not name or not class_name:
+        return None
+    attributes = entity.get("attributes") or {}
+    article = "an" if class_name[0] in "aeiou" else "a"
+    line = f"Declare {name} as {article} {class_name}"
+    attr_parts = [f"{k}: {v}" for k, v in attributes.items() if v is not None]
+    if attr_parts:
+        line += " with " + ", ".join(attr_parts)
+    return line + "."
+
+
+def entities_to_zpl(entities: list[dict]) -> str:
+    lines = [entity_to_zpl(e) for e in entities]
+    return "\n".join(l for l in lines if l)

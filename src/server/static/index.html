@@ -685,7 +685,7 @@
 
   <!-- Left Nav -->
   <nav class="left-nav" id="left-nav">
-    <div class="nav-brand">ZPR <span>Policy Builder</span></div>
+    <div class="nav-brand">ZPR <span>Policy Builder</span> <span style="font-weight:400;font-size:0.75rem;color:var(--muted)">(prototype)</span></div>
     <div class="nav-scroll">
       <div style="display:flex;align-items:center;padding:0.65rem 1.1rem 0.2rem">
         <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);flex:1">Namespace</span>
@@ -701,7 +701,7 @@
       <div class="nav-item active" id="nav-editor"   onclick="navigate('editor',this)">Policy Editor</div>
       <div class="nav-item" id="nav-aiassist"         onclick="navigate('aiassist',this)">AI Assist</div>
       <div class="nav-item" id="nav-audit"            onclick="navigate('audit',this)">Policy Audit</div>
-      <div class="nav-item" id="nav-testing"          onclick="navigate('testing',this)">Testing</div>
+      <div class="nav-item" id="nav-testing"          onclick="navigate('testing',this)">Rule Testing</div>
       <div class="nav-item" id="nav-nsmgr"            onclick="navigate('nsmgr',this)">Namespace Manager</div>
       <div class="nav-item" id="nav-reports"          onclick="navigate('reports',this)">Reports</div>
       <div class="nav-item" id="nav-guide"            onclick="navigate('guide',this)">User Guide</div>
@@ -742,13 +742,13 @@
         <!-- Upper: staging input -->
         <div class="input-zone" id="input-zone">
           <div class="input-zone-toolbar">
-            <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)">New ZPL</span>
+            <button class="tool-btn active" id="btn-zpl-mode" onclick="setEditorMode('zpl')">New ZPL</button>
+            <button class="tool-btn" id="btn-entity-mode" onclick="setEditorMode('entity')">Entities</button>
             <div class="toolbar-sep"></div>
-            <button class="tool-btn" onclick="doCheckUpper()">Check ZPL</button>
+            <button class="tool-btn" id="btn-check-upper" onclick="doCheckUpper()">Check ZPL</button>
             <button class="tool-btn primary" onclick="acceptZpl()">Save</button>
             <button class="tool-btn" id="assist-btn" onclick="navigate('aiassist',document.getElementById('nav-aiassist'))" title="ZPL AI Assistant" style="background:#dcfce7;border-color:#86efac;color:#15803d;font-weight:600">✨ AI Assist</button>
             <button class="tool-btn" onclick="discardUpper()" style="color:var(--muted)">Clear</button>
-            <button class="tool-btn" id="mode-entity" disabled title="Entity mode coming soon" style="opacity:0.45;cursor:not-allowed">Entities (soon)</button>
           </div>
           <div class="input-zone-scroll">
             <div class="infer-bar" id="infer-bar">
@@ -791,9 +791,14 @@
           </div>
           <div class="defs-body">
             <div id="defs-zpl-rows"></div>
-            <div id="defs-table" style="display:none">
+            <div id="defs-table" style="display:none;flex-direction:column;height:100%">
+              <div style="display:flex;gap:0.25rem;padding:0.4rem 0.75rem 0;border-bottom:1px solid var(--border);flex-shrink:0">
+                <button class="tool-btn active" id="schema-tab-classes"  onclick="setSchemaTab('classes')">Classes</button>
+                <button class="tool-btn"        id="schema-tab-entities" onclick="setSchemaTab('entities')">Entities</button>
+                <button class="tool-btn"        id="schema-tab-rules"    onclick="setSchemaTab('rules')">Rules</button>
+              </div>
               <div class="schema-body" id="schema-body">
-                <div class="empty-state">Parse ZPL to see<br>classes and rules here.</div>
+                <div class="empty-state">Parse ZPL to see<br>classes, entities and rules here.</div>
               </div>
             </div>
           </div>
@@ -847,9 +852,9 @@
         <div id="analyst-ns-label" style="font-size:0.8rem;color:var(--muted);margin-left:0.5rem"></div>
         <div style="margin-left:auto;display:flex;align-items:center;gap:0.4rem">
           <div class="view-toggle">
-            <button class="active" id="audit-fast-btn"
+            <button class="active" id="audit-fast-btn" style="font-size:0.9rem;padding:0.25rem 0.75rem"
               onclick="document.getElementById('audit-fast-btn').classList.add('active');document.getElementById('audit-deep-btn').classList.remove('active');S._auditDeep=false">Fast</button>
-            <button id="audit-deep-btn"
+            <button id="audit-deep-btn" style="font-size:0.9rem;padding:0.25rem 0.75rem"
               onclick="document.getElementById('audit-deep-btn').classList.add('active');document.getElementById('audit-fast-btn').classList.remove('active');S._auditDeep=true">Deep</button>
           </div>
           <button class="tool-btn primary" onclick="trRunAnalyst(S._auditDeep||false)">🔍 Run Audit</button>
@@ -865,7 +870,7 @@
     <!-- ══ Testing ══ -->
     <div class="page" id="page-testing">
       <div class="page-header">
-        <h1>Testing</h1>
+        <h1>Rule Testing</h1>
         <span class="ns-editor-label" id="testing-breadcrumb" style="margin-left:0.5rem"></span>
       </div>
       <div id="testing-body" style="flex:1;overflow-y:auto;position:relative">
@@ -1006,6 +1011,7 @@ const S = {
   nsMode: 'full',
   _storedZpl: '',
   _auditDeep: false,
+  editorMode: 'zpl',  // 'zpl' | 'entity'
 };
 
 // ── API ────────────────────────────────────────────────────────────────────
@@ -1093,19 +1099,39 @@ function renderDefsRows(zplText) {
     return;
   }
   const stmts = _splitZplStatements(zplText);
-  const nsName = S.context?.active_display_name || '';
   container.innerHTML = stmts.map(stmt => {
-    const display = (S.nsMode === 'short' && nsName)
-      ? stmt.replace(new RegExp('\\b' + nsName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.', 'g'), '')
-      : stmt;
     return `<div class="zpl-stmt-row" data-zpl="${esc(stmt)}">
-      <span class="zpl-stmt-text">${esc(display)}</span>
+      <span class="zpl-stmt-text">${esc(stmt)}</span>
       <div style="display:flex;gap:0.25rem;flex-shrink:0">
         <button class="stmt-btn" onclick="openStmtEdit(this.closest('[data-zpl]'))" title="Edit">✏</button>
         <button class="stmt-btn del" onclick="deleteStmt(this.closest('[data-zpl]'))" title="Delete">✕</button>
       </div>
     </div>`;
   }).join('');
+}
+
+// ── Entity mode ────────────────────────────────────────────────────────────
+
+function setEditorMode(mode) {
+  S.editorMode = mode;
+  const isEntity = mode === 'entity';
+  document.getElementById('btn-zpl-mode')?.classList.toggle('active', !isEntity);
+  document.getElementById('btn-entity-mode')?.classList.toggle('active', isEntity);
+  document.getElementById('btn-check-upper').textContent = isEntity ? 'Check Entity' : 'Check ZPL';
+  const ta = document.getElementById('zpl-upper');
+  if (ta) {
+    ta.placeholder = isEntity
+      ? 'Declare Alice as a supervisor with department: engineering, shift: day.'
+      : 'Type ZPL here — Check, then Accept to add to policy';
+    ta.focus();
+  }
+  document.getElementById('accept-bar')?.classList.remove('visible');
+  document.getElementById('error-bar')?.classList.remove('visible');
+  clearInferBar();
+}
+
+function toggleEditorMode() {
+  setEditorMode(S.editorMode === 'zpl' ? 'entity' : 'zpl');
 }
 
 async function doCheckUpper() {
@@ -1130,19 +1156,25 @@ async function doCheckUpper() {
       bar.classList.remove('visible', 'warn');
     } else {
       clearErrors();
-      const nCls   = (res.policy_set?.classes||[]).length;
-      const nRules = (res.policy_set?.rules||[]).length;
+      const nCls      = (res.policy_set?.classes||[]).length;
+      const nRules    = (res.policy_set?.rules||[]).length;
+      const nEntities = (res.policy_set?.entities||[]).length;
+      const summary   = [
+        nCls   ? `${nCls} class${nCls>1?'es':''}` : '',
+        nEntities ? `${nEntities} entit${nEntities>1?'ies':'y'}` : '',
+        nRules ? `${nRules} rule${nRules>1?'s':''}` : '',
+      ].filter(Boolean).join(' · ') || 'empty';
       if (hasWarnings) {
         bar.classList.add('visible', 'warn');
         barMsg.style.color = '#92400e';
         barMsg.textContent = 'Has warnings — add anyway?';
-        setStatus('ok', `Parsed — ${nCls} classes · ${nRules} rules (with warnings)`);
+        setStatus('ok', `Parsed — ${summary} (with warnings)`);
       } else {
         bar.classList.add('visible');
         bar.classList.remove('warn');
         barMsg.style.color = '';
         barMsg.textContent = 'Valid — add to policy?';
-        setStatus('ok', `Valid — ${nCls} classes · ${nRules} rules`);
+        setStatus('ok', `Valid — ${summary}`);
       }
     }
     showInferBar(res.inferred_classes || [], res.inferred_zpl || '', null, res.inferred_verbs || [], res.inferred_verbs_zpl || '', res.undefined_parents || []);
@@ -1193,19 +1225,28 @@ function discardUpper() {
 
 function setDefsView(v) {
   S.defsView = v;
-  const zplRows  = document.getElementById('defs-zpl-rows');
+  const zplRows   = document.getElementById('defs-zpl-rows');
   const tableWrap = document.getElementById('defs-table');
   if (zplRows)   zplRows.style.display   = v === 'zpl'   ? '' : 'none';
-  if (tableWrap) tableWrap.style.display = v === 'table' ? '' : 'none';
+  if (tableWrap) tableWrap.style.display = v === 'table' ? 'flex' : 'none';
   document.getElementById('btn-zpl')?.classList.toggle('active', v === 'zpl');
   document.getElementById('btn-table')?.classList.toggle('active', v === 'table');
+  if (v === 'table') renderSchemaBody();
 }
 
-function setNsMode(mode) {
+async function setNsMode(mode) {
   S.nsMode = mode;
   document.getElementById('btn-fullns')?.classList.toggle('active', mode === 'full');
   document.getElementById('btn-shortns')?.classList.toggle('active', mode === 'short');
-  renderDefsRows(S._storedZpl);
+  // Full NS: show stored ZPL with full namespace prefixes intact
+  // Short: show prefix-stripped form (normal editor view)
+  const url = mode === 'full' ? '/api/namespace/zpl?raw=true' : '/api/namespace/zpl';
+  try {
+    const res = await api('GET', url);
+    renderDefsRows(res.text || '');
+  } catch(e) {
+    renderDefsRows(S._storedZpl);
+  }
 }
 
 // ── AI Assist page init ────────────────────────────────────────────────────
@@ -1474,9 +1515,7 @@ async function switchToNamespace(nsId) {
     }
     await loadContext();
     _exitShowAll();
-    const switchLoads = [loadSubOwners(), loadNamespaceZpl()];
-    if (S.schemaTab === 'entities') switchLoads.push(loadEntities());
-    await Promise.all(switchLoads);
+    await Promise.all([loadSubOwners(), loadNamespaceZpl()]);
     navigate('editor', document.getElementById('nav-editor'));
   } catch(e) { alert('Could not switch namespace: ' + e.message); }
 }
@@ -1871,9 +1910,10 @@ function askAssistantAboutInferred() {
     _ASSIST_GENS[gid] = stmt;
     const extra =
       `<code style="display:block;font-size:0.7rem;color:var(--accent);margin-top:0.1rem;word-break:break-all">${esc(stmt)}</code>` +
-      `<div id="assist-gen-btns-${gid}" style="margin-top:0.4rem;display:flex;gap:0.4rem">` +
-      `<button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistSaveGen(${gid})">Stage</button>` +
-      `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistDeleteGen(${gid})">Delete</button>` +
+      `<div id="assist-gen-btns-${gid}" style="margin-top:0.4rem;display:flex;gap:0.4rem;flex-wrap:wrap">` +
+      `<button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistAcceptGen(${gid})">Accept</button>` +
+      `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistSaveGen(${gid})">Stage</button>` +
+      `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem;color:var(--muted)" onclick="assistDeleteGen(${gid})">Drop</button>` +
       `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistEditGen(${gid})">Edit</button>` +
       `</div>`;
     _assistAppendMsg('assistant', '', extra);
@@ -2045,9 +2085,10 @@ async function assistSend() {
         const gid = ++_assistGenId;
         _ASSIST_GENS[gid] = stmt;
         extra = `<br><code style="display:block;font-size:0.7rem;color:var(--accent);margin-top:0.25rem;word-break:break-all">${esc(stmt)}</code>` +
-          `<div id="assist-gen-btns-${gid}" style="margin-top:0.4rem;display:flex;gap:0.4rem">` +
-          `<button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistSaveGen(${gid})">Stage</button>` +
-          `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistDeleteGen(${gid})">Delete</button>` +
+          `<div id="assist-gen-btns-${gid}" style="margin-top:0.4rem;display:flex;gap:0.4rem;flex-wrap:wrap">` +
+          `<button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistAcceptGen(${gid})">Accept</button>` +
+          `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistSaveGen(${gid})">Stage</button>` +
+          `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem;color:var(--muted)" onclick="assistDeleteGen(${gid})">Drop</button>` +
           `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistEditGen(${gid})">Edit</button>` +
           `</div>`;
       }
@@ -2112,6 +2153,26 @@ function _assistDisableGenBtns(gid) {
   if (row) row.querySelectorAll('button').forEach(b => { b.disabled = true; b.style.opacity = '0.4'; });
 }
 
+async function assistAcceptGen(gid) {
+  const stmt = _ASSIST_GENS[gid];
+  if (stmt == null) return;
+  _assistDisableGenBtns(gid);
+  delete _ASSIST_GENS[gid];
+  const stored = _defsText();
+  const combined = stored ? stored.trimEnd() + '\n' + stmt.trim() : stmt.trim();
+  try {
+    await api('PUT', '/api/namespace/zpl', { text: combined });
+    const res = await api('GET', '/api/namespace/zpl');
+    renderDefsRows(res.text || '');
+    const parsed = await api('POST', '/api/parse', { text: res.text || '', language: 'zpl' }).catch(() => null);
+    if (parsed) { S.lastParsed = parsed.policy_set; S.serializedZpl = parsed.serialized_zpl || ''; }
+    renderSchemaBody();
+    _assistAppendMsg('system', 'Accepted and saved to policy. Anything else?');
+  } catch(e) {
+    _assistAppendMsg('system', 'Save failed: ' + (e.message || String(e)));
+  }
+}
+
 function assistSaveGen(gid) {
   const stmt = _ASSIST_GENS[gid];
   if (stmt == null) return;
@@ -2127,7 +2188,7 @@ function assistDeleteGen(gid) {
   if (_ASSIST_GENS[gid] == null) return;
   _assistDisableGenBtns(gid);
   delete _ASSIST_GENS[gid];
-  _assistAppendMsg('system', 'Discarded. Anything else?');
+  _assistAppendMsg('system', 'Dropped. Anything else?');
 }
 
 function assistEditGen(gid) {
@@ -2231,9 +2292,11 @@ function assistDeleteAll() {
 
 // ── Schema panel ───────────────────────────────────────────────────────────
 
-function setSchemaTab(tab, btn) {
+function setSchemaTab(tab) {
   S.schemaTab = tab;
-  if (tab === 'entities') { loadEntities(); return; }
+  ['classes', 'entities', 'rules'].forEach(t => {
+    document.getElementById('schema-tab-' + t)?.classList.toggle('active', t === tab);
+  });
   renderSchemaBody();
 }
 
@@ -2269,16 +2332,13 @@ function renderZpl(body) {
 // ── Entities tab ───────────────────────────────────────────────────────────
 
 async function loadEntities() {
-  try {
-    S.entities = await api('GET', '/api/entities');
-  } catch(e) {
-    S.entities = [];
-  }
+  // Entities now come from ZPL parse — this is a no-op kept for call-site compatibility.
   if (S.schemaTab === 'entities') renderSchemaBody();
 }
 
 function renderEntities(body) {
-  const entities = S.entities || [];
+  const ps = S.lastParsed;
+  const entities = (ps && ps.entities) || [];
 
   // Group by class_name
   const groups = {};
@@ -2288,13 +2348,8 @@ function renderEntities(body) {
     groups[k].push(e);
   }
 
-  // Collect available class names from last parsed ZPL
-  const ps = S.lastParsed;
-  const classNames = ps ? (ps.classes || []).map(c => c.name).filter(Boolean).sort() : [];
-
   let html = `
     <div style="padding:0.6rem 0.75rem 0.4rem;display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
-      <button class="tool-btn" onclick="openEntityModal(null)" style="font-size:0.75rem">+ New Entity</button>
       <div style="position:relative;display:inline-block">
         <button class="tool-btn" onclick="toggleEntityMenu('yaml-menu')" style="font-size:0.75rem">YAML ▾</button>
         <div id="yaml-menu" class="io-menu" style="display:none">
@@ -2313,29 +2368,32 @@ function renderEntities(body) {
         </div>
         <input type="file" id="ldif-import-input" accept=".ldif,.ldap,.txt" style="display:none" onchange="doImportLdif(this)">
       </div>
-      <button class="tool-btn" onclick="doDeleteAllEntities()" style="font-size:0.75rem;margin-left:auto;color:#ef4444">Delete all</button>
     </div>`;
 
   if (entities.length === 0) {
-    html += '<div class="empty-state">No entities defined.<br>Click + New Entity to add one.</div>';
+    html += '<div class="empty-state">No entities declared.<br>Use <code>Declare Alice as a warehouse-manager with shift: day.</code></div>';
   } else {
     for (const [cls, items] of Object.entries(groups).sort()) {
       html += `<div style="padding:0.3rem 0.75rem 0;font-size:0.72rem;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em">${esc(cls)}</div>`;
-      html += `<table style="width:100%;border-collapse:collapse;font-size:0.8rem">`;
       for (const e of items) {
-        const attrStr = Object.entries(e.attributes || {}).map(([k,v])=>`${k}:${v}`).join(', ');
-        html += `<tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:0.35rem 0.75rem;vertical-align:top">
-            <div style="font-weight:500">${esc(e.name)}</div>
-            ${attrStr ? `<div style="color:var(--text-dim);font-size:0.72rem">${esc(attrStr)}</div>` : ''}
-          </td>
-          <td style="padding:0.35rem 0.5rem;text-align:right;white-space:nowrap;vertical-align:top">
-            <button class="tool-btn" onclick="openEntityModal('${e.id}')" style="font-size:0.7rem;padding:0.15rem 0.4rem">Edit</button>
-            <button class="tool-btn" onclick="deleteEntity('${e.id}')" style="font-size:0.7rem;padding:0.15rem 0.4rem;color:#ef4444">×</button>
-          </td>
-        </tr>`;
+        const attrs = Object.entries(e.attributes || {});
+        const attrStr = attrs.map(([k,v]) => `${k}: ${v}`).join('  ·  ');
+        const zpl = esc(e.zpl || '');
+        const json = esc(JSON.stringify(e, null, 2));
+        html += `<div data-json="${json}" data-zpl="${zpl}" style="border-bottom:1px solid var(--border)">
+          <div style="display:flex;align-items:flex-start;padding:0.35rem 0.75rem;gap:0.5rem">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:500;font-family:var(--font-mono);font-size:0.88rem">${esc(e.name)}</div>
+              ${attrStr ? `<div style="color:var(--muted);font-size:0.78rem;margin-top:0.1rem">${esc(attrStr)}</div>` : ''}
+            </div>
+            <div style="display:flex;gap:0.25rem;flex-shrink:0;padding-top:0.1rem">
+              <button class="tool-btn" onclick="openStmtEdit(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">Edit</button>
+              <button class="tool-btn" onclick="event.stopPropagation();deleteStmt(this.closest('[data-zpl]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem;color:#ef4444">[x]</button>
+              <button class="tool-btn" onclick="event.stopPropagation();toggleYamlDetail(this.closest('[data-json]'))" style="font-size:0.78rem;padding:0.15rem 0.4rem">yaml</button>
+            </div>
+          </div>
+        </div>`;
       }
-      html += `</table>`;
     }
   }
 
@@ -2406,7 +2464,12 @@ async function doImportYaml(input) {
     const res = await fetch('/api/entities/import/yaml', { method: 'POST', body: fd });
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
-    await loadEntities();
+    // Reload ZPL so imported declare statements appear in the editor and Entities tab
+    const zplRes = await api('GET', '/api/namespace/zpl');
+    S._storedZpl = zplRes.text || '';
+    renderDefsRows(S._storedZpl);
+    const parsed = await api('POST', '/api/parse', { text: S._storedZpl, language: 'zpl' }).catch(() => null);
+    if (parsed) { S.lastParsed = parsed.policy_set; S.serializedZpl = parsed.serialized_zpl || ''; renderSchemaBody(); }
     alert(`Imported ${data.imported} entities.`);
   } catch(e) { alert('Import failed: ' + e.message); }
 }
@@ -2428,7 +2491,12 @@ async function doImportLdif(input) {
     const res = await fetch('/api/entities/import/ldif', { method: 'POST', body: fd });
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
-    await loadEntities();
+    // Reload ZPL so imported declare statements appear in the editor and Entities tab
+    const zplRes = await api('GET', '/api/namespace/zpl');
+    S._storedZpl = zplRes.text || '';
+    renderDefsRows(S._storedZpl);
+    const parsed = await api('POST', '/api/parse', { text: S._storedZpl, language: 'zpl' }).catch(() => null);
+    if (parsed) { S.lastParsed = parsed.policy_set; S.serializedZpl = parsed.serialized_zpl || ''; renderSchemaBody(); }
     alert(`Imported ${data.imported} entities.`);
   } catch(e) { alert('Import failed: ' + e.message); }
 }
@@ -4055,7 +4123,9 @@ function trAddManual() {
 }
 
 function renderTests(body) {
-  const manualHtml = _trManualForm();
+  // Preserve existing manual form state (inputs, result, trace) across re-renders
+  const existingManual = document.getElementById('tr-manual');
+  const manualHtml = existingManual ? existingManual.outerHTML : _trManualForm();
 
   if (!TR.tests.length) {
     body.innerHTML = manualHtml + `<div class="tr-empty-state" style="padding-top:1rem;">
