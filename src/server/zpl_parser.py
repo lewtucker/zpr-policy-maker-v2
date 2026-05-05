@@ -42,7 +42,7 @@ from typing import Any
 
 _ARTICLES = {"a", "an", "the", "any"}
 _VERBS = {"access", "use", "call", "read", "write"}
-_SEPARATORS = {"on", "to", "and"}
+_SEPARATORS = {"on", "to", "and", "with"}
 _STMT_STARTERS = {"define", "declare", "allow", "never"}
 
 _BUILTIN_ALIASES = {
@@ -514,6 +514,24 @@ def _parse_spec(p: _P) -> dict:
     if t is None or t[0] not in ("word", "string"):
         raise ValueError(f"Expected class or entity name, got {_describe(t)}")
     class_or_name = p.advance()[1]
+
+    # Support "ClassName with attr:val ..." — natural English form in rule specs
+    if p.peek() and p.peek()[0] == "word" and p.peek()[1].lower() == "with":
+        p.advance()  # consume "with"
+        while True:
+            t = p.peek()
+            if t is None or t[0] not in ("word", "string"):
+                break
+            if t[1].lower() in _SEPARATORS or t[1].lower() in _STMT_STARTERS:
+                break
+            nxt = p.peek(1)
+            if nxt and nxt[0] == "punct" and nxt[1] in (":", "="):
+                name = p.advance()[1]
+                p.advance()  # eat ':' or '='
+                value = _parse_attr_value(p)
+                attrs[name] = value
+            else:
+                break  # not a key:val pair — stop
 
     out: dict[str, Any] = {}
     key = class_or_name.lower()
