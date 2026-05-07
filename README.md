@@ -135,7 +135,7 @@ src/server/
     system_classes.yaml Built-in ZPL class hierarchy
   tests/                pytest test suite (83 tests)
 
-Studio_examples/        Sample policies, entities (YAML + LDIF)
+Demo_Studio/        Sample policies, entities (YAML + LDIF)
 docs/                   Architecture and demo notes
 scripts/                Backup / restore scripts
 bnf/                    BNF grammars for ZPL and ZPEL

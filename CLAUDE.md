@@ -1,4 +1,9 @@
-# CLAUDE.md — ZPR Policy Builder (repo: zpr-policy-maker-v2)
+# CLAUDE.md — ZPR Policy AI Playground (repo: zpr-policy-maker-v2)
+
+> **This file is committed to git and is public. Never add sensitive information here.**
+> This includes: server IP addresses, domain names, passwords, API keys, tokens, or
+> local file paths. All secrets and deployment config belong in `src/server/.env` (gitignored).
+> See `src/server/.env.example` for what to put there.
 
 ## ⚠️ PROJECT STATUS: ACTIVE (v3 — UI polish phase)
 
@@ -7,22 +12,17 @@ complete. Do not deploy to production until the user explicitly confirms readine
 
 ---
 
-## ⚠️ DEPLOYMENT SAFETY — READ THIS FIRST AND NEVER VIOLATE
+## ⚠️ DEPLOYMENT SAFETY
 
-There are **three separate applications** on the production server.
-Deploying to the wrong one corrupts it. The rules are absolute:
+When deploying to a production server, confirm the destination before running any rsync or
+restart commands. Do not assume this is the only application on the server — other services
+may share the same host on different ports and paths. Deploying to the wrong directory or
+restarting the wrong service can corrupt a separate running application.
 
-| Application | Domain | Server path | Systemd service | Port |
-|-------------|---------|-------------|-----------------|------|
-| **THIS APP** | `<your-domain>/zpr-policy2` | `/opt/zpr-policy-maker-v2/` | `zpr-policy-maker-v2` | 8082 |
-| ZPR Policy Maker v1 | `<your-domain>/zpr-policy` | `/opt/zpr-policy-maker/` | `zpr-policy-maker` | 8081 |
-| OpenClaw Policy Maker | `<your-domain>/policy` | `/opt/policy-maker/` | `policy-maker` | 8080 |
-
-**NEVER deploy to the v1 or OpenClaw domains.**
-**NEVER write to `/opt/zpr-policy-maker/` or `/opt/policy-maker/`.**
-**NEVER restart `zpr-policy-maker` or `policy-maker` services.**
-
-When deploying, always use full absolute paths and confirm the destination before running rsync.
+Always use full absolute paths. Verify the server path, systemd service name, and port match
+what is configured for **this** application before proceeding. The port is set in the systemd
+`ExecStart` line and the nginx `proxy_pass` — keep them in sync. See `Implementation_Guide.md`
+for the full deployment procedure.
 
 ---
 

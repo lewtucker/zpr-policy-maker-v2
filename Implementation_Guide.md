@@ -329,12 +329,30 @@ The `scripts/` directory contains four scripts:
 
 | Script | What it does |
 |--------|-------------|
-| `scripts/backup-db.sh` | Pull live database from server to `backups/` |
-| `scripts/restore-db.sh` | Push a backup database back to the server |
+| `scripts/backup-db.sh` | Pull live database from production server to `backups/` |
+| `scripts/restore-db.sh` | Push a local backup to the production server |
 | `scripts/backup-local.sh` | Snapshot local dev database with timestamp + label |
-| `scripts/restore-local.sh` | Restore a local backup with confirmation prompt |
+| `scripts/restore-local.sh` | Restore a local backup on your local machine |
 
-Edit the scripts to set your server IP and paths before use.
+**`backup-local.sh` and `restore-local.sh`** operate entirely on your local machine — no server
+required. Use them during development to save and roll back `src/server/zpr_policy.db`.
+
+**`backup-db.sh` and `restore-db.sh`** connect to the production server via SSH/SCP. They read
+all deployment config from `src/server/.env` — no hardcoded paths. Add these three variables
+before running either script:
+
+```
+DEPLOY_SERVER=root@<your-server-ip>
+DEPLOY_REMOTE_DB=/opt/<your-app-dir>/src/server/zpr_policy.db
+DEPLOY_SERVICE=<your-systemd-service-name>
+```
+
+All three are included in `.env.example` with placeholder values. The scripts will exit with
+a clear error listing any that are missing.
+
+Note: the port is **not** a `.env` variable — it is set in the systemd `ExecStart` line and
+the nginx `proxy_pass` directive, which must match. See the [systemd](#systemd-service) and
+[nginx](#nginx-configuration) sections for details.
 
 ### Manual backup
 
@@ -507,6 +525,6 @@ src/server/
   defaults/             Built-in class hierarchy YAML
   tests/                pytest test suite
 
-Studio_examples/        Sample policies and entity files for demos
+Demo_Studio/        Sample policies and entity files for demos
 scripts/                Backup/restore shell scripts
 ```
