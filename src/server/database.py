@@ -187,6 +187,10 @@ async def init_db() -> None:
             await db.execute("ALTER TABLE namespace_zpl_new RENAME TO namespace_zpl")
         if not await _column_exists(db, "namespaces", "description"):
             await db.execute("ALTER TABLE namespaces ADD COLUMN description TEXT NOT NULL DEFAULT ''")
+        if not await _column_exists(db, "namespaces", "created_by_user_id"):
+            await db.execute("ALTER TABLE namespaces ADD COLUMN created_by_user_id TEXT")
+            # Backfill: treat current owner as creator for existing rows
+            await db.execute("UPDATE namespaces SET created_by_user_id = owner_user_id WHERE created_by_user_id IS NULL")
         await db.commit()
 
 
@@ -388,20 +392,22 @@ async def save_prompt(key: str, content: str) -> None:
 
 async def create_namespace(display_name: str, owner_user_id: str,
                            parent_namespace_id: str | None = None,
-                           description: str = "") -> dict:
+                           description: str = "",
+                           created_by_user_id: str | None = None) -> dict:
     import uuid as _uuid
     ns_id = _uuid.uuid4().hex
     now = datetime.now(timezone.utc).isoformat()
+    creator = created_by_user_id or owner_user_id
     async with aiosqlite.connect(_DB_PATH) as db:
         await db.execute(
-            "INSERT INTO namespaces (id, display_name, owner_user_id, parent_namespace_id, created_at, description) "
-            "VALUES (?,?,?,?,?,?)",
-            (ns_id, display_name, owner_user_id, parent_namespace_id, now, description or ""),
+            "INSERT INTO namespaces (id, display_name, owner_user_id, parent_namespace_id, created_at, description, created_by_user_id) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (ns_id, display_name, owner_user_id, parent_namespace_id, now, description or "", creator),
         )
         await db.commit()
     return {"id": ns_id, "display_name": display_name, "owner_user_id": owner_user_id,
             "parent_namespace_id": parent_namespace_id, "created_at": now,
-            "description": description or ""}
+            "description": description or "", "created_by_user_id": creator}
 
 
 async def get_namespace(namespace_id: str) -> dict | None:
@@ -447,6 +453,24 @@ async def delete_namespace(namespace_id: str) -> str | None:
     return None
 
 
+async def delete_namespace_cascade(namespace_id: str) -> None:
+    """Delete a namespace and all its descendants (leaves first)."""
+    async with aiosqlite.connect(_DB_PATH) as db:
+        async with db.execute(
+            """WITH RECURSIVE sub(id) AS (
+                   SELECT ? UNION ALL
+                   SELECT n.id FROM namespaces n JOIN sub s ON n.parent_namespace_id = s.id
+               ) SELECT id FROM sub""",
+            (namespace_id,),
+        ) as cur:
+            ids = [row[0] for row in await cur.fetchall()]
+        # Delete in reverse order so children go before parents
+        for ns_id in reversed(ids):
+            await db.execute("DELETE FROM namespace_zpl WHERE namespace_id = ?", (ns_id,))
+            await db.execute("DELETE FROM namespaces WHERE id = ?", (ns_id,))
+        await db.commit()
+
+
 async def get_namespace_tree(root_id: str) -> dict:
     """Return full namespace tree rooted at root_id as nested dicts."""
     async with aiosqlite.connect(_DB_PATH) as db:
@@ -454,8 +478,12 @@ async def get_namespace_tree(root_id: str) -> dict:
         async with db.execute(
             "SELECT n.id, n.display_name, n.owner_user_id, n.parent_namespace_id, n.created_at, "
             "COALESCE(n.description, '') AS description, "
-            "u.username AS owner_username "
-            "FROM namespaces n LEFT JOIN users u ON u.id = n.owner_user_id"
+            "u.username AS owner_username, "
+            "COALESCE(n.created_by_user_id, n.owner_user_id) AS created_by_user_id, "
+            "cb.username AS created_by_username "
+            "FROM namespaces n "
+            "LEFT JOIN users u ON u.id = n.owner_user_id "
+            "LEFT JOIN users cb ON cb.id = n.created_by_user_id"
         ) as cur:
             all_rows = [dict(r) for r in await cur.fetchall()]
     by_id = {r["id"]: {**r, "children": []} for r in all_rows}

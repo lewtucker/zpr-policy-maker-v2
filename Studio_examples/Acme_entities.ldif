@@ -1,0 +1,129 @@
+# Acme Corporation — Sample Entities (LDIF)
+# Matches Simple_Acme_Policy.md
+# Import via Policy Editor ↑↓ → Import entities (.ldif)
+# Format: dn / cn / objectClass / attributes — one blank line between entries
+
+# ── Employees ──────────────────────────────────────────────────────────────
+
+dn: cn=alice.chen,ou=Employee,dc=zpr,dc=policy
+cn: alice.chen
+objectClass: Employee
+employee_id: E-1001
+department: legal
+role: associate
+
+dn: cn=bob.martinez,ou=Employee,dc=zpr,dc=policy
+cn: bob.martinez
+objectClass: Employee
+employee_id: E-1002
+department: sales
+role: manager
+
+dn: cn=carol.kim,ou=Employee,dc=zpr,dc=policy
+cn: carol.kim
+objectClass: Employee
+employee_id: E-1003
+department: admin
+role: engineer
+
+dn: cn=david.osei,ou=Employee,dc=zpr,dc=policy
+cn: david.osei
+objectClass: Employee
+employee_id: E-1004
+department: legal
+on-leave: true
+
+# ── Executives ─────────────────────────────────────────────────────────────
+
+dn: cn=priya.sharma,ou=Executive,dc=zpr,dc=policy
+cn: priya.sharma
+objectClass: Executive
+role: SVP
+
+dn: cn=sofia.reyes,ou=Executive,dc=zpr,dc=policy
+cn: sofia.reyes
+objectClass: Executive
+role: SVP
+
+dn: cn=james.wu,ou=Executive,dc=zpr,dc=policy
+cn: james.wu
+objectClass: Executive
+role: EVP
+
+dn: cn=raj.patel,ou=Executive,dc=zpr,dc=policy
+cn: raj.patel
+objectClass: Executive
+role: CEO
+
+# ── Legal Staff ────────────────────────────────────────────────────────────
+
+dn: cn=alice.chen,ou=LegalStaff,dc=zpr,dc=policy
+cn: alice.chen
+objectClass: LegalStaff
+department: legal
+role: associate
+
+dn: cn=fatima.noor,ou=LegalStaff,dc=zpr,dc=policy
+cn: fatima.noor
+objectClass: LegalStaff
+department: legal
+role: counsel
+
+# ── Sales Reps ─────────────────────────────────────────────────────────────
+
+dn: cn=bob.martinez,ou=SalesRep,dc=zpr,dc=policy
+cn: bob.martinez
+objectClass: SalesRep
+department: sales
+region: west
+
+dn: cn=leo.santos,ou=SalesRep,dc=zpr,dc=policy
+cn: leo.santos
+objectClass: SalesRep
+department: sales
+region: east
+
+# ── Admin Staff ────────────────────────────────────────────────────────────
+
+dn: cn=carol.kim,ou=AdminStaff,dc=zpr,dc=policy
+cn: carol.kim
+objectClass: AdminStaff
+department: admin
+
+# ── Auditors ───────────────────────────────────────────────────────────────
+
+dn: cn=ernst.audit,ou=Auditor,dc=zpr,dc=policy
+cn: ernst.audit
+objectClass: Auditor
+type: auditor
+audit_scope: legal
+
+dn: cn=kpmg.audit,ou=Auditor,dc=zpr,dc=policy
+cn: kpmg.audit
+objectClass: Auditor
+type: auditor
+audit_scope: finance
+
+# ── Partners ───────────────────────────────────────────────────────────────
+
+dn: cn=acme.partner.active,ou=Partner,dc=zpr,dc=policy
+cn: acme.partner.active
+objectClass: Partner
+type: partner
+company: GlobalDist
+active: true
+
+dn: cn=acme.partner.inactive,ou=Partner,dc=zpr,dc=policy
+cn: acme.partner.inactive
+objectClass: Partner
+type: partner
+company: RegionalCo
+active: false
+
+# ── Visitors ───────────────────────────────────────────────────────────────
+
+dn: cn=visitor.john,ou=Visitor,dc=zpr,dc=policy
+cn: visitor.john
+objectClass: Visitor
+type: visitor
+company: TechConf

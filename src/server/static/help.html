@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ZPR Policy Builder — User Guide</title>
+<title>ZPR Policy Playground — User Guide</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   :root {
@@ -84,13 +84,13 @@
 <!-- ── Main content ── -->
 <main>
 
-<h1>ZPR Policy Builder</h1>
+<h1>ZPR Policy Playground</h1>
 <p class="subtitle">User Guide &mdash; <a href="https://zpr.org" target="_blank">ZPR.org</a> &middot; Applied Invention, LLC</p>
 
 <!-- Overview -->
 <h2 id="overview">Overview</h2>
-<p>ZPR Policy Builder is a browser-based editor for writing and testing <strong>ZPL (Zero-trust Policy Language)</strong> policies. ZPL is defined in <a href="https://zpr.org" target="_blank">ZPR RFC-15.5</a> and provides a structured, human-readable way to express access control rules across services, users, and endpoints.</p>
-<p>With ZPR Policy Builder you can:</p>
+<p>ZPR Policy Playground is a browser-based editor for writing and testing <strong>ZPL (Zero-trust Policy Language)</strong> policies. ZPL is defined in <a href="https://zpr.org" target="_blank">ZPR RFC-15.5</a> and provides a structured, human-readable way to express access control rules across services, users, and endpoints.</p>
+<p>With ZPR Policy Playground you can:</p>
 <ul>
   <li>Write ZPL directly in an editor and see parsed classes, entities, and rules instantly</li>
   <li>Organize policies into a namespace tree with delegated ownership</li>
@@ -180,7 +180,7 @@
 <!-- Writing ZPL -->
 <h2 id="writing-zpl">Writing ZPL</h2>
 <p>ZPL uses four statement types: <code>Define</code>, <code>Allow</code>, <code>Never allow</code>, and <code>Declare</code>*.</p>
-<p style="font-size:0.83rem;color:var(--muted)">* <code>Declare</code> is a ZPR Policy Builder extension — see the <a href="#entities">Entities</a> section below.</p>
+<p style="font-size:0.83rem;color:var(--muted)">* <code>Declare</code> is a ZPR Policy Playground extension — see the <a href="#entities">Entities</a> section below.</p>
 
 <h3>Defining Classes</h3>
 <pre><code>Define employee as a user with an ID-number, roles
@@ -216,7 +216,7 @@ Define internet-gateway as a gateway with external-network-connection:public-int
 <!-- Entities -->
 <h2 id="entities">Entities</h2>
 <p>Entities are named instances of ZPL classes — concrete subjects and objects that exist in your actual environment. For example, <code>Alice</code> as a <code>warehouse-manager</code> with <code>department: operations</code>, or <code>Payroll-DB</code> as a <code>database</code> with <code>tags: financial</code>.</p>
-<div class="note"><strong>Note:</strong> In a production ZPR deployment, entity instances are typically defined in an external directory such as LDAP or Active Directory — not in ZPL policy text. The <code>Declare</code> statement is a ZPR Policy Builder extension added specifically to facilitate simulated rule testing. It lets you describe a small set of named instances directly in the policy editor so that the test generator can produce realistic, entity-specific test cases without requiring a live directory integration.</div>
+<div class="note"><strong>Note:</strong> In a production ZPR deployment, entity instances are typically defined in an external directory such as LDAP or Active Directory — not in ZPL policy text. The <code>Declare</code> statement is a ZPR Policy Playground extension added specifically to facilitate simulated rule testing. It lets you describe a small set of named instances directly in the policy editor so that the test generator can produce realistic, entity-specific test cases without requiring a live directory integration.</div>
 
 <h3>Creating Entities</h3>
 <p>Click the <strong>Entities</strong> tab in the staging input zone. The textarea switches to entity mode — type one or more <code>Declare</code> statements and click <strong>Save</strong>:</p>
@@ -387,7 +387,7 @@ Declare Payroll-DB as a database with tags: financial, employee.</code></pre>
 
 <h2 id="release-notes">Release Notes &amp; ZPL Extensions</h2>
 
-<p>ZPR Policy Builder v3 implements RFC-15.5 ZPL with the following documented extensions.</p>
+<p>ZPR Policy Playground v3 implements RFC-15.5 ZPL with the following documented extensions.</p>
 
 <h3>Extension 1 — <code>attr:value</code> filters in Allow / Never rules</h3>
 <p><strong>RFC-15.5 baseline:</strong> rule qualifiers support bare tag words only.<br>
@@ -426,7 +426,7 @@ Never allow Ted to read payroll-system.</code></pre>
 YAML and LDIF entity files can still be imported via the Entities tab in the Definitions panel; imported entities are automatically converted to <code>Declare</code> statements and merged into the namespace ZPL — duplicates are deduplicated on save.</p>
 
 <p style="margin-top:2.5rem;font-size:0.78rem;color:var(--muted)">
-  ZPR Policy Builder &mdash; Applied Invention, LLC &mdash; <a href="https://zpr.org" target="_blank">zpr.org</a>
+  ZPR Policy Playground &mdash; Applied Invention, LLC &mdash; <a href="https://zpr.org" target="_blank">zpr.org</a>
 </p>
 
 </main>

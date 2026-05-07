@@ -1,0 +1,122 @@
+# Acme Corporation — Sample Entities
+# Matches Simple_Acme_Policy.md
+# Import via Policy Editor ↑↓ → Import entities (.ldif) or via Entities tab YAML menu
+
+entities:
+
+  # ── Employees ───────────────────────────────────────────────────────────────
+  - name: alice.chen
+    class_name: Employee
+    attributes:
+      employee_id: "E-1001"
+      department: legal
+      role: associate
+
+  - name: bob.martinez
+    class_name: Employee
+    attributes:
+      employee_id: "E-1002"
+      department: sales
+      role: manager
+
+  - name: carol.kim
+    class_name: Employee
+    attributes:
+      employee_id: "E-1003"
+      department: admin
+      role: engineer
+
+  - name: david.osei
+    class_name: Employee
+    attributes:
+      employee_id: "E-1004"
+      department: legal
+      on-leave: "true"
+
+  # ── Executives ──────────────────────────────────────────────────────────────
+  - name: priya.sharma
+    class_name: Executive
+    attributes:
+      role: SVP
+
+  - name: sofia.reyes
+    class_name: Executive
+    attributes:
+      role: SVP
+
+  - name: james.wu
+    class_name: Executive
+    attributes:
+      role: EVP
+
+  - name: raj.patel
+    class_name: Executive
+    attributes:
+      role: CEO
+
+  # ── Legal Staff ─────────────────────────────────────────────────────────────
+  - name: alice.chen
+    class_name: LegalStaff
+    attributes:
+      department: legal
+      role: associate
+
+  - name: fatima.noor
+    class_name: LegalStaff
+    attributes:
+      department: legal
+      role: counsel
+
+  # ── Sales Reps ──────────────────────────────────────────────────────────────
+  - name: bob.martinez
+    class_name: SalesRep
+    attributes:
+      department: sales
+      region: west
+
+  - name: leo.santos
+    class_name: SalesRep
+    attributes:
+      department: sales
+      region: east
+
+  # ── Admin Staff ─────────────────────────────────────────────────────────────
+  - name: carol.kim
+    class_name: AdminStaff
+    attributes:
+      department: admin
+
+  # ── Auditors ────────────────────────────────────────────────────────────────
+  - name: ernst.audit
+    class_name: Auditor
+    attributes:
+      type: auditor
+      audit_scope: legal
+
+  - name: kpmg.audit
+    class_name: Auditor
+    attributes:
+      type: auditor
+      audit_scope: finance
+
+  # ── Partners ────────────────────────────────────────────────────────────────
+  - name: acme.partner.active
+    class_name: Partner
+    attributes:
+      type: partner
+      company: GlobalDist
+      active: "true"
+
+  - name: acme.partner.inactive
+    class_name: Partner
+    attributes:
+      type: partner
+      company: RegionalCo
+      active: "false"
+
+  # ── Visitors ────────────────────────────────────────────────────────────────
+  - name: visitor.john
+    class_name: Visitor
+    attributes:
+      type: visitor
+      company: TechConf

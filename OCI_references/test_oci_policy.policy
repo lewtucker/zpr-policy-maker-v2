@@ -1,0 +1,72 @@
+# OCI ZPR Test Policy
+# Add examples below to exercise the translator.
+# Blank lines and # comments are preserved in the output.
+
+# ── Form 1: single VCN (prefix) ─────────────────────────────────────────────
+
+# Basic endpoint-to-endpoint
+in app:fin-network VCN allow app:web endpoints to connect to app:store endpoints
+
+# Dotted namespace
+in applications.apps:app1 VCN allow apps:frontend endpoints to connect to apps:backend endpoints
+
+# CIDR source
+in applications.apps:app1 VCN allow '10.0.0.0/16' to connect to apps:app1 endpoints
+
+# CIDR destination
+in front-end:network VCN allow loadbalancer:web endpoints to connect to '0.0.0.0/0'
+
+# OCI services (OSN magic literal)
+in VCN-Network:DB VCN allow db:DB-Server endpoints to connect to 'osn-services-ip-addresses'
+
+# With protocol filter — single port
+in networks:net1 VCN allow compute:instance1 endpoints to connect to compute:instance2 endpoints with protocol='tcp/22'
+
+# With protocol filter — port range
+in VCN-Network:DB VCN allow App:App1 to connect to DB-Server:App1 endpoints with protocol='tcp/999-11199'
+
+# With multiple filters — comma syntax
+in finance.network:prod VCN allow app:frontend endpoints to connect to database:server endpoints with protocol='tcp/1521', connection-state='stateless'
+
+# ── Form 2: cross-VCN (inline) ───────────────────────────────────────────────
+
+# No filter, two VCNs
+allow applications.app:webserver endpoints in applications.vcn:A VCN to connect to database.database:MySQL endpoints in database.vcn:B VCN
+
+# SSH across peered VCNs
+allow compute:instance1 endpoints in networks:net1 VCN to connect to compute:instance2 endpoints with protocol='tcp/22' in networks:net2 VCN
+
+# SQLNet across peered VCNs
+allow compute:instance1 endpoints in networks:net1 VCN to connect to db:DB-Server endpoints with protocol='tcp/1521' in VCN-Network:DB VCN
+
+# Three-part attribute (namespace:key:value form)
+allow networks:net1:App1 endpoints in networks:net1 VCN to connect to DB-Server:App1 endpoints in networks:net2 VCN
+
+# Repeated 'with' syntax (equivalent to comma syntax)
+allow app:frontend endpoints in finance.network:dev VCN to connect to database:server endpoints with protocol='tcp/1521' with connection-state='stateless' in finance.network:prod VCN
+
+# Port range cross-VCN
+allow App:App1 endpoints in VCN-Network:App VCN to connect to DB-Server:App1 endpoints with protocol='tcp/999-11199' in VCN-Network:DB VCN
+
+# Remote VCN peering
+allow DB-client:App1 endpoints in VCN-Network:DB VCN to connect to DB-client:app1 endpoints with protocol='tcp/1521' in VCN-Network:Remote VCN
+
+# ── Miscellaneous ────────────────────────────────────────────────────────────
+
+# HR application data
+in networks:application VCN allow apps:hr-apps endpoints to connect to apps:hr-app-data endpoints
+
+# Trusted internal hosts
+in networks:internal VCN allow hosts:trusted endpoints to connect to data:sensitive endpoints
+
+# NLB ingress
+in my:VCN VCN allow '0.0.0.0/0' to connect to XYZ-NLB:NLB1 endpoints
+
+# NLB to app servers
+in my:VCN VCN allow XYZ-NLB:NLB1 endpoints to connect to ABC-web-servers:app1 endpoints
+
+# OCI Cache / Redis
+in my:VCN VCN allow compute:instance1 endpoints to connect to redis:cluster1 endpoints
+
+# Private service access
+in vcn:A VCN allow app:dbs endpoints to connect to svc:dbs endpoints with protocol='tcp/443'

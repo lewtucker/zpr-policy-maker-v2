@@ -4,11 +4,20 @@
 
 ## Prompt: Guidence for making ZPL rules
 
-Acme Corporation operates a large enterprise datacenter serving employees across six departments: HR, Finance, Engineering, Legal, Sales, and Administration. Users range from full-time employees and managers to executives (CEO, SVP, EVP), interns, external partners, and auditors. Resources and services include sensitive databases (payroll, employee records, revenue tracking), legal archives (patent library), customer-facing systems, and engineering development infrastructure. These services should only be accessible to employees in the corresponding department or the senior executives.  Servers running these apps are endpoints with a classification level of:  `confidential` for legal and financial, `corporate` for general employees, and 'development' for engineering and administration.   Map the services, such as databases, to run on appropriately named servers as endpoints, so there are simple ways to restrict access.
+Acme Corporation operates a large enterprise datacenter serving employees across six departments: HR, Finance, Engineering, Legal, Sales, and Administration. Users range from full-time employees and managers to executives (CEO, SVP, EVP), interns, external partners, and auditors. Resources and services include sensitive databases (payroll, employee records, revenue tracking), legal archives (patent library), customer-facing systems, and engineering development infrastructure. These services should only be accessible to employees in the corresponding department or the senior executives.  Servers running these apps are endpoints with a classification level of:  `confidential` for legal and financial, `corporate` for general employees, and 'development' for engineering and administration.   Map the services, such as databases, to run on appropriately named servers as endpoints, so there are simple ways to restrict access. 
 
 The ZPL policy enforces least-privilege access using allow-only rules: each department's namespace defines the classes and rules relevant to its systems, and the default verdict is deny for anything not explicitly allowed. Namespace owners (department heads) are responsible for maintaining their policies. Cross-cutting concerns — executive access and auditor read rights — are expressed as explicit allow rules within each namespace.
 
 When making rules, after defining the users, services, and endpoints it's advisable to start with a service designed for a particular department, determine who should have access and then make rules that seem reasonable.  It's ok if some users won't have any access, such as visitors which only have access to a corporate directory to look up employees.
+
+
+A hint on the use of Never Allow rules.  In general things are easier when only Allow rules are made, but when it's necessary to block only some employees from something broadly accessed, two rules can be used.  For example, if we wanted to give all employees access to benefits except those in the state of Tennessee, we could do that as follows:
+ - Allow employees with employee_id: to access benefits
+ - Never allow employees with state:Tennessee to access benefits
+
+This lets only employees with an employee_id access benefits while narrowly blocking those employees that either lack a employee_id or are in the state of Tennessee.
+
+
 
 Try to make this based on a realistic scenario of what might go on in a corporation or business.
 
@@ -92,6 +101,7 @@ Allow Auditor with audit_scope:hr to access HRDatabase on HRServer.
 Allow HRStaff to access TimesheetSystem.
 Allow Employee to access TimesheetSystem.
 Allow Intern to access TimesheetSystem.
+Never allow Employee with on-leave:true to access TimesheetSystem.
 Allow HRStaff to access OnboardingPortal.
 Allow Manager to access OnboardingPortal.
 ```
@@ -126,6 +136,7 @@ Allow Executive with role:{CEO, SVP} to access RevenueTracker on FinanceServer.
 Allow Auditor with audit_scope:finance to access RevenueTracker on FinanceServer.
 Allow Employee to access ExpenseSystem.
 Allow Manager to access ExpenseSystem.
+Never allow Employee with on-leave:true to access ExpenseSystem.
 ```
 
 ---
@@ -149,11 +160,13 @@ Define LegalServer as a server with classification:confidential, location, os.
 
 ```zpl
 Allow LegalStaff to access PatentLibrary on LegalServer.
-Allow Executive with role:{CEO, SVP} to access PatentLibrary on LegalServer.
+Allow Executive to access PatentLibrary on LegalServer.
+Never allow Executive with role:EVP to access PatentLibrary on LegalServer.
 Allow Auditor with audit_scope:legal to access PatentLibrary on LegalServer.
 Allow LegalStaff to access ContractRepository on LegalServer.
 Allow Manager with department:legal to access ContractRepository on LegalServer.
-Allow Executive with role:{CEO, SVP} to access ContractRepository on LegalServer.
+Allow Executive to access ContractRepository on LegalServer.
+Never allow Executive with role:EVP to access ContractRepository on LegalServer.
 ```
 
 ---
@@ -237,7 +250,8 @@ Define CorporateServer as a server with classification:corporate, location, os.
 Allow AdminStaff to access ITDashboard on AdminServer.
 Allow Manager with department:admin to access ITDashboard on AdminServer.
 Allow AdminStaff to access MonitoringSystem on AdminServer.
-Allow Executive with role:{CEO, SVP} to access MonitoringSystem on AdminServer.
+Allow Executive to access MonitoringSystem on AdminServer.
+Never allow Executive with role:EVP to access MonitoringSystem on AdminServer.
 Allow Employee to access CorporateDirectory on CorporateServer.
 Allow Visitor to access CorporateDirectory on CorporateServer.
 Allow Partner to access CorporateDirectory on CorporateServer.
@@ -255,8 +269,8 @@ Allow Partner to access CorporateDirectory on CorporateServer.
 | Server classes    | 7     |
 | **Total classes** | **32**|
 | Allow rules       | 44    |
-| Never rules       | 0     |
-| **Total rules**   | **44**|
+| Never rules       | 5     |
+| **Total rules**   | **49**|
 
 ### Namespace Owners
 

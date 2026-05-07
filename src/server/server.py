@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -88,6 +89,7 @@ import random as _random
 import re as _re
 
 import ai_client
+import oci_translator
 from zpl_engine import CheckRequest, Entity, Rule, ZPLEngine
 from class_schema import ClassSchema
 
@@ -514,6 +516,8 @@ class MatchRequest(BaseModel):
     object_class: str = "services"
     object_name: str | None = None
     object_attrs: dict = {}
+    server_class: str | None = None
+    server_attrs: dict = {}
 
 
 @app.post("/api/match")
@@ -543,6 +547,8 @@ async def match_rule(req: MatchRequest, session: dict = Depends(get_session_or_t
         verb=req.action,
         accessor_endpoint=Entity(class_name=req.accessor_class, attrs=req.accessor_attrs)
             if req.accessor_class else None,
+        server_endpoint=Entity(class_name=req.server_class, attrs=req.server_attrs)
+            if req.server_class else None,
     )
     try:
         result = ZPLEngine(rules, schema).evaluate(check)
@@ -573,6 +579,8 @@ _PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 @app.get("/api/prompts/{key}")
 async def get_prompt(key: str, _: dict = Depends(get_session)):
+    if key == "studio":
+        return {"key": key, "content": _STUDIO_SYSTEM_TEMPLATE}
     content = await db.get_prompt(key)
     if content is None:
         path = _PROMPTS_DIR / f"{key}.md"
@@ -668,7 +676,7 @@ _ADVERSARIAL_VERBS = ["read", "write", "access", "use", "execute", "delete", "cr
 
 
 def _base_payload(rule) -> dict:
-    s, o, ae = rule.subject, rule.object, rule.accessor_endpoint
+    s, o, ae, se = rule.subject, rule.object, rule.accessor_endpoint, rule.server_endpoint
     p: dict = {
         "subject_class": s.cls if s and s.cls else "users",
         "subject_attrs": dict(s.attrs) if s and s.attrs else {},
@@ -679,6 +687,9 @@ def _base_payload(rule) -> dict:
     if ae and ae.cls:
         p["accessor_class"] = ae.cls
         p["accessor_attrs"] = dict(ae.attrs) if ae.attrs else {}
+    if se and se.cls:
+        p["server_class"] = se.cls
+        p["server_attrs"] = dict(se.attrs) if se.attrs else {}
     return p
 
 
@@ -716,6 +727,10 @@ def _check_req_from_payload(payload: dict) -> CheckRequest:
             class_name=p["accessor_class"],
             attrs=p.get("accessor_attrs") or {},
         ) if p.get("accessor_class") else None,
+        server_endpoint=Entity(
+            class_name=p["server_class"],
+            attrs=p.get("server_attrs") or {},
+        ) if p.get("server_class") else None,
     )
 
 
@@ -1075,6 +1090,16 @@ class AdversarialRequest(BaseModel):
     n_adversarial: int = 8
 
 
+async def _get_subtree_entities(root_ns_id: str) -> list[dict]:
+    """Return all entities from root_ns_id and every descendant namespace."""
+    tree = await db.get_namespace_tree(root_ns_id)
+    ns_ids = [n["id"] for n in _flatten_tree_nodes(tree)]
+    entities: list[dict] = []
+    for nid in ns_ids:
+        entities.extend(await db.get_entities(nid))
+    return entities
+
+
 def _entity_matches_class(entity: dict, cls_name: str, schema: "ClassSchema") -> bool:
     """True if entity.class_name is cls_name or a subclass of it."""
     ecn = entity["class_name"]
@@ -1090,7 +1115,7 @@ def _entity_matches_class(entity: dict, cls_name: str, schema: "ClassSchema") ->
 
 def _entity_payload(rule, subj_entity: dict | None, obj_entity: dict | None) -> dict:
     """Build a test payload using the rule's qualified class names but entity name/attrs."""
-    s, o, ae = rule.subject, rule.object, rule.accessor_endpoint
+    s, o, ae, se = rule.subject, rule.object, rule.accessor_endpoint, rule.server_endpoint
     # Always keep the rule's qualified class name so the engine can resolve it.
     # The entity contributes its name and attributes only.
     p: dict = {
@@ -1107,6 +1132,9 @@ def _entity_payload(rule, subj_entity: dict | None, obj_entity: dict | None) -> 
     if ae and ae.cls:
         p["accessor_class"] = ae.cls
         p["accessor_attrs"] = dict(ae.attrs) if ae.attrs else {}
+    if se and se.cls:
+        p["server_class"] = se.cls
+        p["server_attrs"] = dict(se.attrs) if se.attrs else {}
     return p
 
 
@@ -1117,9 +1145,14 @@ async def generate_tests_from_entities(req: AdversarialRequest,
         raise HTTPException(503, "ANTHROPIC_API_KEY not set")
 
     ns_id = session["active_user_id"]
-    entities = await db.get_entities(ns_id)
+    # Use the full tree (root → all descendants) so that root-level entities (e.g.
+    # Acme.Employee) are available even when a sub-namespace is active.
+    login_user_id = session["login_user_id"]
+    root_ns = await db.get_root_namespace(login_user_id)
+    entity_root = root_ns["id"] if root_ns else ns_id
+    entities = await _get_subtree_entities(entity_root)
     if not entities:
-        raise HTTPException(422, "No entities found in this namespace. Add entities first.")
+        raise HTTPException(422, "No entities found in this namespace or its descendants. Add entities first.")
 
     ps_parsed = await _merged_policy_set(ns_id)
     if not ps_parsed:
@@ -1425,7 +1458,7 @@ async def analyze_namespace(req: AnalyzeRequest, session: dict = Depends(get_ses
     user_message = prompt_path.read_text().replace("{zpl_text}", combined_zpl)
 
     model = ai_client.ANTHROPIC_MODEL if req.deep else "claude-haiku-4-5-20251001"
-    max_tokens = 4096 if req.deep else 2048
+    max_tokens = 8192 if req.deep else 4096
 
     try:
         raw = ai_client.complete(
@@ -1439,11 +1472,24 @@ async def analyze_namespace(req: AnalyzeRequest, session: dict = Depends(get_ses
         raise HTTPException(500, f"AI call failed: {exc}")
 
     text = raw.strip()
+    # Strip markdown fences if present
     text = _re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=_re.DOTALL).strip()
     try:
         result = _json.loads(text)
     except Exception:
-        raise HTTPException(500, "AI returned invalid JSON")
+        # Fallback: extract outermost {...} block in case of leading/trailing prose
+        m = _re.search(r'\{.*\}', text, flags=_re.DOTALL)
+        if m:
+            try:
+                result = _json.loads(m.group())
+            except Exception:
+                import sys
+                print(f"[audit] JSON parse failed. Raw response:\n{text[:500]}", file=sys.stderr)
+                raise HTTPException(500, "AI returned invalid JSON")
+        else:
+            import sys
+            print(f"[audit] No JSON object found. Raw response:\n{text[:500]}", file=sys.stderr)
+            raise HTTPException(500, "AI returned invalid JSON")
 
     return {"namespace": ns_name, "result": result}
 
@@ -1985,6 +2031,20 @@ async def import_zpl_markdown(req: ImportMarkdownRequest, session: dict = Depend
             "results": results}
 
 
+async def _sync_entities_from_zpl(ns_id: str, zpl_text: str) -> None:
+    """Parse entity declarations from ZPL text and sync them to namespace_entities table."""
+    try:
+        raw = zpl_parser.parse(zpl_text)
+        entities = raw.get("entities", [])
+        if not entities:
+            return
+        await db.delete_all_entities(ns_id)
+        for e in entities:
+            await db.create_entity(ns_id, e.get("class_name", ""), e.get("name", ""), e.get("attributes", {}))
+    except Exception:
+        pass
+
+
 async def _merge_entities_into_zpl(ns_id: str, new_entities: list[dict]) -> None:
     """Merge new entities into the stored ZPL, deduplicating by (name, class_name)."""
     existing = await db.get_namespace_zpl(ns_id) or ""
@@ -2068,6 +2128,27 @@ async def save_namespace_zpl(req: SaveNamespaceZplRequest, session: dict = Depen
     if root_ns_id:
         _cache_invalidate(root_ns_id)
     return {"ok": True}
+
+
+@app.post("/api/namespace/zpl/clear-tree")
+async def clear_zpl_tree(session: dict = Depends(get_session)):
+    """Clear ZPL for all namespaces in the login user's tree (root + all descendants)."""
+    login_user_id = session["login_user_id"]
+    root_ns = await db.get_root_namespace(login_user_id)
+    if not root_ns:
+        raise HTTPException(404, "Root namespace not found")
+    tree = await db.get_namespace_tree(root_ns["id"])
+
+    def _collect_ids(node: dict) -> list[str]:
+        ids = [node["id"]]
+        for child in node.get("children", []):
+            ids.extend(_collect_ids(child))
+        return ids
+
+    ns_ids = _collect_ids(tree)
+    for ns_id in ns_ids:
+        await db.save_namespace_zpl(ns_id, "")
+    return {"cleared": len(ns_ids)}
 
 
 # ── Parse ─────────────────────────────────────────────────────────────────────
@@ -2156,6 +2237,27 @@ async def validate_text(req: ParseRequest, _: dict = Depends(get_session)):
     else:
         raise HTTPException(400, f"Unknown language: {req.language!r}")
     return {"language": lang, "errors": errors, "valid": len(errors) == 0}
+
+
+# ── OCI ZPR translator ───────────────────────────────────────────────────────
+
+@app.post("/api/translate/oci")
+async def translate_oci(file: UploadFile = File(...), _: dict = Depends(get_session)):
+    """Translate an OCI ZPR policy file.
+
+    Returns JSON with two keys:
+      markdown    — Markdown guide explaining each translation step
+      policy_json — Policy Studio restore payload (POST /api/restore compatible)
+    """
+    content = await file.read()
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
+    return {
+        "markdown": oci_translator.oci_to_markdown(text),
+        "policy_json": oci_translator.oci_to_policy_json(text),
+    }
 
 
 # ── .zplc import ─────────────────────────────────────────────────────────────
@@ -2952,6 +3054,286 @@ async def assist_generate_rules(req: GenerateRulesRequest, session: dict = Depen
 
 
 # ── SPA ───────────────────────────────────────────────────────────────────────
+
+# ── Policy Studio: backup / restore / generate ───────────────────────────────
+
+def _flatten_tree(node: dict, path: list[str]) -> list[dict]:
+    """Return list of {id, path} for every node in the tree (BFS order)."""
+    result = [{"id": node["id"], "path": path.copy()}]
+    for child in node.get("children", []):
+        result.extend(_flatten_tree(child, path + [child["display_name"]]))
+    return result
+
+
+@app.post("/api/yaml/preview")
+async def yaml_preview(file: UploadFile = File(...), _session: dict = Depends(get_session)):
+    """Parse an uploaded YAML file and return its content as JSON for client-side rendering."""
+    import yaml as _yaml
+    raw = await file.read()
+    try:
+        data = _yaml.safe_load(raw)
+    except Exception as exc:
+        raise HTTPException(400, f"Invalid YAML: {exc}")
+    return {"filename": file.filename or "file.yaml", "data": data}
+
+
+@app.post("/api/ldif/preview")
+async def ldif_preview(file: UploadFile = File(...), _session: dict = Depends(get_session)):
+    """Parse an uploaded LDIF file and return entities as JSON for client-side rendering."""
+    raw = (await file.read()).decode("utf-8", errors="replace")
+    entries = []
+    current: dict | None = None
+    for line in raw.splitlines():
+        line = line.rstrip()
+        if line.startswith("dn:"):
+            if current:
+                entries.append(current)
+            current = {"name": "", "class_name": "", "attributes": {}}
+        elif current is None:
+            continue
+        elif line == "":
+            if current:
+                entries.append(current)
+            current = None
+        elif ":" in line:
+            key, _, val = line.partition(":")
+            key, val = key.strip(), val.strip()
+            if key == "cn":
+                current["name"] = val
+            elif key == "objectClass":
+                current["class_name"] = val
+            elif key not in ("dn",):
+                current["attributes"][key] = val
+    if current:
+        entries.append(current)
+    # Filter out incomplete entries (comments-only blocks produce empty ones)
+    data = [e for e in entries if e.get("name") or e.get("class_name")]
+    return {"filename": file.filename or "file.ldif", "data": data}
+
+
+@app.get("/api/backup")
+async def backup_workspace(session: dict = Depends(get_session)):
+    """Return the full namespace tree + ZPL as a JSON backup."""
+    user_id = session["login_user_id"]
+    root_ns = await db.get_root_namespace(user_id)
+    if not root_ns:
+        return {"format_version": 1, "saved_at": datetime.now(timezone.utc).isoformat(),
+                "namespaces": []}
+    tree = await db.get_namespace_tree(root_ns["id"])
+    nodes = _flatten_tree(tree, [])
+    zpl_map = await db.get_namespace_zpl_batch([n["id"] for n in nodes])
+    return {
+        "format_version": 1,
+        "saved_at": datetime.now(timezone.utc).isoformat(),
+        "namespaces": [{"path": n["path"], "zpl": zpl_map.get(n["id"], "")} for n in nodes],
+    }
+
+
+class RestoreRequest(BaseModel):
+    format_version: int = 1
+    namespaces: list[dict] = []
+    saved_at: str | None = None
+
+
+@app.post("/api/restore")
+async def restore_workspace(req: RestoreRequest, session: dict = Depends(get_session)):
+    """Wipe the current namespace tree and recreate it from backup JSON."""
+    user_id = session["login_user_id"]
+    root_ns = await db.get_root_namespace(user_id)
+    if not root_ns:
+        raise HTTPException(404, "No root namespace found")
+    root_id = root_ns["id"]
+
+    # Delete all children of root (cascade), leave root itself
+    tree = await db.get_namespace_tree(root_id)
+    for child in tree.get("children", []):
+        await db.delete_namespace_cascade(child["id"])
+
+    # path-tuple → namespace_id as we create them
+    path_to_id: dict[tuple, str] = {(): root_id}
+
+    # If AI generates path=[RootName] instead of path=[], merge it into root.
+    # This collapses the double-nesting pattern and lets child paths resolve correctly.
+    root_display = (root_ns.get("display_name") or "").strip()
+    root_zpl_parts: list[str] = []
+
+    sorted_ns = sorted(req.namespaces, key=lambda n: len(n.get("path") or []))
+    restored = 0
+    for entry in sorted_ns:
+        path = entry.get("path") or []
+        zpl = entry.get("zpl") or ""
+        if not path:
+            # Explicit root ZPL
+            if zpl.strip():
+                root_zpl_parts.append(zpl.strip())
+            restored += 1
+            continue
+        # Collapse path=[RootName] into root (AI double-nesting / flat-but-split pattern)
+        if path == [root_display]:
+            if zpl.strip():
+                root_zpl_parts.append(zpl.strip())
+            path_to_id[(root_display,)] = root_id  # children of this path → root children
+            restored += 1
+            continue
+        parent_path = tuple(path[:-1])
+        parent_id = path_to_id.get(parent_path)
+        if not parent_id:
+            continue  # orphan — skip
+        new_ns = await db.create_namespace(path[-1], user_id, parent_namespace_id=parent_id)
+        ns_id = new_ns["id"]
+        path_to_id[tuple(path)] = ns_id
+        if zpl.strip():
+            await db.save_namespace_zpl(ns_id, zpl)
+            await _sync_entities_from_zpl(ns_id, zpl)
+        restored += 1
+
+    # Write merged root ZPL and sync its entities
+    root_zpl = "\n\n".join(root_zpl_parts)
+    await db.save_namespace_zpl(root_id, root_zpl)
+    if root_zpl.strip():
+        await _sync_entities_from_zpl(root_id, root_zpl)
+
+    return {"ok": True, "namespaces_restored": restored}
+
+
+class GeneratePolicyRequest(BaseModel):
+    description: str
+    root_display_name: str = "Org"
+    structure_instructions: str = ""
+
+
+_STUDIO_SYSTEM_TEMPLATE = """You are a ZPL (Zero-trust Policy Language) policy architect. Given an organization description, generate a complete, realistic namespace-structured ZPL policy.
+
+The user's root namespace display name is: ROOT_NS
+
+ZPL SYNTAX REFERENCE:
+- Class definition: Define ClassName as a user|service|server|endpoint with attr1, attr2, optional attr3.
+- Subclass: Define Manager as a Employee with role:manager.
+- Multi-value attr: Define Executive as a user with role:{CEO, SVP, EVP}.
+- Allow rule: Allow SubjectClass to action ObjectClass on ServerClass.
+- Never Allow: Never allow SubjectClass with attr:value to action ObjectClass.
+- Presence check (attr must exist): Allow Employee with employee_id: to access benefits.
+- Server-bound rules: Allow HRStaff to access HRDatabase on HRServer.
+- Entity instance: declare <Name> as a <ClassName> with key: value, key: value.
+  Example: declare Alice as a Employee with department: marketing, employee_id: alice001.
+  Example: declare PayrollDB as a PayrollService with env: production.
+  Use entities when the description names specific people, systems, or resources.
+
+NAMESPACE STRUCTURE — flat two-level model (no intermediate org wrapper):
+- path=[] → root namespace. Holds ONLY company-wide base person types. ZPL prefix is "ROOT_NS."
+- path=["DeptName"] → department namespace, direct child of root. ZPL prefix is "DeptName."
+  Cross-references to root classes MUST use the root prefix "ROOT_NS.":
+  Example: "Allow ROOT_NS.Executive to access HR.HRDatabase on HR.HRServer."
+
+ROOT NAMESPACE RULE — CRITICAL:
+The path=[] namespace contains ONLY the org-wide base person types that every department shares:
+  Employee, Executive/Manager/Intern (role-based), Auditor, Partner, Visitor — and their equivalents.
+NEVER put these in a department namespace. Even though HR administers employees, ROOT_NS.Employee
+is NOT an HR class — it belongs in path=[] because all departments reference it.
+Each department namespace defines only its OWN staff subclass (e.g. HR.HRStaff), its services,
+its servers, and its access rules. It references the root base classes via ROOT_NS. prefix.
+
+NEVER ALLOW PATTERN — use when all-but-some need access:
+  Allow ROOT_NS.Employee to access HR.TimesheetSystem.
+  Never allow ROOT_NS.Employee with on-leave:true to access HR.TimesheetSystem.
+
+SERVER CLASSIFICATION PATTERN:
+- Define servers with a classification attribute (confidential, corporate, development)
+- Bind sensitive service access to appropriately classified servers using "on ServerClass"
+- Confidential services use "on DeptServer" constraint; broadly-accessible corporate services may omit it
+
+DESIGN GUIDELINES:
+- Root (path=[]): Employee, Executive, Manager, Intern, Auditor, Partner, Visitor — these only
+- Each dept (path=["Dept"]): DeptStaff subclass + services + servers + rules referencing ROOT_NS. base classes
+- Apply Never Allow rules for narrow exceptions (on-leave blocking, role exclusions, etc.)
+- Write 5–10 rules per department; keep them concrete and purposeful
+- Use realistic dept names that match the org description
+- If the description names specific people, systems, or resources: declare them as entity instances in the appropriate namespace ZPL, after the class and rule definitions
+
+OUTPUT FORMAT — return EXACTLY this JSON structure inside <POLICY> tags:
+<POLICY>
+{
+  "format_version": 1,
+  "description": "exact copy of the user's organization description",
+  "rationale": {
+    "intro": "One paragraph: what this organisation is, what it does, and why a ZPL policy is appropriate.",
+    "design": "One paragraph: overall design philosophy — who needs what access, which assets are sensitive, how the namespace structure reflects the org structure.",
+    "summary": "One sentence listing totals: e.g. 'We defined 5 user classes, 8 service classes, 3 servers, and 22 rules across 4 namespaces.'",
+    "rules": [
+      { "rule": "Allow HR.HRStaff to access HR.HRDatabase on HR.HRServer.", "reasoning": "HR staff need daily access to employee records to do their jobs; binding this to the confidential HRServer limits exposure." }
+    ]
+  },
+  "namespaces": [
+    {
+      "path": [],
+      "zpl": "Define ROOT_NS.Employee as a user with employee_id, department, optional role, optional on-leave.\\nDefine ROOT_NS.Executive as a user with role:{CEO, SVP, EVP}.\\nDefine ROOT_NS.Auditor as a user with type:auditor, audit_scope, optional firm.\\nDefine ROOT_NS.Partner as a user with type:partner, company, active.\\nDefine ROOT_NS.Visitor as a user with type:visitor, optional company."
+    },
+    {
+      "path": ["HR"],
+      "zpl": "Define HR.HRStaff as a user with department:hr, optional role.\\nDefine HR.HRDatabase as a service with classification:confidential, env.\\nDefine HR.TimesheetSystem as a service with classification:corporate, env.\\nDefine HR.HRServer as a server with classification:confidential, location, os.\\nAllow HR.HRStaff to access HR.HRDatabase on HR.HRServer.\\nAllow ROOT_NS.Executive with role:CEO to access HR.HRDatabase on HR.HRServer.\\nAllow ROOT_NS.Auditor with audit_scope:hr to access HR.HRDatabase on HR.HRServer.\\nAllow HR.HRStaff to access HR.TimesheetSystem.\\nAllow ROOT_NS.Employee to access HR.TimesheetSystem.\\nNever allow ROOT_NS.Employee with on-leave:true to access HR.TimesheetSystem."
+    },
+    {
+      "path": ["Finance"],
+      "zpl": "Define Finance.FinanceStaff as a user with department:finance, optional role.\\nDefine Finance.PayrollService as a service with classification:confidential, env.\\nDefine Finance.FinanceServer as a server with classification:confidential, location, os.\\nAllow Finance.FinanceStaff to access Finance.PayrollService on Finance.FinanceServer.\\nAllow ROOT_NS.Executive with role:CEO to access Finance.PayrollService on Finance.FinanceServer.\\nAllow ROOT_NS.Auditor with audit_scope:finance to access Finance.PayrollService on Finance.FinanceServer."
+    }
+  ]
+}
+</POLICY>
+
+DEFAULT STRUCTURE (use unless the user's STRUCTURE OVERRIDE says otherwise):
+- NEVER create a path=["ROOT_NS"] intermediate level — departments go directly at path=["Dept"]
+- path=[] uses "ROOT_NS." prefix for all class names
+- path=["Dept"] uses "Dept." prefix for own classes; "ROOT_NS." prefix for root class references
+
+If the user provides a STRUCTURE OVERRIDE, follow it exactly — it takes precedence over the default structure above. Adjust namespace paths and ZPL prefixes accordingly.
+
+FLAT NAMESPACE EXAMPLE (when STRUCTURE OVERRIDE says "flat" or "single namespace" or "everything under root"):
+Return exactly ONE entry with path=[]. Put ALL class definitions AND all rules in that one entry.
+Use ROOT_NS. prefix for every class name — no other prefixes. No sub-namespace entries at all.
+{
+  "format_version": 1,
+  "description": "...",
+  "namespaces": [
+    {
+      "path": [],
+      "zpl": "Define ROOT_NS.Employee as a user with employee_id, department, optional role.\\nDefine ROOT_NS.Executive as a user with role:{CEO, SVP, EVP}.\\nDefine ROOT_NS.HRStaff as a user with department:hr.\\nDefine ROOT_NS.PayrollService as a service with classification:confidential, env.\\nDefine ROOT_NS.HRServer as a server with classification:confidential, location.\\nAllow ROOT_NS.HRStaff to access ROOT_NS.PayrollService on ROOT_NS.HRServer.\\nAllow ROOT_NS.Executive to access ROOT_NS.PayrollService on ROOT_NS.HRServer."
+    }
+  ]
+}
+
+ALWAYS:
+- In ZPL text, newlines must be \\n (JSON-escaped)
+- Copy the user's description verbatim into the "description" field
+- Do NOT include trailing periods in the JSON strings; each statement ends with "." already
+"""
+
+
+@app.post("/api/policy-studio/generate")
+async def generate_policy(req: GeneratePolicyRequest, session: dict = Depends(get_session)):
+    """Use Claude to generate a complete ZPL policy from an org description."""
+    if not ai_client.available():
+        raise HTTPException(503, "ANTHROPIC_API_KEY not set")
+    if not req.description.strip():
+        raise HTTPException(422, "description is required")
+    root_name = (req.root_display_name or "Org").strip()
+    system = _STUDIO_SYSTEM_TEMPLATE.replace("ROOT_NS", root_name)
+    user_msg = req.description.strip()
+    if req.structure_instructions.strip():
+        user_msg = f"STRUCTURE OVERRIDE: {req.structure_instructions.strip()}\n\n{user_msg}"
+    text = ai_client.complete(
+        system,
+        [{"role": "user", "content": user_msg}],
+        max_tokens=6000,
+        temperature=0.3,
+    )
+    blocks = ai_client.extract_json_blocks(text, "POLICY")
+    if not blocks:
+        raise HTTPException(422, "AI did not return a valid <POLICY> block")
+    policy = blocks[0]
+    if "namespaces" not in policy:
+        raise HTTPException(422, "Generated policy missing namespaces list")
+    return policy
+
 
 @app.get("/v2", response_class=HTMLResponse)
 async def spa_v2(request: Request):

@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "saved_at": "2026-05-07T00:03:17.375400+00:00",
+  "namespaces": [
+    {
+      "path": [],
+      "zpl": "Define zpl.Employee as a user with employee_id, department, optional role, optional seniority, optional trusted.\nDefine zpl.NewHire as a zpl.Employee with seniority:new.\nDefine zpl.SeniorEmployee as a zpl.Employee with seniority:senior, trusted:true.\nDefine zpl.Manager as a zpl.Employee with role:manager, trusted:true.\nDefine zpl.Visitor as a user with type:visitor, optional company."
+    },
+    {
+      "path": [
+        "Carwash"
+      ],
+      "zpl": "Define Carwash.CarwashStaff as an user with department:carwash, seniority and trusted.\nDefine Carwash.Basic_Wash as a service with classification:corporate and type:wash.\nDefine Carwash.Super_Wash as a service with classification:corporate and type:wash.\nDefine Carwash.Detailing as a service with classification:corporate and type:detailing.\nDefine Carwash.CashRegister as a service with classification:confidential and type:pos.\nDefine Carwash.StoreAccess as a service with classification:confidential and type:facility.\nDefine Carwash.CarwashServer as a server with classification:corporate, location:onsite and os:linux.\nDefine perform as a verb.\nDefine operate as a verb.\n\nDeclare Bob as a zpl.SeniorEmployee with employee_id: bob001, department: carwash, seniority: senior, trusted: true.\nDeclare Ted as a zpl.NewHire with employee_id: ted001, department: carwash, seniority: new, trusted: false.\nDeclare Alice as a zpl.Manager with employee_id: alice001, department: carwash, role: manager, trusted: true.\n\nAllow zpl.Employee to perform Carwash.Basic_Wash.\nAllow zpl.SeniorEmployee to perform Carwash.Super_Wash.\nAllow zpl.Manager to perform Carwash.Super_Wash.\nAllow zpl.SeniorEmployee to perform Carwash.Detailing.\nAllow zpl.Manager to perform Carwash.Detailing.\nNever allow zpl.NewHire to perform Carwash.Detailing.\nNever allow zpl.NewHire to perform Carwash.Super_Wash.\nAllow zpl.SeniorEmployee to operate Carwash.CashRegister.\nAllow zpl.Manager to operate Carwash.CashRegister.\nNever allow zpl.Employee with trusted:false to operate Carwash.CashRegister.\nAllow zpl.SeniorEmployee to access Carwash.StoreAccess.\nAllow zpl.Manager to access Carwash.StoreAccess.\nNever allow zpl.Employee with trusted:false to access Carwash.StoreAccess."
+    }
+  ]
+}

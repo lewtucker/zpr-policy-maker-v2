@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ZPR Policy Builder</title>
+  <title>ZPR Policy AI Playground</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -240,6 +240,7 @@
       text-transform: uppercase; letter-spacing: 0.05em;
     }
     #assist-stmts { overflow-y: auto; flex: 1 1 0; }
+    #assist-defs-rows { overflow-y: auto; flex: 1 1 0; }
     .assist-stmt-empty {
       padding: 0.75rem 0.5rem; color: var(--muted); font-size: 0.75rem;
       font-style: italic; text-align: center;
@@ -610,6 +611,12 @@
     }
     .page-header h1 { font-size: 0.95rem; font-weight: 700; white-space: nowrap; }
     .page-header h1 span { font-weight: 500; color: var(--accent); }
+    .ns-select-inline {
+      font-size: 0.85rem; padding: 0.2rem 0.4rem;
+      border: 1px solid var(--border); border-radius: 4px;
+      background: var(--surface2); color: var(--fg); cursor: pointer;
+      min-width: 120px; max-width: 260px;
+    }
     .page-body { flex: 1; overflow-y: auto; padding: 1rem; }
 
     /* ── Input zone (upper staging) ─────────────────────────────── */
@@ -670,12 +677,14 @@
 
     /* ── ZPL statement rows ─────────────────────────────────────── */
     .zpl-stmt-row {
-      display: flex; align-items: center;
-      padding: 0.32rem 0.75rem;
       border-bottom: 1px solid var(--border);
       transition: background 0.1s;
     }
     .zpl-stmt-row:hover { background: var(--surface2); }
+    .zpl-stmt-inner {
+      display: flex; align-items: center;
+      padding: 0.32rem 0.75rem;
+    }
     .zpl-stmt-text {
       flex: 1; font-family: var(--font-mono); font-size: 0.8rem;
       color: var(--text); word-break: break-word;
@@ -683,6 +692,37 @@
 
     /* ── User guide iframe ──────────────────────────────────────── */
     .guide-iframe { flex: 1; border: none; }
+
+    /* ── Policy Studio ──────────────────────────────────────────────────── */
+    .studio-body { flex:1;overflow-y:auto;padding:1.25rem;display:flex;flex-direction:column;gap:1.25rem;max-width:820px }
+    .studio-card { background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1rem 1.1rem }
+    .studio-card-title { font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--accent);margin-bottom:0.5rem }
+    .studio-card p { font-size:0.82rem;color:var(--muted);margin:0 0 0.75rem }
+    .studio-ta { width:100%;min-height:140px;font-size:0.83rem;font-family:inherit;padding:0.5rem 0.65rem;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--text);resize:vertical;box-sizing:border-box }
+    .studio-ns-block { border:1px solid var(--border);border-radius:4px;margin-bottom:0.4rem;overflow:hidden }
+    .studio-ns-header { display:flex;align-items:center;gap:0.5rem;padding:0.45rem 0.75rem;cursor:pointer;user-select:none;background:var(--surface2) }
+    .studio-ns-header:hover { background:var(--border) }
+    .studio-ns-arrow { font-size:0.72rem;color:var(--muted);flex-shrink:0 }
+    .studio-ns-label { font-size:0.82rem;font-weight:600;font-family:var(--font-mono);flex:1 }
+    .studio-ns-count { font-size:0.72rem;color:var(--muted) }
+    .studio-zpl-pre { margin:0;padding:0.6rem 0.85rem;font-size:0.78rem;font-family:var(--font-mono);white-space:pre;overflow-x:auto;line-height:1.55;background:var(--surface);color:var(--text) }
+    .studio-msg-ok  { color:var(--green,#16a34a) }
+    .studio-msg-err { color:#ef4444 }
+
+    /* ── YAML/LDAP Viewer ──────────────────────────────────────────── */
+    .yaml-drop-hover { background: var(--surface) !important; border-color: var(--accent) !important; }
+    .yaml-md h2 { font-size:1rem;font-weight:700;margin:1.25rem 0 0.4rem;padding-bottom:0.25rem;border-bottom:1px solid var(--border);color:var(--accent) }
+    .yaml-md h3 { font-size:0.88rem;font-weight:600;margin:0.9rem 0 0.25rem;color:var(--text) }
+    .yaml-md table { border-collapse:collapse;width:100%;font-size:0.82rem;margin-bottom:0.75rem }
+    .yaml-md th { background:var(--surface2);text-align:left;padding:0.35rem 0.65rem;border:1px solid var(--border);font-weight:600;font-size:0.78rem;white-space:nowrap }
+    .yaml-md td { padding:0.3rem 0.65rem;border:1px solid var(--border);vertical-align:top;word-break:break-word }
+    .yaml-md tr:nth-child(even) td { background:var(--surface2) }
+    .yaml-md .kv-key { font-weight:600;color:var(--muted);font-size:0.78rem;white-space:nowrap;padding-right:0.5rem }
+    .yaml-md .kv-val { font-family:var(--font-mono);font-size:0.8rem }
+    .yaml-md .scalar { font-family:var(--font-mono);font-size:0.82rem;white-space:pre-wrap;word-break:break-all }
+    .yaml-md .filename { font-size:0.78rem;color:var(--muted);font-family:var(--font-mono);margin-bottom:0.75rem }
+    .yaml-md .class-badge { display:inline-block;background:var(--accent);color:white;border-radius:3px;padding:0.05rem 0.4rem;font-size:0.72rem;font-weight:700;margin-right:0.35rem }
+    .yaml-md .empty { color:var(--muted);font-size:0.82rem;font-style:italic }
 
     /* ── Toast ──────────────────────────────────────────────────── */
     #_toast {
@@ -702,27 +742,26 @@
 
   <!-- Left Nav -->
   <nav class="left-nav" id="left-nav">
-    <div class="nav-brand">ZPR <span>Policy Builder</span> <span style="font-weight:400;font-size:0.75rem;color:var(--muted)">(prototype)</span></div>
+    <div class="nav-brand">ZPR <span>Policy AI Playground</span><br><span style="font-weight:400;font-size:0.75rem;color:var(--muted)">(prototype)</span></div>
     <div class="nav-scroll">
-      <div style="display:flex;align-items:center;padding:0.65rem 1.1rem 0.2rem">
-        <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);flex:1">Namespace</span>
-        <button onclick="toggleNavNs(this)"
-          style="font-size:1.3rem;background:none;border:none;cursor:pointer;color:var(--muted);padding:0 0.2rem;border-radius:3px;line-height:1"
-          title="Collapse namespace tree">▾</button>
-        <button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.45rem;margin-left:0.25rem"
-          onclick="openNewOwnerModal()">+</button>
+      <div style="padding:0.5rem 0.85rem 0.55rem;border-bottom:1px solid var(--border)">
+        <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:0.3rem">Namespace</div>
+        <select id="ns-select" class="ns-select" onchange="switchNsFromSelect(this.value)"
+          style="width:100%;font-size:0.82rem;padding:0.25rem 0.4rem;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--fg);cursor:pointer">
+        </select>
       </div>
-      <div class="nav-ns-tree" id="ns-tree"></div>
-      <div style="height:1px;background:var(--border);margin:0.35rem 0"></div>
-      <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);padding:0.45rem 1.1rem 0.2rem">Pages</div>
       <div class="nav-item active" id="nav-editor"   onclick="navigate('editor',this)">Policy Editor</div>
-      <div class="nav-item" id="nav-aiassist"         onclick="navigate('aiassist',this)">AI Assist</div>
-      <div class="nav-item" id="nav-audit"            onclick="navigate('audit',this)">Policy Audit</div>
       <div class="nav-item" id="nav-testing"          onclick="navigate('testing',this)">Rule Testing</div>
-      <div class="nav-item" id="nav-nsmgr"            onclick="navigate('nsmgr',this)">Namespace Manager</div>
-      <div class="nav-item" id="nav-reports"          onclick="navigate('reports',this)">Reports</div>
-      <div class="nav-item" id="nav-nsconfig"         onclick="navigate('nsconfig',this)">NS Config</div>
+      <div class="nav-item" id="nav-audit"            onclick="navigate('audit',this)">Policy Audit</div>
+      <div class="nav-item" id="nav-studio"           onclick="navigate('studio',this)">Policy Studio</div>
+      <div class="nav-item" id="nav-nsmgr"            onclick="navigate('nsmgr',this)">Namespace Mgnt</div>
+      <div class="nav-item" id="nav-nsconfig"         onclick="navigate('nsconfig',this)">ZPL Config</div>
       <div class="nav-item" id="nav-guide"            onclick="navigate('guide',this)">User Guide</div>
+      <div style="border-top:1px solid var(--border);margin:0.5rem 0.85rem 0.2rem;padding-top:0.4rem;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted)">User Add-ons</div>
+      <div class="nav-item" id="nav-yamlview"         onclick="navigate('yamlview',this)">YAML/LDAP Viewer</div>
+      <!-- hidden nav targets — navigable but not listed -->
+      <div id="nav-aiassist"  style="display:none"></div>
+      <div id="nav-reports"   style="display:none"></div>
     </div>
     <div class="nav-footer">
       <span class="nav-username" id="hdr-user"></span>
@@ -739,7 +778,8 @@
     <!-- ══ Policy Editor ══ -->
     <div class="page active" id="page-editor">
       <div class="page-header">
-        <h1>Policy Editor for Namespace: <span id="h1-ns-editor">—</span></h1>
+        <h1>Policy Editor</h1>
+        <select class="ns-select ns-select-inline" onchange="switchNsFromSelect(this.value)"></select>
         <span class="status-pill idle" id="status-pill"></span>
         <div style="margin-left:auto;display:flex;align-items:center;gap:0.4rem;position:relative">
           <button class="tool-btn" id="show-all-btn" onclick="toggleShowAll()" title="Show ZPL for this namespace and all sub-namespaces">Show All</button>
@@ -751,21 +791,31 @@
               <div class="io-menu-item" onclick="doDownloadAllMd()">↓ Export all namespaces (.md)</div>
               <div class="io-menu-item" onclick="doImportAllMd()">↑ Import all namespaces (.md)</div>
               <div class="io-menu-item" onclick="doUploadZplc()">↑ Import .zplc definitions</div>
+              <div class="io-menu-item" onclick="doTranslateOci()">⇄ Translate OCI ZPR → ZPL (.md)</div>
+              <div style="border-top:1px solid var(--border);margin:0.25rem 0"></div>
+              <div class="io-menu-item" onclick="document.getElementById('toolbar-ldif-import').click();closeIoMenu()">↑ Import entities (.ldif)</div>
+              <div class="io-menu-item" onclick="doShowEntities('ldif');closeIoMenu()">⊕ Show entities (.ldif)</div>
+              <div class="io-menu-item" onclick="doExportLdif();closeIoMenu()">↓ Export entities (.ldif)</div>
             </div>
           </div>
+          <input type="file" id="toolbar-ldif-import" accept=".ldif,.ldap,.txt" style="display:none" onchange="doImportLdif(this)">
+          <button id="delete-all-btn" class="tool-btn" onclick="doDeleteAllZpl()" style="display:none;color:var(--red)" title="Clear all ZPL for this namespace and all descendants">Delete All</button>
         </div>
       </div>
       <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative" id="editor-split">
         <!-- Upper: staging input -->
         <div class="input-zone" id="input-zone">
           <div class="input-zone-toolbar">
-            <button class="tool-btn active" id="btn-zpl-mode" onclick="setEditorMode('zpl')">New ZPL</button>
-            <button class="tool-btn" id="btn-entity-mode" onclick="setEditorMode('entity')">Entities</button>
+            <button class="tool-btn" id="assist-btn" onclick="navigate('aiassist',document.getElementById('nav-aiassist'))" title="ZPL AI Assistant" style="background:#dcfce7;border-color:#86efac;color:#15803d;font-weight:600">✨ AI Assistant</button>
+            <div class="toolbar-sep"></div>
+            <button class="tool-btn active" id="btn-zpl-mode" onclick="setEditorMode('zpl')">ZPL Defines</button>
+            <button class="tool-btn" id="btn-entity-mode" onclick="setEditorMode('entity')">ZPL Declares</button>
             <div class="toolbar-sep"></div>
             <button class="tool-btn" id="btn-check-upper" onclick="doCheckUpper()">Check ZPL</button>
-            <button class="tool-btn primary" onclick="acceptZpl()">Save</button>
-            <button class="tool-btn" id="assist-btn" onclick="navigate('aiassist',document.getElementById('nav-aiassist'))" title="ZPL AI Assistant" style="background:#dcfce7;border-color:#86efac;color:#15803d;font-weight:600">✨ AI Assist</button>
-            <button class="tool-btn" onclick="discardUpper()" style="color:var(--muted)">Clear</button>
+            <div class="toolbar-right">
+              <button class="tool-btn primary" onclick="acceptZpl()">Save</button>
+              <button class="tool-btn" onclick="discardUpper()" style="color:var(--muted)">Clear</button>
+            </div>
           </div>
           <div class="input-zone-scroll">
             <div class="infer-bar" id="infer-bar">
@@ -799,8 +849,7 @@
               <button class="tool-btn active" id="btn-zpl"   onclick="setDefsView('zpl')">ZPL</button>
               <button class="tool-btn"        id="btn-table" onclick="setDefsView('table')">Table</button>
               <div class="toolbar-sep"></div>
-              <button class="tool-btn active" id="btn-fullns" onclick="setNsMode('full')">Full NS</button>
-              <button class="tool-btn"        id="btn-shortns" onclick="setNsMode('short')">Short</button>
+              <button class="tool-btn" id="btn-fullns" onclick="setNsMode('full')">Full NS</button>
               <div class="toolbar-sep"></div>
               <button class="tool-btn" onclick="doReset()" style="color:var(--red)">Delete All</button>
               <button class="tool-btn" onclick="trRunAnalyst()" title="AI policy analysis">🔍 Audit</button>
@@ -824,19 +873,29 @@
       <!-- Hidden file inputs -->
       <input type="file" id="zpl-file-input" accept=".zpl,.txt" style="display:none" onchange="onZplFileSelected(event)">
       <input type="file" id="zplc-file-input" accept=".zplc,.toml" style="display:none" onchange="onZplcFileSelected(event)">
+      <input type="file" id="oci-file-input" accept=".txt,.policy,.zpr,.md" style="display:none" onchange="onOciFileSelected(event)">
     </div>
 
     <!-- ══ AI Assist ══ -->
     <div class="page" id="page-aiassist">
       <div class="page-header">
         <h1>AI Assistant for Namespace: <span id="h1-ns-assist">—</span></h1>
+        <button class="tool-btn" style="margin-left:auto" onclick="showPrompt('zpl-assist','AI Assistant Prompt')">Prompt</button>
+      </div>
+      <div class="input-zone-toolbar">
+        <button class="tool-btn" id="assist-ai-btn" onclick="closeAssistPage()" title="Back to Policy Editor" style="background:#dcfce7;border-color:#86efac;color:#15803d;font-weight:600">✨ AI Assistant</button>
+        <div class="toolbar-sep"></div>
+        <button class="tool-btn" id="assist-btn-zpl-mode" onclick="setEditorMode('zpl');closeAssistPage()">ZPL Defines</button>
+        <button class="tool-btn" id="assist-btn-entity-mode" onclick="setEditorMode('entity');closeAssistPage()">ZPL Declares</button>
+        <div class="toolbar-sep"></div>
+        <button class="tool-btn" onclick="doCheckUpper()">Check ZPL</button>
+        <div class="toolbar-right">
+          <button class="tool-btn primary" onclick="assistSaveAll()">Save</button>
+          <button class="tool-btn" onclick="assistDeleteAll()" style="color:var(--muted)">Clear</button>
+        </div>
       </div>
       <div class="assist-split" id="assist-split" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
         <div class="assist-bottom">
-          <div class="assist-bottom-header">
-            <button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="closeAssistPage()">✓ Done — Back to Editor</button>
-            <span class="assist-bottom-title">ZPL Assistant</span>
-          </div>
           <div class="assist-input-row">
             <div class="assist-input-wrap">
               <textarea class="assist-input" id="assist-input"
@@ -851,13 +910,9 @@
         <div class="assist-pane-sep" id="assist-pane-sep"></div>
         <div class="assist-stmts-wrap">
           <div class="assist-stmts-header">
-            <span class="assist-stmts-title">Staged ZPL</span>
-            <div style="display:flex;gap:0.3rem">
-              <button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.45rem" onclick="assistSaveAll()">✓ Save All</button>
-              <button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.45rem" onclick="assistDeleteAll()">✕ Delete All</button>
-            </div>
+            <span class="assist-stmts-title">Stored ZPL</span>
           </div>
-          <div id="assist-stmts"></div>
+          <div id="assist-defs-rows"></div>
         </div>
         <textarea id="assist-top" style="display:none" spellcheck="false" oninput="scheduleAutoParse()" onkeydown="handleTabKey(event)"></textarea>
       </div>
@@ -866,8 +921,18 @@
     <!-- ══ Policy Audit ══ -->
     <div class="page" id="page-audit">
       <div class="page-header">
-        <h1>Policy Audit for Namespace: <span id="h1-ns-audit">—</span></h1>
-        <div id="analyst-ns-label" style="font-size:0.8rem;color:var(--muted);margin-left:0.5rem"></div>
+        <h1>Policy Audit</h1>
+        <select class="ns-select ns-select-inline" onchange="switchNsFromSelect(this.value)"></select>
+        <button class="tool-btn primary" onclick="trRunAnalyst(S._auditDeep||false)">🔍 Run Audit</button>
+        <button class="tool-btn" onclick="navigate('reports',document.getElementById('nav-reports'))">Reports</button>
+        <button id="analyst-save-btn" class="tool-btn" onclick="analystBeginSave()" style="display:none">💾 Save</button>
+        <span id="analyst-save-inline" style="display:none;align-items:center;gap:0.3rem">
+          <input id="analyst-save-name" type="text" style="font-size:0.78rem;padding:0.2rem 0.4rem;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--text);width:22rem" />
+          <button class="tool-btn primary" style="font-size:0.72rem;padding:0.2rem 0.5rem" onclick="analystConfirmSave()">Save</button>
+          <button class="tool-btn" style="font-size:0.72rem;padding:0.2rem 0.5rem" onclick="analystCancelSave()">Cancel</button>
+        </span>
+        <button id="analyst-dl-btn" class="tool-btn" onclick="analystDownloadMd()" style="display:none" title="Download as Markdown">⬇ MD</button>
+        <button class="tool-btn" onclick="showPrompt('policy_analyst','Policy Audit Prompt')">Prompt</button>
         <div style="margin-left:auto;display:flex;align-items:center;gap:0.4rem">
           <div class="view-toggle">
             <button class="active" id="audit-fast-btn" style="font-size:0.9rem;padding:0.25rem 0.75rem"
@@ -875,15 +940,6 @@
             <button id="audit-deep-btn" style="font-size:0.9rem;padding:0.25rem 0.75rem"
               onclick="document.getElementById('audit-deep-btn').classList.add('active');document.getElementById('audit-fast-btn').classList.remove('active');S._auditDeep=true">Deep</button>
           </div>
-          <button class="tool-btn primary" onclick="trRunAnalyst(S._auditDeep||false)">🔍 Run Audit</button>
-          <button id="analyst-save-btn" class="tool-btn" onclick="analystBeginSave()" style="display:none">💾 Save</button>
-          <span id="analyst-save-inline" style="display:none;align-items:center;gap:0.3rem">
-            <input id="analyst-save-name" type="text" style="font-size:0.78rem;padding:0.2rem 0.4rem;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--text);width:22rem" />
-            <button class="tool-btn primary" style="font-size:0.72rem;padding:0.2rem 0.5rem" onclick="analystConfirmSave()">Save</button>
-            <button class="tool-btn" style="font-size:0.72rem;padding:0.2rem 0.5rem" onclick="analystCancelSave()">Cancel</button>
-          </span>
-          <button id="analyst-deep-btn" class="tool-btn" onclick="trRunAnalyst(true)" style="display:none">Deep ▶</button>
-          <button id="analyst-dl-btn" class="tool-btn" onclick="analystDownloadMd()" style="display:none" title="Download as Markdown">⬇ MD</button>
         </div>
       </div>
       <div style="flex:1;overflow-y:auto;padding:0.75rem 1rem" id="analyst-body">
@@ -894,7 +950,10 @@
     <!-- ══ Testing ══ -->
     <div class="page" id="page-testing">
       <div class="page-header">
-        <h1>Rule Testing for Namespace: <span id="h1-ns-testing">—</span></h1>
+        <h1>Rule Testing</h1>
+        <select class="ns-select ns-select-inline" onchange="switchNsFromSelect(this.value)"></select>
+        <button class="tool-btn" onclick="showPrompt('adversarial_test','Test Generator Prompt')">Prompt</button>
+        <button class="tool-btn" style="margin-left:auto" onclick="trReset()" title="Clear all tests">Clear</button>
       </div>
       <div id="testing-body" style="flex:1;overflow-y:auto;position:relative">
         <div class="empty-state">Loading tests…</div>
@@ -920,7 +979,8 @@
     <!-- ══ Reports ══ -->
     <div class="page" id="page-reports">
       <div class="page-header">
-        <h1>Audit Reports</h1>
+        <button class="tool-btn" onclick="navigate('audit',document.getElementById('nav-audit'))" title="Back to Policy Audit">← Back</button>
+        <h1 style="margin-left:0.5rem">Audit Reports</h1>
         <span id="reports-count" style="font-size:0.82rem;color:var(--muted);margin-left:0.25rem"></span>
       </div>
       <div class="page-body" id="reports-panel">
@@ -931,7 +991,7 @@
     <!-- ══ NS Config ══ -->
     <div class="page" id="page-nsconfig">
       <div class="page-header">
-        <h1>Namespace Config</h1>
+        <h1>ZPL Configuration</h1>
         <span style="font-size:0.82rem;color:var(--muted);margin-left:0.25rem">Root namespace built-in classes, aliases, and verbs</span>
       </div>
       <div class="page-body" style="max-width:640px;display:flex;flex-direction:column;gap:1.5rem;padding:1rem">
@@ -972,9 +1032,86 @@
       </div>
     </div>
 
+    <!-- ══ Policy Studio ══ -->
+    <div class="page" id="page-studio">
+      <div class="page-header">
+        <h1>Policy Studio</h1>
+        <button class="tool-btn" style="margin-left:auto" onclick="showPrompt('studio','Policy Generator Prompt')">Prompt</button>
+      </div>
+      <div class="studio-body">
+
+        <!-- Backup / Restore -->
+        <div class="studio-card">
+          <div class="studio-card-title">Workspace Backup</div>
+          <p>Save your entire namespace tree and ZPL to a JSON file so you can restore it later. Use this before deploying a generated policy so you can easily get back to your original work.</p>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+            <button class="tool-btn primary" onclick="studioSaveWorkspace()">⬇ Save Workspace</button>
+            <button class="tool-btn" onclick="document.getElementById('studio-restore-input').click()">⬆ Restore Workspace</button>
+            <input type="file" id="studio-restore-input" accept=".json" style="display:none" onchange="studioRestoreFile(event)">
+          </div>
+          <div id="studio-backup-msg" style="font-size:0.78rem;margin-top:0.5rem;min-height:1.2em"></div>
+        </div>
+
+        <!-- Policy Generator -->
+        <div class="studio-card">
+          <div class="studio-card-title">Policy Generator</div>
+          <p>Describe your organization — departments, roles, services, and who should access what. The AI will generate a complete ZPL policy with namespaces and rules ready to deploy.</p>
+          <textarea id="studio-desc" class="studio-ta"
+            placeholder="Example: Acme Corp has three departments — HR, Finance, and Engineering. HR staff manage confidential employee records and payroll data stored on secure servers. Finance controls revenue tracking and expense submission. Engineers access development and CI/CD infrastructure. Executives (CEO, SVP, EVP) need broad visibility. External auditors have scoped read access. All employees can submit expenses and check timesheets."></textarea>
+          <div style="margin-top:0.5rem">
+            <button class="tool-btn" style="font-size:0.75rem;padding:0.15rem 0.5rem" onclick="studioToggleStructure()" id="studio-struct-toggle">▸ Namespace structure</button>
+            <div id="studio-struct-wrap" style="display:none;margin-top:0.4rem">
+              <textarea id="studio-struct" class="studio-ta" style="min-height:3.5rem;font-size:0.82rem"
+                placeholder="Optional: override the default namespace layout. Examples:&#10;• Put everything in a single flat namespace under the root.&#10;• Create only two namespaces: Corp and Partners.&#10;• Use a three-level tree: root → division → department."></textarea>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.5rem;margin-top:0.6rem;align-items:center;flex-wrap:wrap">
+            <button class="tool-btn primary" onclick="studioGenerate()" id="studio-gen-btn">⚡ Generate Policy</button>
+            <button class="tool-btn" onclick="document.getElementById('studio-upload-desc').click()" title="Load business description from a .md file">⬆ Upload Description</button>
+            <input type="file" id="studio-upload-desc" accept=".md,.txt" style="display:none" onchange="studioLoadDescription(event)">
+            <button class="tool-btn" onclick="studioClear()">Clear</button>
+            <span id="studio-gen-status" style="font-size:0.78rem;color:var(--muted)"></span>
+          </div>
+          <div id="studio-preview" style="margin-top:0.75rem"></div>
+          <div id="studio-deploy-bar" style="display:none;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border);display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+            <button class="tool-btn primary" onclick="studioDeploy()" id="studio-deploy-btn">🚀 Deploy to Workspace</button>
+            <button class="tool-btn" onclick="studioSavePolicy('json')" title="Download as JSON (can be restored)">⬇ JSON</button>
+            <button class="tool-btn" onclick="studioSavePolicy('markdown')" title="Download as human-readable Markdown">⬇ Markdown</button>
+            <button class="tool-btn" id="studio-rationale-btn" onclick="studioShowRationale()" style="display:none" title="View agent reasoning">💬 Agent Rationale</button>
+            <span style="font-size:0.78rem;color:var(--muted)">Replaces your current namespace tree — save first if needed.</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
     <!-- ══ User Guide ══ -->
     <div class="page" id="page-guide">
       <iframe class="guide-iframe" src="/help" id="guide-iframe"></iframe>
+    </div>
+
+    <!-- ══ YAML/LDAP Viewer ══ -->
+    <div class="page" id="page-yamlview">
+      <div class="page-header">
+        <h1>YAML/LDAP Viewer</h1>
+        <span style="font-size:0.82rem;color:var(--muted)">Upload a YAML file to view it as a formatted document</span>
+      </div>
+      <div style="padding:1rem 1.25rem;display:flex;flex-direction:column;gap:1rem;height:100%;overflow:auto;box-sizing:border-box">
+        <!-- Drop zone / upload -->
+        <div id="yaml-drop-zone"
+             ondragover="event.preventDefault();this.classList.add('yaml-drop-hover')"
+             ondragleave="this.classList.remove('yaml-drop-hover')"
+             ondrop="yamlViewDrop(event)"
+             onclick="document.getElementById('yaml-view-input').click()"
+             style="border:2px dashed var(--border);border-radius:8px;padding:2rem;text-align:center;cursor:pointer;background:var(--surface2);transition:background 0.15s;flex-shrink:0">
+          <div style="font-size:1.5rem;margin-bottom:0.4rem">📄</div>
+          <div style="font-size:0.9rem;font-weight:500">Drop a YAML file here, or click to browse</div>
+          <div style="font-size:0.78rem;color:var(--muted);margin-top:0.25rem">Accepts .yaml / .yml / .ldif</div>
+        </div>
+        <input type="file" id="yaml-view-input" accept=".yaml,.yml,.ldif,.ldap" style="display:none" onchange="yamlViewUpload(this)">
+        <!-- Rendered output -->
+        <div id="yaml-view-output" style="display:none;flex:1;overflow:auto"></div>
+      </div>
     </div>
 
   </div><!-- /.main -->
@@ -994,7 +1131,7 @@
 </div>
 
 <div class="modal-backdrop" id="tr-gen-modal">
-  <div class="modal" style="max-width:340px">
+  <div class="modal" style="max-width:460px">
     <h3 style="margin-bottom:1rem">Generate tests</h3>
     <div style="display:flex;gap:1rem;margin-bottom:1rem">
       <div style="flex:1">
@@ -1012,16 +1149,38 @@
     </div>
     <div class="modal-actions" style="flex-direction:column;gap:0.5rem;align-items:stretch">
       <div style="display:flex;gap:0.5rem">
-        <button class="btn" onclick="closeTrGenModal()" style="flex:0 0 auto">Cancel</button>
-        <button class="btn primary" onclick="trStartGenerate()" style="flex:1">⚡ Generate from rules</button>
+        <button class="btn primary" onclick="trStartGenerate()" style="flex:1">⚡ From rules</button>
+        <button class="btn" onclick="trGenerateWithEntities()" style="flex:1;background:var(--surface2)">⚡ From entities</button>
       </div>
-      <button class="btn" onclick="trGenerateWithEntities()" style="width:100%;background:var(--surface2)">⚡ Generate using entities</button>
+      <button class="btn" onclick="closeTrGenModal()">Cancel</button>
     </div>
   </div>
 </div>
 
 <!-- analyst-modal content moved to page-audit -->
 <div id="analyst-modal" style="display:none"></div>
+
+<!-- ── Prompt viewer modal ──────────────────────────────────────────── -->
+<div class="modal-backdrop" id="prompt-modal" onclick="if(event.target===this)closePromptModal()">
+  <div class="modal" style="width:min(1360px,90vw);max-height:80vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;margin-bottom:0.75rem">
+      <h3 style="flex:1;margin:0" id="prompt-modal-title">Agent Prompt</h3>
+      <button class="tool-btn" onclick="closePromptModal()">✕</button>
+    </div>
+    <pre id="prompt-modal-body" style="flex:1;overflow-y:auto;font-size:0.78rem;white-space:pre-wrap;word-break:break-word;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:0.75rem;margin:0"></pre>
+  </div>
+</div>
+
+<!-- ── Agent Rationale modal ────────────────────────────────────────── -->
+<div class="modal-backdrop" id="rationale-modal" onclick="if(event.target===this)closeRationaleModal()">
+  <div class="modal" style="width:min(860px,90vw);max-height:82vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;margin-bottom:0.75rem">
+      <h3 style="flex:1;margin:0">💬 Agent Rationale</h3>
+      <button class="tool-btn" onclick="closeRationaleModal()">✕</button>
+    </div>
+    <div id="rationale-modal-body" style="flex:1;overflow-y:auto;font-size:0.83rem;line-height:1.65"></div>
+  </div>
+</div>
 
 <!-- ── New namespace modal ──────────────────────────────────────────── -->
 <div class="modal-backdrop" id="new-owner-modal">
@@ -1139,6 +1298,7 @@ function navigate(pageId, navEl) {
   if (pageId === 'reports') loadReports();
   if (pageId === 'nsconfig') loadNsConfig();
   if (pageId === 'aiassist') _initAssistPage();
+  if (pageId === 'studio') { STUDIO.generated = null; }
 }
 
 function toggleNavNs(btn) {
@@ -1166,16 +1326,30 @@ function renderDefsRows(zplText) {
     container.innerHTML = '<div class="empty-state">No definitions saved yet.<br>Type ZPL above and Accept to add.</div>';
     return;
   }
-  const stmts = _splitZplStatements(zplText);
+  const _norm = s => s.toLowerCase().replace(/\s+/g, ' ').replace(/\.\s*$/, '').trim();
+  const stmtMap = {};
+  const ps = S.lastParsed;
+  if (ps) {
+    for (const c of (ps.classes || [])) { if (c.zpl) stmtMap[_norm(c.zpl)] = c; }
+    for (const r of (ps.rules  || [])) { if (r.zpl) stmtMap[_norm(r.zpl)] = r; }
+    for (const e of (ps.entities || [])) { if (e.zpl) stmtMap[_norm(e.zpl)] = e; }
+  }
+  const stmts = _splitZplStatements(zplText).reverse();
   container.innerHTML = stmts.map(stmt => {
-    return `<div class="zpl-stmt-row" data-zpl="${esc(stmt)}">
-      <span class="zpl-stmt-text">${esc(stmt)}</span>
-      <div style="display:flex;gap:0.25rem;flex-shrink:0">
-        <button class="stmt-btn" onclick="openStmtEdit(this.closest('[data-zpl]'))" title="Edit">✏</button>
-        <button class="stmt-btn del" onclick="deleteStmt(this.closest('[data-zpl]'))" title="Delete">✕</button>
+    const obj = stmtMap[_norm(stmt)] || { zpl: stmt };
+    const json = esc(JSON.stringify(obj, null, 2));
+    return `<div class="zpl-stmt-row" data-json="${json}" data-zpl="${esc(stmt)}">
+      <div class="zpl-stmt-inner">
+        <span class="zpl-stmt-text">${esc(stmt)}</span>
+        <div style="display:flex;gap:0.25rem;flex-shrink:0">
+          <button class="stmt-btn" onclick="openStmtEdit(this.closest('[data-zpl]'))" title="Edit">Edit</button>
+          <button class="stmt-btn" onclick="event.stopPropagation();toggleYamlDetail(this.closest('[data-json]'))" title="YAML">yaml</button>
+          <button class="stmt-btn del" onclick="deleteStmt(this.closest('[data-zpl]'))" title="Delete">Delete</button>
+        </div>
       </div>
     </div>`;
   }).join('');
+  renderAssistStoredZpl();
 }
 
 // ── Entity mode ────────────────────────────────────────────────────────────
@@ -1291,7 +1465,7 @@ function discardUpper() {
   setStatus('idle');
 }
 
-function setDefsView(v) {
+async function setDefsView(v) {
   S.defsView = v;
   const zplRows   = document.getElementById('defs-zpl-rows');
   const tableWrap = document.getElementById('defs-table');
@@ -1299,31 +1473,40 @@ function setDefsView(v) {
   if (tableWrap) tableWrap.style.display = v === 'table' ? 'flex' : 'none';
   document.getElementById('btn-zpl')?.classList.toggle('active', v === 'zpl');
   document.getElementById('btn-table')?.classList.toggle('active', v === 'table');
-  if (v === 'table') renderSchemaBody();
+  document.getElementById('btn-fullns')?.classList.remove('active');
+  if (v === 'table') { renderSchemaBody(); return; }
+  // ZPL view always reloads short (prefix-stripped) form
+  try {
+    const res = await api('GET', '/api/namespace/zpl');
+    renderDefsRows(res.text || '');
+  } catch(e) { renderDefsRows(S._storedZpl); }
 }
 
 async function setNsMode(mode) {
-  S.nsMode = mode;
-  document.getElementById('btn-fullns')?.classList.toggle('active', mode === 'full');
-  document.getElementById('btn-shortns')?.classList.toggle('active', mode === 'short');
-  // Full NS: show stored ZPL with full namespace prefixes intact
-  // Short: show prefix-stripped form (normal editor view)
-  const url = mode === 'full' ? '/api/namespace/zpl?raw=true' : '/api/namespace/zpl';
+  if (mode !== 'full') return;
+  // Full NS: switch to ZPL view and load full-prefix form
+  S.defsView = 'zpl';
+  const zplRows   = document.getElementById('defs-zpl-rows');
+  const tableWrap = document.getElementById('defs-table');
+  if (zplRows)   zplRows.style.display = '';
+  if (tableWrap) tableWrap.style.display = 'none';
+  document.getElementById('btn-zpl')?.classList.remove('active');
+  document.getElementById('btn-table')?.classList.remove('active');
+  document.getElementById('btn-fullns')?.classList.add('active');
   try {
-    const res = await api('GET', url);
+    const res = await api('GET', '/api/namespace/zpl?raw=true');
     renderDefsRows(res.text || '');
-  } catch(e) {
-    renderDefsRows(S._storedZpl);
-  }
+  } catch(e) { renderDefsRows(S._storedZpl); }
 }
 
 // ── AI Assist page init ────────────────────────────────────────────────────
 
 function _initAssistPage() {
-  if (!S.assist) S.assist = { active: false, history: [], original: '', staged: [], editingId: null };
+  if (!S.assist) S.assist = { active: false, history: [], original: '' };
   S.assist.active = true;
   S.assist.original = _defsText();
   _syncAssistTop();
+  renderAssistStoredZpl();
   if (!S.assist.history || !S.assist.history.length) {
     const hist = document.getElementById('assist-history');
     if (hist) hist.innerHTML = '';
@@ -1433,16 +1616,8 @@ function renderHeader() {
   if (!ctx) return;
   const nsLabel = ctx.active_display_name || ctx.active_username;
   document.getElementById('hdr-user').textContent = ctx.login_username;
-  // Don't overwrite h1-ns-audit while a saved report is displayed (it shows the report's namespace)
-  const viewingReport = S.analyst?.title != null;
-  ['h1-ns-editor','h1-ns-assist','h1-ns-testing'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = nsLabel;
-  });
-  if (!viewingReport) {
-    const el = document.getElementById('h1-ns-audit');
-    if (el) el.textContent = nsLabel;
-  }
+  const assistEl = document.getElementById('h1-ns-assist');
+  if (assistEl) assistEl.textContent = nsLabel;
   const auditNsEl = document.getElementById('audit-ns-placeholder');
   if (auditNsEl) auditNsEl.textContent = nsLabel;
 }
@@ -1548,10 +1723,68 @@ function flattenTree(nodes, depth = 0) {
   return result;
 }
 
+function renderNsSelect() {
+  const ctx = S.context;
+  if (!ctx) return;
+  const activeNsId = ctx.active_namespace_id || ctx.active_user_id;
+  const rootNsId   = S._ownerTree && S._ownerTree.id;
+  const opts = [];
+  if (rootNsId) {
+    opts.push(`<option value="${esc(rootNsId)}">${esc(S._ownerTree.display_name)}</option>`);
+  }
+  for (const u of S.subOwners) {
+    if (u._external) continue;
+    const pad = '  '.repeat(u._depth) + (u._depth ? '└ ' : '');
+    opts.push(`<option value="${esc(u.id)}">${pad}${esc(u.display_name)}</option>`);
+  }
+  const html = opts.join('');
+  document.querySelectorAll('.ns-select').forEach(sel => {
+    sel.innerHTML = html;
+    sel.value = activeNsId || '';
+  });
+  const deleteAllBtn = document.getElementById('delete-all-btn');
+  if (deleteAllBtn) deleteAllBtn.style.display = (activeNsId && activeNsId === rootNsId) ? '' : 'none';
+}
+
+async function doDeleteAllZpl() {
+  const rootName = S._ownerTree?.display_name || 'this workspace';
+  if (!confirm(`Delete ALL ZPL from "${rootName}" and every sub-namespace?
+
+This cannot be undone.`)) return;
+  const btn = document.getElementById('delete-all-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Deleting…'; }
+  try {
+    const result = await api('POST', '/api/namespace/zpl/clear-tree');
+    toast(`Cleared ZPL from ${result.cleared} namespace${result.cleared !== 1 ? 's' : ''}.`);
+    await loadNamespaceZpl();
+    await renderDefsRows();
+  } catch(e) {
+    toast('Delete failed: ' + (e.message || e));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Delete All'; }
+  }
+}
+
+async function switchNsFromSelect(nsId) {
+  if (!nsId) return;
+  try {
+    await api('POST', '/api/context/switch', { namespace_id: nsId });
+    const ctx = await api('GET', '/api/context');
+    S.context = ctx;
+    renderHeader();
+    renderNsSelect();
+    await loadNamespaceZpl();
+    renderSchemaBody();
+  } catch(e) {
+    toast('Switch failed: ' + (e.message || e));
+    renderNsSelect(); // reset select to current value
+  }
+}
+
 function renderNsTree() {
   const ctx = S.context;
   const tree = document.getElementById('ns-tree');
-  if (!ctx) { tree.innerHTML = ''; return; }
+  if (!ctx) { if (tree) tree.innerHTML = ''; renderNsSelect(); return; }
 
   let html = '';
 
@@ -1587,7 +1820,8 @@ function renderNsTree() {
     </div>`;
   }
 
-  tree.innerHTML = html;
+  if (tree) tree.innerHTML = html;
+  renderNsSelect();
 }
 
 // Returns 'save', 'discard', or 'cancel'
@@ -1633,6 +1867,7 @@ async function switchToNamespace(nsId) {
     await loadContext();
     _exitShowAll();
     await Promise.all([loadSubOwners(), loadNamespaceZpl()]);
+    renderNsSelect();
     navigate('editor', document.getElementById('nav-editor'));
   } catch(e) { alert('Could not switch namespace: ' + e.message); }
 }
@@ -1809,6 +2044,10 @@ function toggleIoMenu(e) {
   document.getElementById('io-menu').classList.toggle('open');
 }
 
+function closeIoMenu() {
+  document.getElementById('io-menu')?.classList.remove('open');
+}
+
 document.addEventListener('click', () => {
   document.getElementById('io-menu')?.classList.remove('open');
 });
@@ -1897,6 +2136,39 @@ async function onZplcFileSelected(e) {
     showInferBar(data.inferred_classes || [], data.inferred_zpl || '', label);
   } catch(e) {
     setStatus('error', 'Failed to read .zplc: ' + e.message);
+  }
+}
+
+function doTranslateOci() {
+  document.getElementById('io-menu').classList.remove('open');
+  document.getElementById('oci-file-input').click();
+}
+
+async function onOciFileSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = '';
+  const base = file.name.replace(/\.[^.]+$/, '');
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await fetch('/api/translate/oci', { method: 'POST', body: fd, credentials: 'include' });
+    if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || res.statusText); }
+    const data = await res.json();
+    function triggerDownload(content, filename, type) {
+      const blob = new Blob([content], { type });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+    triggerDownload(data.markdown, base + '_translation.md', 'text/markdown');
+    // Small delay so browsers don't block the second download
+    setTimeout(() => triggerDownload(JSON.stringify(data.policy_json, null, 2), base + '_policy.json', 'application/json'), 400);
+    setStatus('ok', 'OCI translation complete — review the .md guide, then restore the .json in Policy Studio.');
+  } catch(err) {
+    setStatus('error', 'OCI translation failed: ' + err.message);
   }
 }
 
@@ -2204,9 +2476,8 @@ async function assistSend() {
         extra = `<br><code style="display:block;font-size:0.7rem;color:var(--accent);margin-top:0.25rem;word-break:break-all">${esc(stmt)}</code>` +
           `<div id="assist-gen-btns-${gid}" style="margin-top:0.4rem;display:flex;gap:0.4rem;flex-wrap:wrap">` +
           `<button class="tool-btn primary" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistAcceptGen(${gid})">Accept</button>` +
-          `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistSaveGen(${gid})">Stage</button>` +
-          `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem;color:var(--muted)" onclick="assistDeleteGen(${gid})">Drop</button>` +
           `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem" onclick="assistEditGen(${gid})">Edit</button>` +
+          `<button class="tool-btn" style="font-size:0.72rem;padding:0.15rem 0.5rem;color:var(--muted)" onclick="assistDeleteGen(${gid})">Drop</button>` +
           `</div>`;
       }
       _assistAppendMsg('assistant', reply, extra);
@@ -2235,26 +2506,25 @@ async function assistSend() {
 }
 
 
-function assistConfirmMod(mid) {
+async function assistConfirmMod(mid) {
   const newZpl = _ASSIST_MODS[mid];
   if (newZpl == null) return;
   const row = document.getElementById(`assist-mod-btns-${mid}`);
   if (row) row.querySelectorAll('button').forEach(b => { b.disabled = true; b.style.opacity = '0.4'; });
   delete _ASSIST_MODS[mid];
-  // Diff old vs new: added lines go to staged for review, retained lines become the new original
-  const oldSet = new Set((S.assist.original || '').split('\n').map(l => l.trim()).filter(Boolean));
-  const newLines = (newZpl || '').split('\n').map(l => l.trim()).filter(Boolean);
-  const added = newLines.filter(l => !oldSet.has(l));
-  const retained = newLines.filter(l => oldSet.has(l));
-  S.assist.original = retained.join('\n');
-  added.forEach(line => {
-    S.assist.staged.push({id: ++_assistStmtId, text: line});
-  });
-  _syncAssistTop();
-  const msg = added.length
-    ? `Applied. ${added.length} new statement${added.length > 1 ? 's' : ''} added to staged for review.`
-    : 'Applied. Anything else?';
-  _assistAppendMsg('system', msg);
+  try {
+    await api('PUT', '/api/namespace/zpl', { text: newZpl });
+    const res = await api('GET', '/api/namespace/zpl');
+    renderDefsRows(res.text || '');
+    const parsed = await api('POST', '/api/parse', { text: res.text || '', language: 'zpl' }).catch(() => null);
+    if (parsed) { S.lastParsed = parsed.policy_set; S.serializedZpl = parsed.serialized_zpl || ''; }
+    renderSchemaBody();
+    S.assist.original = res.text || '';
+    _syncAssistTop();
+    _assistAppendMsg('system', 'Applied. Anything else?');
+  } catch(e) {
+    _assistAppendMsg('system', 'Save failed: ' + (e.message || String(e)));
+  }
 }
 
 function assistRejectMod(mid) {
@@ -2284,6 +2554,8 @@ async function assistAcceptGen(gid) {
     const parsed = await api('POST', '/api/parse', { text: res.text || '', language: 'zpl' }).catch(() => null);
     if (parsed) { S.lastParsed = parsed.policy_set; S.serializedZpl = parsed.serialized_zpl || ''; }
     renderSchemaBody();
+    S.assist.original = res.text || '';
+    _syncAssistTop();
     _assistAppendMsg('system', 'Accepted and saved to policy. Anything else?');
   } catch(e) {
     _assistAppendMsg('system', 'Save failed: ' + (e.message || String(e)));
@@ -2321,11 +2593,9 @@ function assistEditGen(gid) {
 function _syncAssistTop() {
   const top = document.getElementById('assist-top');
   if (!top) return;
-  const orig = (S.assist.original || '').trimEnd();
-  const staged = S.assist.staged.map(s => s.text).join('\n');
-  top.value = orig && staged ? orig + '\n' + staged : orig || staged;
+  top.value = (S.assist.original || '').trimEnd();
   scheduleAutoParse();
-  renderAssistStmts();
+  renderAssistStoredZpl();
 }
 
 function renderAssistStmts() {
@@ -2353,6 +2623,20 @@ function renderAssistStmts() {
       `<button class="assist-stmt-btn" onclick="assistStmtDelete(${item.id})" title="Delete">✕</button>` +
       `</div></div>`;
   }).join('');
+}
+
+function renderAssistStoredZpl() {
+  const container = document.getElementById('assist-defs-rows');
+  if (!container) return;
+  const zplText = S._storedZpl || '';
+  if (!zplText.trim()) {
+    container.innerHTML = '<div class="empty-state">No definitions saved yet.</div>';
+    return;
+  }
+  const stmts = _splitZplStatements(zplText).reverse();
+  container.innerHTML = stmts.map(stmt =>
+    `<div class="zpl-stmt-row"><div class="zpl-stmt-inner"><span class="zpl-stmt-text">${esc(stmt)}</span></div></div>`
+  ).join('');
 }
 
 function assistStmtEdit(id) {
@@ -2394,17 +2678,13 @@ function assistStmtDelete(id) {
 }
 
 function assistSaveAll() {
-  S.assist.staged.forEach(item => {
-    S.assist.original = ((S.assist.original || '').trimEnd() + '\n' + item.text).trim();
-  });
-  S.assist.staged = [];
-  _syncAssistTop();
   closeAssistPage();
 }
 
 function assistDeleteAll() {
-  S.assist.staged = [];
-  _syncAssistTop();
+  S.assist.history = [];
+  const hist = document.getElementById('assist-history');
+  if (hist) hist.innerHTML = '';
 }
 
 // ── Schema panel ───────────────────────────────────────────────────────────
@@ -2760,6 +3040,9 @@ function renderOwnerTree(node, depth) {
   const ownerMeta = node.owner_username
     ? `<div class="cfg-ns-meta">owner: ${esc(node.owner_username)}</div>`
     : `<div class="cfg-ns-unowned">No owner assigned</div>`;
+  const createdByMeta = node.created_by_username && node.created_by_username !== node.owner_username
+    ? `<div class="cfg-ns-meta">created by: ${esc(node.created_by_username)}</div>`
+    : '';
   const descMeta = node.description
     ? `<div class="cfg-ns-meta" style="color:var(--muted);font-style:italic">${esc(node.description)}</div>`
     : '';
@@ -2772,6 +3055,7 @@ function renderOwnerTree(node, depth) {
           <div class="cfg-ns-name">${esc(node.display_name)}</div>
           ${descMeta}
           ${ownerMeta}
+          ${createdByMeta}
         </div>
         <div class="cfg-ns-actions">
           <button class="cfg-ns-btn" onclick="toggleNsNew('${uid}')">+ New</button>
@@ -3085,7 +3369,7 @@ function _viewToggleHtml(which, current) {
 function renderClassesTable(body, classes) {
   const verbs = classes.filter(c => c.is_verb || c.parent === 'verb');
   const nonVerb = classes.filter(c => !c.is_verb && c.parent !== 'verb');
-  const roots = ['users', 'endpoints', 'services'];
+  const roots = ['users', 'endpoints', 'services', 'servers'];
   const byParent = {};
   for (const c of nonVerb) { const p = c.parent || 'root'; (byParent[p] = byParent[p] || []).push(c); }
   function flattenSubtree(parent, depth) {
@@ -3188,7 +3472,7 @@ function renderClasses(body, classes) {
     }
   }
 
-  const roots = ['users', 'endpoints', 'services'];
+  const roots = ['users', 'endpoints', 'services', 'servers'];
   const nonVerb = classes.filter(c => !c.is_verb && c.parent !== 'verb');
   const byParent = {};
   for (const c of nonVerb) {
@@ -3438,7 +3722,7 @@ async function doLogout() {
 
 // ── Test Runner ────────────────────────────────────────────────────────────
 
-const TR = { tests: [], manualActive: null };
+const TR = { tests: [], manualActive: null, manualOpen: false };
 
 const _TR_BUILTINS = new Set(['user','users','service','services','endpoint','endpoints','server','servers']);
 
@@ -3595,11 +3879,37 @@ function _trBuildPayload(r) {
     payload.accessor_class = _trQualify(acc.cls || acc.class);
     payload.accessor_attrs = _trFlattenAttrs(acc.attrs);
   }
+  const srv = r.server_endpoint;
+  if (srv?.cls || srv?.class) {
+    payload.server_class = _trQualify(srv.cls || srv.class);
+    payload.server_attrs = _trFlattenAttrs(srv.attrs);
+  }
   return payload;
 }
 
 function trGenerate() {
   document.getElementById('tr-gen-modal').classList.add('open');
+}
+
+// ── Prompt viewer ─────────────────────────────────────────────────────────
+
+async function showPrompt(key, title) {
+  const modal = document.getElementById('prompt-modal');
+  const body  = document.getElementById('prompt-modal-body');
+  const ttl   = document.getElementById('prompt-modal-title');
+  if (ttl) ttl.textContent = title || 'Agent Prompt';
+  body.textContent = 'Loading…';
+  modal.classList.add('open');
+  try {
+    const data = await api('GET', `/api/prompts/${encodeURIComponent(key)}`);
+    body.textContent = data.content;
+  } catch(e) {
+    body.textContent = 'Could not load prompt: ' + (e.message || e);
+  }
+}
+
+function closePromptModal() {
+  document.getElementById('prompt-modal').classList.remove('open');
 }
 
 function closeTrGenModal() {
@@ -3789,6 +4099,304 @@ function trReset() {
   renderSchemaBody();
 }
 
+// ── Policy Studio ─────────────────────────────────────────────────────────
+
+const STUDIO = { generated: null };
+
+async function studioSaveWorkspace() {
+  const msg = document.getElementById('studio-backup-msg');
+  msg.className = ''; msg.textContent = 'Saving…';
+  try {
+    const data = await api('GET', '/api/backup');
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const ns = (S.context?.active_display_name || 'workspace').replace(/[^a-z0-9_-]/gi, '_');
+    a.download = `${ns}_backup_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    msg.className = 'studio-msg-ok'; msg.textContent = 'Workspace saved.';
+  } catch(e) {
+    msg.className = 'studio-msg-err'; msg.textContent = 'Save failed: ' + e.message;
+  }
+}
+
+function studioRestoreFile(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  const msg = document.getElementById('studio-backup-msg');
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!confirm(`Restore workspace from "${esc(file.name)}"?\n\nThis will replace your current namespace tree.`)) return;
+      msg.className = ''; msg.textContent = 'Restoring…';
+      await api('POST', '/api/restore', data);
+      msg.className = 'studio-msg-ok'; msg.textContent = 'Workspace restored.';
+      await _studioPostDeploy();
+    } catch(e) {
+      msg.className = 'studio-msg-err'; msg.textContent = 'Restore failed: ' + (e.message || e);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function studioClear() {
+  const descEl   = document.getElementById('studio-desc');
+  const structEl = document.getElementById('studio-struct');
+  const status   = document.getElementById('studio-gen-status');
+  const preview  = document.getElementById('studio-preview');
+  const deployBar = document.getElementById('studio-deploy-bar');
+  if (descEl)   descEl.value = '';
+  if (structEl) structEl.value = '';
+  if (status)   { status.className = ''; status.textContent = ''; }
+  if (preview)  preview.innerHTML = '';
+  if (deployBar) deployBar.style.display = 'none';
+  STUDIO.generated = null;
+  // Collapse structure panel if open
+  const wrap = document.getElementById('studio-struct-wrap');
+  const btn  = document.getElementById('studio-struct-toggle');
+  if (wrap) wrap.style.display = 'none';
+  if (btn)  btn.textContent = '▸ Namespace structure';
+}
+
+function studioToggleStructure() {
+  const wrap = document.getElementById('studio-struct-wrap');
+  const btn  = document.getElementById('studio-struct-toggle');
+  if (!wrap) return;
+  const open = wrap.style.display !== 'none';
+  wrap.style.display = open ? 'none' : '';
+  btn.textContent = (open ? '▸' : '▾') + ' Namespace structure';
+}
+
+function studioLoadDescription(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result;
+    let desc = text.trim();
+    // If file has a "## Business Description" section, extract just that section
+    const headingMatch = text.match(/^##\s+Business Description[^\n]*/im);
+    if (headingMatch) {
+      const afterHeading = text.slice(headingMatch.index + headingMatch[0].length).trimStart();
+      const nextHeading = afterHeading.match(/^##\s/m);
+      desc = (nextHeading ? afterHeading.slice(0, nextHeading.index) : afterHeading).trim();
+    }
+    const ta = document.getElementById('studio-desc');
+    if (ta) { ta.value = desc; ta.focus(); }
+    const status = document.getElementById('studio-gen-status');
+    if (status) { status.className = 'studio-msg-ok'; status.textContent = `Loaded from ${file.name}`; }
+  };
+  reader.readAsText(file);
+}
+
+async function studioGenerate() {
+  const desc = document.getElementById('studio-desc')?.value.trim();
+  if (!desc) { toast('Enter an organization description first'); return; }
+  const btn    = document.getElementById('studio-gen-btn');
+  const status = document.getElementById('studio-gen-status');
+  const preview = document.getElementById('studio-preview');
+  const deployBar = document.getElementById('studio-deploy-bar');
+  btn.disabled = true;
+  status.className = ''; status.textContent = 'Generating… (15–30 seconds)';
+  preview.innerHTML = '';
+  deployBar.style.display = 'none';
+  STUDIO.generated = null;
+  try {
+    const rootName = S.context?.active_display_name || 'Org';
+    const structInstructions = document.getElementById('studio-struct')?.value.trim() || '';
+    const result = await api('POST', '/api/policy-studio/generate', {
+      description: desc,
+      root_display_name: rootName,
+      structure_instructions: structInstructions,
+    });
+    STUDIO.generated = result;
+    preview.innerHTML = _studioPreviewHtml(result);
+    deployBar.style.display = 'flex';
+    const rationaleBtn = document.getElementById('studio-rationale-btn');
+    if (rationaleBtn) rationaleBtn.style.display = result.rationale ? '' : 'none';
+    const n = (result.namespaces || []).filter(ns => ns.path?.length).length;
+    status.className = 'studio-msg-ok';
+    status.textContent = `${n} namespace${n !== 1 ? 's' : ''} generated.`;
+  } catch(e) {
+    status.className = 'studio-msg-err'; status.textContent = 'Generation failed: ' + (e.message || e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function _studioPreviewHtml(result) {
+  const nss = result.namespaces || [];
+  if (!nss.length) return '<div class="empty-state">No namespaces returned.</div>';
+  return nss.map((ns, i) => {
+    const label = ns.path?.length ? ns.path.join(' › ') : '(root)';
+    const zpl   = (ns.zpl || '').trim();
+    const lines = zpl ? zpl.split('\n').length : 0;
+    return `<div class="studio-ns-block">
+      <div class="studio-ns-header" onclick="studioToggleNs(${i})">
+        <span class="studio-ns-arrow" id="studio-ns-arrow-${i}">▸</span>
+        <span class="studio-ns-label">${esc(label)}</span>
+        <span class="studio-ns-count">${lines ? lines + ' line' + (lines !== 1 ? 's' : '') : 'empty'}</span>
+      </div>
+      <div class="studio-ns-body" id="studio-ns-body-${i}" style="display:none">
+        <pre class="studio-zpl-pre">${esc(zpl || '(empty)')}</pre>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function studioToggleNs(i) {
+  const body  = document.getElementById(`studio-ns-body-${i}`);
+  const arrow = document.getElementById(`studio-ns-arrow-${i}`);
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : '';
+  if (arrow) arrow.textContent = open ? '▸' : '▾';
+}
+
+function studioShowRationale() {
+  const r = STUDIO.generated?.rationale;
+  if (!r) return;
+  const body = document.getElementById('rationale-modal-body');
+  const section = (title, content) =>
+    `<div style="margin-bottom:1.1rem">
+       <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);margin-bottom:0.35rem">${esc(title)}</div>
+       <div style="color:var(--text)">${esc(content)}</div>
+     </div>`;
+  let html = '';
+  if (r.intro)   html += section('Overview', r.intro);
+  if (r.design)  html += section('Design Philosophy', r.design);
+  if (r.summary) html += section('What Was Generated', r.summary);
+  if ((r.rules || []).length) {
+    html += `<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);margin-bottom:0.5rem">Rule Reasoning</div>`;
+    html += (r.rules || []).map(item =>
+      `<div style="border:1px solid var(--border);border-radius:4px;margin-bottom:0.5rem;overflow:hidden">
+         <div style="background:var(--surface2);padding:0.3rem 0.65rem;font-family:var(--font-mono);font-size:0.76rem;color:var(--text);border-bottom:1px solid var(--border)">${esc(item.rule || '')}</div>
+         <div style="padding:0.4rem 0.65rem;font-size:0.8rem;color:var(--muted);line-height:1.55">${esc(item.reasoning || '')}</div>
+       </div>`
+    ).join('');
+  }
+  body.innerHTML = html;
+  document.getElementById('rationale-modal').classList.add('open');
+}
+
+function closeRationaleModal() {
+  document.getElementById('rationale-modal').classList.remove('open');
+}
+
+async function studioDeploy() {
+  if (!STUDIO.generated) return;
+  if (!confirm('Deploy generated policy?\n\nThis will replace your current namespace tree. Save your workspace first if you want to keep it.')) return;
+  const btn    = document.getElementById('studio-deploy-btn');
+  const status = document.getElementById('studio-gen-status');
+  btn.disabled = true; status.className = ''; status.textContent = 'Deploying…';
+  try {
+    const result = await api('POST', '/api/restore', STUDIO.generated);
+    status.className = 'studio-msg-ok';
+    status.textContent = `Deployed ${result.namespaces_restored} namespaces.`;
+    await _studioPostDeploy();
+    navigate('editor', document.getElementById('nav-editor'));
+    // Re-parse after a short delay so the full namespace tree is available
+    // before the infer bar checks for undefined cross-namespace classes
+    setTimeout(() => doCheckUpper(), 800);
+  } catch(e) {
+    status.className = 'studio-msg-err'; status.textContent = 'Deploy failed: ' + (e.message || e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function _studioPostDeploy() {
+  try {
+    const ctx = await api('GET', '/api/context');
+    S.context = ctx;
+    renderHeader();
+    await loadSubOwners();
+  } catch(_) {}
+}
+
+function studioSavePolicy(fmt) {
+  if (!STUDIO.generated) return;
+  const g = STUDIO.generated;
+  const orgName = (S.context?.active_display_name || 'Policy').replace(/[^a-z0-9_-]/gi, '_');
+  const today = new Date().toISOString().slice(0, 10);
+  if (fmt === 'json') {
+    const blob = new Blob([JSON.stringify(g, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `${orgName}_policy_${today}.json`; a.click();
+    URL.revokeObjectURL(url);
+    return;
+  }
+  // Markdown format
+  const desc = (g.description || document.getElementById('studio-desc')?.value || '').trim();
+  const nss = g.namespaces || [];
+  const deptNs = nss.filter(n => n.path?.length > 0);
+  const rootNs = nss.find(n => !n.path?.length);
+
+  // Count classes and rules
+  let allowCount = 0, neverCount = 0, classCount = 0;
+  for (const ns of nss) {
+    for (const line of (ns.zpl || '').split('\n')) {
+      const t = line.trim();
+      if (t.startsWith('Define ')) classCount++;
+      else if (t.startsWith('Allow ')) allowCount++;
+      else if (t.toLowerCase().startsWith('never allow')) neverCount++;
+    }
+  }
+
+  const nsTableRows = [
+    `| (root) | — | Company-wide base classes |`,
+    ...deptNs.map(n => `| ${n.path.join('.')} | ${n.path[n.path.length - 1]} | Department namespace |`)
+  ].join('\n');
+
+  const nsSections = nss.map(ns => {
+    const label = ns.path?.length ? ns.path.join('.') : '(root)';
+    const zpl = (ns.zpl || '').trim();
+    return `## Namespace: ${label}\n\n\`\`\`zpl\n${zpl || '(empty)'}\n\`\`\`\n`;
+  }).join('\n---\n\n');
+
+  const md = [
+    `# ${orgName} — Policy Design`,
+    ``,
+    `## Overview`,
+    ``,
+    desc,
+    ``,
+    `---`,
+    ``,
+    `## Namespace Structure`,
+    ``,
+    `| Namespace | Display Name | Description |`,
+    `|-----------|--------------|-------------|`,
+    nsTableRows,
+    ``,
+    `---`,
+    ``,
+    nsSections,
+    `---`,
+    ``,
+    `## Summary`,
+    ``,
+    `| Category | Count |`,
+    `|----------|-------|`,
+    `| Namespaces | ${nss.length} |`,
+    `| Classes | ${classCount} |`,
+    `| Allow rules | ${allowCount} |`,
+    `| Never Allow rules | ${neverCount} |`,
+    `| **Total rules** | **${allowCount + neverCount}** |`,
+    ``,
+  ].join('\n');
+
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `${orgName}_policy_${today}.md`; a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ── Rule Analyst ──────────────────────────────────────────────────────────
 
 const _SEVERITY_COLOR = { HIGH: '#ef4444', MEDIUM: '#f59e0b', LOW: '#6b7280' };
@@ -3819,7 +4427,7 @@ function _analystRender(ns, data) {
           font-size:0.78rem;white-space:pre-wrap;word-break:break-word;color:#166534">${esc(zpl)}</code>
         <button onclick="analystApplyFix(decodeURIComponent('${encoded}'),this)"
             style="flex-shrink:0;font-size:0.72rem;padding:0.25rem 0.55rem;background:#22c55e;color:white;
-              border:none;border-radius:4px;cursor:pointer;align-self:center" title="Append to ZPL editor">+ Add</button>
+              border:none;border-radius:4px;cursor:pointer;align-self:center" title="Save directly to namespace ZPL">Accept</button>
       </div>`;
     }).join('');
     return `
@@ -4134,15 +4742,30 @@ async function saveNsConfig() {
   }
 }
 
-function analystApplyFix(zpl, btn) {
-  const upper = document.getElementById('zpl-upper');
-  if (!upper) return;
-  const cur = upper.value.trimEnd();
-  upper.value = cur ? cur + '\n' + zpl : zpl;
-  btn.textContent = '✓ Staged';
-  btn.style.background = '#16a34a';
+async function analystApplyFix(zpl, btn) {
   btn.disabled = true;
-  navigate('editor', document.getElementById('nav-editor'));
+  btn.textContent = '…';
+  try {
+    const current = await api('GET', '/api/namespace/zpl');
+    const existing = (current.text || '').trimEnd();
+    // Strip active namespace prefix from fix_zpl so it matches the stripped editor ZPL
+    const nsName = S.context?.active_display_name || '';
+    const fixStripped = nsName
+      ? zpl.replace(new RegExp('(?<!\\.)\\b' + nsName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.', 'g'), '')
+      : zpl;
+    const updated = existing ? existing + '\n' + fixStripped : fixStripped;
+    await api('PUT', '/api/namespace/zpl', { text: updated });
+    // Keep editor in sync if it's open
+    const upper = document.getElementById('zpl-upper');
+    if (upper) upper.value = updated;
+    btn.textContent = '✓ Accepted';
+    btn.style.background = '#16a34a';
+  } catch(e) {
+    btn.textContent = '✗ Error';
+    btn.style.background = '#ef4444';
+    btn.disabled = false;
+    console.error('analystApplyFix:', e);
+  }
 }
 
 // ── Busy overlay ──────────────────────────────────────────────────────────
@@ -4258,9 +4881,22 @@ function _trPromptSection() {
   </div>`;
 }
 
+function trToggleManual() {
+  TR.manualOpen = !TR.manualOpen;
+  const body = document.getElementById('tr-manual-body');
+  const arrow = document.getElementById('tr-manual-arrow');
+  if (body)  body.style.display  = TR.manualOpen ? '' : 'none';
+  if (arrow) arrow.textContent   = TR.manualOpen ? '▾' : '▸';
+}
+
 function _trManualForm() {
+  const open = TR.manualOpen;
   return `<div class="tr-manual" id="tr-manual">
-    <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.4rem;">Manual test</div>
+    <div style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;user-select:none" onclick="trToggleManual()">
+      <span id="tr-manual-arrow" style="font-size:0.75rem;color:var(--muted)">${open ? '▾' : '▸'}</span>
+      <span style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)">Manual test</span>
+    </div>
+    <div id="tr-manual-body" style="display:${open ? '' : 'none'};margin-top:0.4rem;">
     <div style="display:flex;flex-direction:column;gap:0.3rem;">
       <div style="display:flex;gap:0.4rem;align-items:center;">
         <input id="tr-m-subj" class="tr-m-input" placeholder="subject class" style="flex:1" onkeydown="if(event.key==='Enter')trRunManual()">
@@ -4279,11 +4915,23 @@ function _trManualForm() {
         </div>
       </div>
       <div style="display:flex;gap:0.4rem;align-items:center;">
+        <span style="color:var(--muted);font-size:0.78rem;white-space:nowrap;flex-shrink:0">on server</span>
+        <input id="tr-m-srv" class="tr-m-input" placeholder="server class (optional)" style="flex:1" onkeydown="if(event.key==='Enter')trRunManual()">
+      </div>
+      <div style="display:flex;gap:0.4rem;align-items:flex-start">
+        <div style="width:5rem;flex-shrink:0"></div>
+        <div style="flex:1;min-width:0">
+          <div id="tr-m-srv-attr-rows"></div>
+          <button class="tool-btn" onclick="trAddAttrRow('srv')" style="font-size:0.72rem;margin-top:0.15rem">+attr</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:0.4rem;align-items:center;">
         <button class="tool-btn" onclick="trRunManual()" id="tr-m-run-btn">▶ Run</button>
         <button class="tool-btn" onclick="trAddManual()" title="Add to test list">+ Add</button>
         <span id="tr-m-result" style="font-size:0.72rem;flex:1"></span>
       </div>
       <div id="tr-m-detail" style="font-family:var(--mono);font-size:0.85rem;color:var(--muted);white-space:pre;overflow-x:auto;display:none"></div>
+    </div>
     </div>
   </div>`;
 }
@@ -4308,6 +4956,10 @@ function trSetManual(i, checked) {
   if (objEl)    objEl.value    = p.object_class || '';
   _trSetAttrRows('subj', p.subject_attrs);
   _trSetAttrRows('obj',  p.object_attrs);
+  const srvEl = document.getElementById('tr-m-srv');
+  if (srvEl) srvEl.value = p.server_class || '';
+  _trSetAttrRows('srv', p.server_attrs);
+  if (!TR.manualOpen) trToggleManual();
   document.getElementById('tr-manual')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   _trRunWithPayload(p);
 }
@@ -4347,12 +4999,14 @@ async function trRunManual() {
   const btn = document.getElementById('tr-m-run-btn');
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
 
+  const srv = document.getElementById('tr-m-srv')?.value.trim();
   const payload = {
     subject_class: _trQualify(subj),
     subject_attrs: _trBuildAttrsFromRows('subj'),
     action,
     object_class: _trQualify(obj),
     object_attrs: _trBuildAttrsFromRows('obj'),
+    ...(srv ? { server_class: _trQualify(srv), server_attrs: _trBuildAttrsFromRows('srv') } : {}),
   };
 
   const resEl   = document.getElementById('tr-m-result');
@@ -4386,12 +5040,14 @@ function trAddManual() {
   const action = document.getElementById('tr-m-action')?.value.trim() || 'access';
   const obj   = document.getElementById('tr-m-obj')?.value.trim();
   if (!subj || !obj) { toast('Enter subject and object class'); return; }
+  const srv = document.getElementById('tr-m-srv')?.value.trim();
   const payload = {
     subject_class: _trQualify(subj),
     subject_attrs: _trBuildAttrsFromRows('subj'),
     action,
     object_class: _trQualify(obj),
     object_attrs: _trBuildAttrsFromRows('obj'),
+    ...(srv ? { server_class: _trQualify(srv), server_attrs: _trBuildAttrsFromRows('srv') } : {}),
   };
   TR.tests.push({
     number: TR.tests.length + 1,
@@ -4411,7 +5067,7 @@ function renderTests(body) {
   if (!TR.tests.length) {
     body.innerHTML = manualHtml + `<div class="tr-empty-state" style="padding-top:1rem;">
       <div style="display:flex;align-items:center">
-        <button class="tool-btn" onclick="trGenerate()">⚡ Generate…</button>
+        <button class="tool-btn" onclick="trGenerate()">⚡ Generate a set of tests both positive and negative</button>
       </div>
     </div>`;
     return;
@@ -4450,7 +5106,7 @@ function renderTests(body) {
 
   body.innerHTML = manualHtml + `
     <div class="tr-toolbar">
-      <button class="tool-btn" onclick="trGenerate()">⚡ Generate…</button>
+      <button class="tool-btn" onclick="trGenerate()">⚡ Generate a set of tests both positive and negative</button>
       <div style="display:flex;gap:0.4rem;align-items:center;flex:1">
         <button class="tool-btn" id="tr-run-btn" onclick="trRunAll()">▶ Run All</button>
         <button class="tool-btn" onclick="trExport()">↓ Export</button>
@@ -4464,6 +5120,130 @@ function renderTests(body) {
       <span style="width:1.4rem;flex-shrink:0">Run</span>
     </div>
     <div class="tr-body">${listHtml}</div>`;
+}
+
+// ── YAML/LDAP Viewer ────────────────────────────────────────────────────────────
+
+function yamlViewDrop(e) {
+  e.preventDefault();
+  document.getElementById('yaml-drop-zone').classList.remove('yaml-drop-hover');
+  const file = e.dataTransfer?.files?.[0];
+  if (file) _yamlViewProcess(file);
+}
+
+function yamlViewUpload(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (file) _yamlViewProcess(file);
+}
+
+async function _yamlViewProcess(file) {
+  const zone = document.getElementById('yaml-drop-zone');
+  const out  = document.getElementById('yaml-view-output');
+  zone.querySelector('div').textContent = '⏳ Loading…';
+  out.style.display = 'none';
+  try {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const endpoint = (ext === 'ldif' || ext === 'ldap') ? '/api/ldif/preview' : '/api/yaml/preview';
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(endpoint, { method: 'POST', body: fd });
+    if (!res.ok) throw new Error(await res.text());
+    const { filename, data } = await res.json();
+    out.innerHTML = _yamlRenderMd(data, filename);
+    out.style.display = 'block';
+    zone.querySelector('div').textContent = '📄 Drop a YAML file here, or click to browse';
+  } catch(e) {
+    zone.querySelector('div').textContent = '📄 Drop a YAML file here, or click to browse';
+    alert('Error loading file: ' + e.message);
+  }
+}
+
+function _yamlRenderMd(data, filename) {
+  const e = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let html = `<div class="yaml-md"><div class="filename">${e(filename)}</div>`;
+
+  // Entity list: array of objects with class_name + name + attributes
+  if (Array.isArray(data) && data.length > 0 && data[0]?.class_name !== undefined) {
+    const groups = {};
+    for (const item of data) {
+      const cls = item.class_name || '(unknown)';
+      if (!groups[cls]) groups[cls] = [];
+      groups[cls].push(item);
+    }
+    for (const [cls, items] of Object.entries(groups).sort()) {
+      // Collect all attribute keys across items in this group
+      const attrKeys = [...new Set(items.flatMap(it => Object.keys(it.attributes || {})))].sort();
+      html += `<h2><span class="class-badge">${e(cls)}</span>${e(cls)} <span style="font-weight:400;color:var(--muted);font-size:0.78rem">(${items.length})</span></h2>`;
+      html += '<table><thead><tr><th>name</th>';
+      for (const k of attrKeys) html += `<th>${e(k)}</th>`;
+      html += '</tr></thead><tbody>';
+      for (const it of items) {
+        html += `<tr><td style="font-family:var(--font-mono);font-weight:500">${e(it.name || '')}</td>`;
+        for (const k of attrKeys) {
+          const v = (it.attributes || {})[k];
+          html += `<td>${v !== undefined ? e(String(v)) : '<span style="color:var(--muted)">—</span>'}</td>`;
+        }
+        html += '</tr>';
+      }
+      html += '</tbody></table>';
+    }
+    html += `<div style="font-size:0.78rem;color:var(--muted);margin-top:0.5rem">${data.length} entities total</div>`;
+
+  // Generic list
+  } else if (Array.isArray(data)) {
+    if (data.length === 0) {
+      html += '<div class="empty">Empty list.</div>';
+    } else if (typeof data[0] === 'object' && data[0] !== null) {
+      // List of objects — infer columns from all keys
+      const keys = [...new Set(data.flatMap(r => Object.keys(r || {})))];
+      html += '<table><thead><tr>' + keys.map(k => `<th>${e(k)}</th>`).join('') + '</tr></thead><tbody>';
+      for (const row of data) {
+        html += '<tr>' + keys.map(k => {
+          const v = (row || {})[k];
+          return `<td>${v !== undefined ? e(typeof v === 'object' ? JSON.stringify(v) : String(v)) : ''}</td>`;
+        }).join('') + '</tr>';
+      }
+      html += '</tbody></table>';
+    } else {
+      // List of scalars
+      html += '<ul style="margin:0;padding-left:1.2rem">' + data.map(v => `<li class="scalar">${e(String(v))}</li>`).join('') + '</ul>';
+    }
+
+  // Object / dict
+  } else if (data && typeof data === 'object') {
+    for (const [section, value] of Object.entries(data)) {
+      html += `<h2>${e(section)}</h2>`;
+      if (Array.isArray(value)) {
+        if (value.length === 0) {
+          html += '<div class="empty">—</div>';
+        } else if (typeof value[0] === 'object') {
+          const keys = [...new Set(value.flatMap(r => Object.keys(r || {})))];
+          html += '<table><thead><tr>' + keys.map(k => `<th>${e(k)}</th>`).join('') + '</tr></thead><tbody>';
+          for (const row of value) {
+            html += '<tr>' + keys.map(k => { const v = (row||{})[k]; return `<td>${e(v !== undefined ? String(v) : '')}</td>`; }).join('') + '</tr>';
+          }
+          html += '</tbody></table>';
+        } else {
+          html += '<ul style="margin:0;padding-left:1.2rem">' + value.map(v => `<li class="scalar">${e(String(v))}</li>`).join('') + '</ul>';
+        }
+      } else if (value && typeof value === 'object') {
+        html += '<table style="max-width:600px"><tbody>';
+        for (const [k, v] of Object.entries(value)) {
+          html += `<tr><td class="kv-key">${e(k)}</td><td class="kv-val">${e(typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v))}</td></tr>`;
+        }
+        html += '</tbody></table>';
+      } else {
+        html += `<div class="scalar">${e(String(value ?? ''))}</div>`;
+      }
+    }
+
+  } else {
+    html += `<div class="scalar">${e(String(data ?? ''))}</div>`;
+  }
+
+  html += '</div>';
+  return html;
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
