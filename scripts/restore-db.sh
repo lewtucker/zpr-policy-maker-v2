@@ -7,9 +7,9 @@
 
 set -euo pipefail
 
-SERVER="root@72.62.97.102"
-REMOTE_DB="/opt/zpr-policy-maker/src/server/policy_maker.db"
-SERVICE="zpr-policy-maker"
+SERVER="root@<your-server-ip>"
+REMOTE_DB="/opt/zpr-policy-maker-v2/src/server/zpr_policy.db"
+SERVICE="zpr-policy-maker-v2"
 
 BACKUP="${1:-}"
 if [ -z "${BACKUP}" ]; then

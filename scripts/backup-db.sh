@@ -7,8 +7,8 @@
 
 set -euo pipefail
 
-SERVER="root@72.62.97.102"
-REMOTE_DB="/opt/zpr-policy-maker/src/server/policy_maker.db"
+SERVER="root@<your-server-ip>"
+REMOTE_DB="/opt/zpr-policy-maker-v2/src/server/zpr_policy.db"
 
 LABEL="${1:-}"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
