@@ -11,5 +11,7 @@ snapshots/
 *.pdf
 ZPL_Reference/
 test-cases/
-.claude/
+.claude/settings.json
+.claude/settings.local.json
+.claude/projects/
 Local/
