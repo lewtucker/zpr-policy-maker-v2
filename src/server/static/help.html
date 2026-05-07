@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ZPR Policy Playground — User Guide</title>
+<title>ZPR Policy Builder — User Guide</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   :root {
@@ -60,7 +60,8 @@
     <div class="nav-title">Interface</div>
     <a href="#layout">Layout &amp; Navigation</a>
     <a href="#policy-editor">Policy Editor</a>
-    <a href="#definitions-panel">Definitions Panel</a>
+    <a href="#schema-panel">Schema Panel</a>
+    <a href="#upload-download">Upload &amp; Download</a>
   </div>
   <div class="nav-section">
     <div class="nav-title">Features</div>
@@ -68,9 +69,12 @@
     <a href="#namespaces">Namespaces</a>
     <a href="#entities">Entities</a>
     <a href="#rule-testing">Rule Testing</a>
+    <a href="#policy-studio">Policy Studio</a>
     <a href="#ai-assist">AI Assist</a>
     <a href="#policy-audit">Policy Audit</a>
-    <a href="#reports">Reports</a>
+    <a href="#reports">Audit Reports</a>
+    <a href="#yaml-viewer">YAML/LDAP Viewer</a>
+    <a href="#zpl-config">ZPL Config</a>
   </div>
   <div class="nav-section">
     <div class="nav-title">Reference</div>
@@ -84,263 +88,321 @@
 <!-- ── Main content ── -->
 <main>
 
-<h1>ZPR Policy Playground</h1>
+<h1>ZPR Policy Builder</h1>
 <p class="subtitle">User Guide &mdash; <a href="https://zpr.org" target="_blank">ZPR.org</a> &middot; Applied Invention, LLC</p>
 
 <!-- Overview -->
 <h2 id="overview">Overview</h2>
-<p>ZPR Policy Playground is a browser-based editor for writing and testing <strong>ZPL (Zero-trust Policy Language)</strong> policies. ZPL is defined in <a href="https://zpr.org" target="_blank">ZPR RFC-15.5</a> and provides a structured, human-readable way to express access control rules across services, users, and endpoints.</p>
-<p>With ZPR Policy Playground you can:</p>
+<p>ZPR Policy Builder is a browser-based tool for authoring, testing, and auditing <strong>ZPL (Zero-trust Policy Language)</strong> policies. ZPL is defined in <a href="https://zpr.org" target="_blank">ZPR RFC-15.5</a> and provides a plain-English way to express access control rules: who can access what, under what conditions, and what is explicitly denied.</p>
+<p>With ZPR Policy Builder you can:</p>
 <ul>
   <li>Write ZPL directly in an editor and see parsed classes, entities, and rules instantly</li>
-  <li>Organize policies into a namespace tree with delegated ownership</li>
-  <li>Define named entity instances (e.g. specific users, databases) using <code>Declare</code> statements</li>
-  <li>Generate and run policy test suites — including AI-generated adversarial tests</li>
-  <li>Use AI assistance to help author or explain ZPL</li>
-  <li>Run an AI-powered <strong>Policy Audit</strong> to detect shadowing, gaps, and overly broad rules</li>
-  <li>Save analysis results as versioned <strong>Audit Reports</strong> accessible from the Reports page</li>
+  <li>Organize policies into a namespace tree with delegated ownership per team or system</li>
+  <li>Define named entity instances using <code>Declare</code> statements, or import them from YAML or LDIF</li>
+  <li>Generate and run policy test suites — including AI-generated adversarial tests using real entity instances</li>
+  <li>Use <strong>Policy Studio</strong> to generate a complete policy from a plain-English description</li>
+  <li>Use the inline <strong>AI Assist</strong> chat to author, explain, or refine ZPL</li>
+  <li>Run an AI-powered <strong>Policy Audit</strong> to detect security risks, shadowing, gaps, and structural issues</li>
+  <li>Save audit results as versioned <strong>Audit Reports</strong></li>
+  <li>Upload and browse YAML or LDIF files in the <strong>YAML/LDAP Viewer</strong></li>
 </ul>
 
 <!-- Getting Started -->
 <h2 id="getting-started">Getting Started</h2>
 <h3>First Run</h3>
-<p>When no accounts exist, the application redirects to <code>/setup</code>. Enter a username and password to create the root admin account. This account is automatically granted admin privileges and becomes the owner of the root namespace.</p>
+<p>When no accounts exist, the application redirects to <code>/setup</code>. Enter a username and password to create the root admin account. This account is automatically granted admin privileges and becomes the owner of the root namespace. Your username becomes the top-level namespace name (e.g. username <code>acme</code> creates root namespace <code>Acme</code>).</p>
 
 <h3>Logging In</h3>
-<p>Use your username and password at the login page. Your session is maintained via a secure cookie.</p>
+<p>Use your username and password at the login page. Your session is maintained via a secure cookie. You can also access all API endpoints using a Bearer token (see <a href="#profile">Profile &amp; API Token</a>).</p>
 
 <h3>What You See When You Log In</h3>
-<p>What you see depends on how your account was created. There are two common scenarios:</p>
-<p><strong>You own your own root namespace.</strong> If an admin created your account to give you an independent space, you own a root namespace (e.g. <code>Acme</code>) that sits at the top of your own hierarchy. You start with a blank policy and are free to create classes, rules, entities, and sub-namespaces beneath it.</p>
-<p><strong>You were delegated ownership of a sub-namespace.</strong> If another user created a namespace and assigned you as its owner, you will see that namespace — and any sub-namespaces below it — already present in your namespace tree. Your responsibility is to write ZPL within your assigned namespace and to create any additional sub-namespaces below it that your team needs.</p>
-<div class="note">The active namespace is shown in the Policy Editor header. Only ZPL belonging to that namespace is loaded into the editor — classes and rules from parent or sibling namespaces are separate.</div>
+<p>The active namespace is shown in the Policy Editor header. Two common starting points:</p>
+<p><strong>You own your root namespace.</strong> You start with a blank policy and can create classes, rules, entities, and sub-namespaces beneath your root.</p>
+<p><strong>You were assigned ownership of a sub-namespace.</strong> Your namespace tree already contains the namespace you own. Write ZPL within your scope and create further sub-namespaces as needed.</p>
+<div class="note">Only ZPL belonging to the active namespace is loaded into the editor. Parent namespaces supply class definitions for cross-namespace references but are not editable from your context.</div>
 
 <!-- Layout -->
 <h2 id="layout">Layout &amp; Navigation</h2>
-<p>The application has a left navigation sidebar and a main content area. The sidebar contains:</p>
+<p>The application has a left navigation sidebar and a main content area.</p>
+
+<h3>Sidebar</h3>
 <ul>
-  <li><strong>Namespace tree</strong> — click any namespace to switch the active context; use <strong>+</strong> to create a sub-namespace</li>
-  <li><strong>Pages</strong> — links to each section of the application</li>
+  <li><strong>Namespace selector</strong> — dropdown to switch active namespace context</li>
+  <li><strong>Pages</strong> — navigate between sections of the application</li>
+  <li><strong>User Add-ons</strong> section — optional tools like YAML/LDAP Viewer</li>
   <li><strong>Profile / Sign out</strong> — at the bottom of the sidebar</li>
 </ul>
-<p>The pages accessible from the sidebar are:</p>
+
+<h3>Pages</h3>
 <table>
   <tr><th>Page</th><th>Purpose</th></tr>
   <tr><td><strong>Policy Editor</strong></td><td>Write and manage ZPL for the active namespace</td></tr>
-  <tr><td><strong>AI Assist</strong></td><td>Chat with an AI assistant to author or explain ZPL</td></tr>
-  <tr><td><strong>Policy Audit</strong></td><td>AI-powered analysis of the policy for issues and risks</td></tr>
   <tr><td><strong>Rule Testing</strong></td><td>Manual and generated test suites to verify policy behavior</td></tr>
-  <tr><td><strong>Namespace Manager</strong></td><td>Create, rename, delete, and reassign namespace ownership</td></tr>
-  <tr><td><strong>Reports</strong></td><td>Saved audit reports</td></tr>
+  <tr><td><strong>Policy Audit</strong></td><td>AI-powered analysis for security risks and structural issues</td></tr>
+  <tr><td><strong>Policy Studio</strong></td><td>Generate a complete policy from a plain-English description</td></tr>
+  <tr><td><strong>Namespace Mgnt</strong></td><td>Create, rename, delete, and reassign namespace ownership</td></tr>
+  <tr><td><strong>ZPL Config</strong></td><td>Per-namespace built-in class and verb configuration</td></tr>
   <tr><td><strong>User Guide</strong></td><td>This guide (also at <code>/help</code>)</td></tr>
+  <tr><td><strong>YAML/LDAP Viewer</strong></td><td>Upload and browse YAML or LDIF entity files</td></tr>
 </table>
 
 <!-- Policy Editor -->
 <h2 id="policy-editor">Policy Editor</h2>
-<p>The Policy Editor is the main workspace. It is split vertically into two zones: the <strong>staging input</strong> at the top and the <strong>Definitions panel</strong> below. A draggable divider separates them.</p>
+<p>The Policy Editor is the main workspace. It has a toolbar at the top, a <strong>staging input</strong> zone below it, and the <strong>saved policy</strong> area beneath that. A draggable divider separates staging from saved.</p>
 
-<h3>Page Header</h3>
-<p>The page header shows the active namespace name and two controls:</p>
-<ul>
-  <li><strong>Show All</strong> — loads a read-only combined view of ZPL for the active namespace and all its sub-namespaces</li>
-  <li><strong>↑↓</strong> — upload or download ZPL files; also export/import all namespaces as a Markdown bundle or import <code>.zplc</code> definitions</li>
-</ul>
-
-<h3>Staging Input Zone</h3>
-<p>This is where you type new ZPL before adding it to the saved policy. The toolbar has two mode tabs and action buttons:</p>
+<h3>Toolbar</h3>
 <table>
   <tr><th>Control</th><th>Action</th></tr>
-  <tr><td><strong>New ZPL</strong> tab</td><td>Switch to ZPL mode — type class definitions, rules, or any ZPL statement</td></tr>
-  <tr><td><strong>Entities</strong> tab</td><td>Switch to entity mode — type <code>Declare</code> statements to define named instances</td></tr>
-  <tr><td><strong>Check ZPL</strong></td><td>Parse the staging textarea without saving; errors are shown inline. Changes to "Check Entity" in entity mode.</td></tr>
-  <tr><td><strong>Save</strong></td><td>Parse and append the staged content to the saved policy. The namespace prefix is injected automatically.</td></tr>
-  <tr><td><strong>✨ AI Assist</strong></td><td>Open the AI Assist page with the current ZPL as context</td></tr>
-  <tr><td><strong>Clear</strong></td><td>Discard the staging textarea content without saving</td></tr>
+  <tr><td><strong>Namespace name</strong></td><td>Shows the active namespace. Click the inline selector to switch.</td></tr>
+  <tr><td><strong>Check ZPL</strong></td><td>Parse staging content without saving; errors shown inline</td></tr>
+  <tr><td><strong>Save</strong></td><td>Parse and save staged content; namespace prefix is injected automatically</td></tr>
+  <tr><td><strong>Show All</strong></td><td>Load a read-only combined view of ZPL for the active namespace and all descendants</td></tr>
+  <tr><td><strong>↑↓</strong></td><td>Upload/download menu — see <a href="#upload-download">Upload &amp; Download</a></td></tr>
+  <tr><td><strong>Delete All</strong></td><td>Clear all ZPL for the current namespace tree (root namespace only; asks for confirmation)</td></tr>
+  <tr><td><strong>✨ AI Assistant</strong></td><td>Open the AI Assist panel with the current ZPL pre-loaded as context</td></tr>
 </table>
-<p>After clicking <strong>Check ZPL</strong> and getting a valid result, an <strong>✓ Accept</strong> / <strong>✕ Discard</strong> bar appears below the textarea as a confirmation step before saving.</p>
-<div class="note">ZPL in the staging area uses relative (un-prefixed) class names. The namespace prefix (e.g. <code>Corp.</code>) is added automatically when saving and stripped when loading.</div>
 
-<!-- Definitions Panel -->
-<h2 id="definitions-panel">Definitions Panel</h2>
-<p>The lower zone shows the saved ZPL for the active namespace. It has two view modes toggled by buttons in the toolbar:</p>
+<h3>Staging Input</h3>
+<p>Type new ZPL here before adding it to the saved policy. Two modes:</p>
 <ul>
-  <li><strong>ZPL view</strong> — shows each saved statement as a row with Edit (✏) and Delete (✕) buttons</li>
-  <li><strong>Table view</strong> — shows parsed Classes, Entities, or Rules in a structured table; switch between them using the <strong>Classes / Entities / Rules</strong> tabs</li>
+  <li><strong>ZPL Editor</strong> — type class definitions, allow/never rules, or any ZPL statement</li>
+  <li><strong>ZPL Declares</strong> — type <code>Declare</code> statements to define named entity instances</li>
 </ul>
-<p>Additional toolbar controls:</p>
+<p>After <strong>Check ZPL</strong> passes, a confirmation bar appears with <strong>✓ Accept</strong> and <strong>✕ Discard</strong>. Click <strong>Save</strong> to skip the confirmation and save directly.</p>
+<div class="note">ZPL in the staging area uses relative (un-prefixed) class names. The namespace prefix (e.g. <code>Acme.</code>) is added automatically when saving and stripped when loading.</div>
+
+<!-- Schema Panel -->
+<h2 id="schema-panel">Schema Panel</h2>
+<p>The right panel shows the parsed structure of the saved policy. It has five tabs:</p>
 <table>
-  <tr><th>Control</th><th>Action</th></tr>
-  <tr><td><strong>Full NS</strong></td><td>Show ZPL with full namespace prefixes as stored (e.g. <code>corp.employee</code>)</td></tr>
-  <tr><td><strong>Short</strong></td><td>Show ZPL with the active namespace prefix stripped (editor view)</td></tr>
-  <tr><td><strong>Delete All</strong></td><td>Clear all saved ZPL for the active namespace (with confirmation)</td></tr>
-  <tr><td><strong>🔍 Audit</strong></td><td>Shortcut to run a fast Policy Audit on the active namespace</td></tr>
+  <tr><th>Tab</th><th>Contents</th></tr>
+  <tr><td><strong>Tests</strong></td><td>Manual test runner and test suite management</td></tr>
+  <tr><td><strong>Classes</strong></td><td>Defined classes and their attributes, grouped by hierarchy</td></tr>
+  <tr><td><strong>Rules</strong></td><td>All allow and never-allow rules</td></tr>
+  <tr><td><strong>Entities</strong></td><td>Declared entity instances; YAML and LDAP import/export controls</td></tr>
+  <tr><td><strong>ZPL (full)</strong></td><td>Canonicalized round-trip ZPL output from the parser</td></tr>
 </table>
-<p>In Table view, each row has <strong>Edit</strong>, <strong>Delete</strong>, and <strong>yaml</strong> buttons. Clicking <strong>yaml</strong> expands an inline YAML detail panel for that item.</p>
+<p>Classes and Rules tabs default to <strong>Table view</strong> with Edit, Delete, and yaml buttons per row. The <strong>yaml</strong> button toggles an inline YAML detail panel. Switch to <strong>Tree view</strong> with the toggle at the top of each tab.</p>
+<p>The panel can be expanded to full width with the <strong>⊞</strong> button in the top-right corner.</p>
+
+<!-- Upload / Download -->
+<h2 id="upload-download">Upload &amp; Download</h2>
+<p>The <strong>↑↓</strong> button in the Policy Editor toolbar opens a menu with all import and export options:</p>
+<table>
+  <tr><th>Option</th><th>Description</th></tr>
+  <tr><td>↑ Upload ZPL file</td><td>Load a <code>.zpl</code> file into the staging area</td></tr>
+  <tr><td>↓ Download ZPL file</td><td>Save the current editor content as a <code>.zpl</code> file</td></tr>
+  <tr><td>↓ Export all namespaces (.md)</td><td>Export the full namespace tree as a Markdown bundle</td></tr>
+  <tr><td>↑ Import all namespaces (.md)</td><td>Restore a namespace tree from a Markdown bundle</td></tr>
+  <tr><td>↑ Import .zplc definitions</td><td>Import compiled <code>.zplc</code> class definitions</td></tr>
+  <tr><td>⇄ Translate OCI ZPR → ZPL</td><td>Convert an OCI ZPR policy JSON into ZPL Markdown</td></tr>
+  <tr><td>↑ Import entities (.ldif)</td><td>Import entity instances from an LDIF file into the active namespace</td></tr>
+  <tr><td>⊕ Show entities (.ldif)</td><td>Preview current entities formatted as LDIF in a modal</td></tr>
+  <tr><td>↓ Export entities (.ldif)</td><td>Download current entities as an LDIF file</td></tr>
+</table>
 
 <!-- Writing ZPL -->
 <h2 id="writing-zpl">Writing ZPL</h2>
-<p>ZPL uses four statement types: <code>Define</code>, <code>Allow</code>, <code>Never allow</code>, and <code>Declare</code>*.</p>
-<p style="font-size:0.83rem;color:var(--muted)">* <code>Declare</code> is a ZPR Policy Playground extension — see the <a href="#entities">Entities</a> section below.</p>
+<p>ZPL has four statement types: <code>Define</code>, <code>Allow</code>, <code>Never allow</code>, and <code>Declare</code>.</p>
 
 <h3>Defining Classes</h3>
-<pre><code>Define employee as a user with an ID-number, roles
-    and optional tags full-time, part-time, and intern.
-
-Define database as a service with content
-    and optional tags corporate, employee, financial.</code></pre>
-<p>The base classes are <code>user</code>, <code>service</code>, and <code>endpoint</code>. Subclasses inherit attributes and can add their own. The <code>optional tags</code> clause defines allowed tag values for instances.</p>
+<pre><code>Define Employee  as a user    with employee_id, department, optional role.
+Define Executive as a user    with role:{CEO, SVP, EVP}.
+Define Database  as a service with classification:confidential.
+Define AppServer as a server  with classification:corporate, location.</code></pre>
+<p>Base classes are <code>user</code>, <code>service</code>, <code>endpoint</code>, and <code>server</code>. Classes inherit parent attributes. The <code>with role:{CEO, SVP, EVP}</code> syntax constrains an attribute to a fixed set of values.</p>
 
 <h3>Allow Rules</h3>
-<pre><code>Allow full-time employees to access databases.
-Allow HR employees to access Payroll-DB.
-Allow department:sales employees on managed laptops to access customer databases.</code></pre>
-<p>Rules can match by class, attribute value (<code>department:sales</code>), tag, named entity, or endpoint context (<code>on managed laptops</code>).</p>
+<pre><code>Allow Employee                      to access Database on AppServer.
+Allow Executive with role:{CEO,SVP} to access Database on AppServer.
+Allow Partner   with active:true    to access CustomerSystem on SalesServer.</code></pre>
+<p>Rules match by class, attribute filter (<code>role:SVP</code>), named entity, tag, or server context (<code>on AppServer</code>).</p>
 
 <h3>Never Rules</h3>
-<pre><code>Never allow intern users to access services.
-Never allow internet-gateways to access internal services.</code></pre>
-<p><code>Never allow</code> takes precedence over any matching <code>Allow</code> rule.</p>
+<pre><code>Never allow Executive with role:EVP to access Database on AppServer.
+Never allow FloorWorker to use SystemController.</code></pre>
+<p><code>Never allow</code> is evaluated <strong>before</strong> any <code>Allow</code> rule — a subject matching a never-allow is denied regardless of any matching allow. There is no override.</p>
+
+<h3>Attribute Values Are Exclusive</h3>
+<p>An entity has exactly one value per attribute. A user with <code>role:EVP</code> cannot simultaneously match <code>role:CEO</code> — they are distinct values. A class defined <code>with role:{CEO, SVP, EVP}</code> means any entity whose role is <em>one of</em> those values qualifies.</p>
 
 <h3>Subclasses</h3>
-<pre><code>Define senior-employee as an employee with clearance-level.
-Define internet-gateway as a gateway with external-network-connection:public-internet.</code></pre>
-<p>Subclasses inherit all attributes of their parent. Attribute values can be fixed in a subclass definition.</p>
+<pre><code>Define LegalStaff  as a user with department:legal, optional role.
+Define SalesRep    as a user with department:sales, optional region.</code></pre>
+<p>An allow rule on a parent class covers all subclasses. An allow on <code>Employee</code> also covers <code>LegalStaff</code> and <code>SalesRep</code>.</p>
 
 <!-- Namespaces -->
 <h2 id="namespaces">Namespaces</h2>
-<p>Namespaces scope ZPL definitions and rules. Every class and rule you write belongs to the active namespace. Sub-namespaces allow you to partition a large policy across teams or systems.</p>
-<p>Click any namespace in the sidebar tree to switch to it. The active namespace is highlighted and shown in the Policy Editor header.</p>
-<p>To create, rename, delete, or reassign namespaces, use the <strong>Namespace Manager</strong> page (accessible from the left nav). You can also create a sub-namespace quickly by clicking <strong>+</strong> next to the namespace section header in the sidebar.</p>
-<p>Renaming a namespace cascades: all stored ZPL in that namespace and its descendants is re-prefixed automatically.</p>
+<p>Namespaces scope ZPL definitions and rules. Every class and rule belongs to the active namespace. Sub-namespaces let you partition a large policy across teams or systems, each with their own owner.</p>
+<p>Click any namespace in the sidebar dropdown to switch context. The active namespace is shown in the Policy Editor header.</p>
+<p>To create, rename, delete, or reassign namespaces, use the <strong>Namespace Mgnt</strong> page. Renaming cascades: all stored ZPL in that namespace and its descendants is re-prefixed automatically.</p>
+<p>Cross-namespace class references use dotted notation: <code>Acme.Employee</code> refers to the <code>Employee</code> class in the <code>Acme</code> namespace. The active namespace prefix is stripped in the editor for readability.</p>
 
 <!-- Entities -->
 <h2 id="entities">Entities</h2>
-<p>Entities are named instances of ZPL classes — concrete subjects and objects that exist in your actual environment. For example, <code>Alice</code> as a <code>warehouse-manager</code> with <code>department: operations</code>, or <code>Payroll-DB</code> as a <code>database</code> with <code>tags: financial</code>.</p>
-<div class="note"><strong>Note:</strong> In a production ZPR deployment, entity instances are typically defined in an external directory such as LDAP or Active Directory — not in ZPL policy text. The <code>Declare</code> statement is a ZPR Policy Playground extension added specifically to facilitate simulated rule testing. It lets you describe a small set of named instances directly in the policy editor so that the test generator can produce realistic, entity-specific test cases without requiring a live directory integration.</div>
+<p>Entities are named instances of ZPL classes — the concrete "who" and "what" of your policy. For example, <code>alice.chen</code> as a <code>LegalStaff</code> member with <code>department:legal</code>, or <code>PatentLibrary</code> as a <code>service</code> with <code>classification:confidential</code>.</p>
+<div class="note"><strong>Note:</strong> In a production ZPR deployment, entity instances typically come from an external directory such as LDAP or Active Directory. The <code>Declare</code> statement is a ZPR Policy Builder extension that lets you describe a small set of named instances directly in the policy for use in simulated rule testing.</div>
 
-<h3>Creating Entities</h3>
-<p>Click the <strong>Entities</strong> tab in the staging input zone. The textarea switches to entity mode — type one or more <code>Declare</code> statements and click <strong>Save</strong>:</p>
-<pre><code>Declare Alice as a warehouse-manager with department: operations, shift: day.
-Declare Payroll-DB as a database with tags: financial, employee.</code></pre>
-<p>Declared entities are saved alongside class and rule definitions in the namespace ZPL and appear in the <strong>Entities</strong> tab of the Definitions panel.</p>
+<h3>Declaring Entities</h3>
+<p>Click <strong>ZPL Declares</strong> in the staging toolbar to switch to entity mode, then type:</p>
+<pre><code>Declare alice.chen as a LegalStaff with department:legal, role:associate.
+Declare james.wu   as an Executive  with role:EVP.
+Declare raj.patel  as an Executive  with role:CEO.</code></pre>
+<p>Entities are saved as part of namespace ZPL and appear in the <strong>Entities</strong> tab of the Schema panel.</p>
 
-<h3>Importing and Exporting</h3>
-<p>Entities can also be imported from YAML or LDIF files. In the Definitions panel Table view, the Entities tab has import/export controls. The YAML format:</p>
-<pre><code>entities:
-  - class_name: employee
-    name: Alice
-    attributes:
-      department: engineering
-      roles: developer
-      tags: full-time
-  - class_name: database
-    name: Payroll-DB
-    attributes:
-      tags: financial, employee</code></pre>
-<p>LDIF format uses standard LDAP attribute notation. Imported entities are merged into the namespace ZPL as <code>Declare</code> statements; duplicates are deduplicated automatically.</p>
-
-<h3>Using Entities in Tests</h3>
-<p>Once entities are defined, the <strong>Generate using Entities</strong> option in the Rule Testing generator creates a test suite using real entity names and attributes, including AI-generated adversarial tests.</p>
+<h3>Importing from YAML or LDIF</h3>
+<p>Use <strong>↑↓ → Import entities (.ldif)</strong> in the toolbar, or the YAML/LDAP menus in the Entities tab. Imported entities are merged into namespace ZPL as <code>Declare</code> statements; duplicates are deduplicated automatically.</p>
+<p>YAML format:</p>
+<pre><code>- name: alice.chen
+  class_name: LegalStaff
+  attributes:
+    department: legal
+    role: associate</code></pre>
+<p>LDIF format:</p>
+<pre><code>dn: cn=alice.chen,ou=LegalStaff,dc=zpr,dc=policy
+cn: alice.chen
+objectClass: LegalStaff
+department: legal
+role: associate</code></pre>
+<p>Sample entity files for the Acme demo policy are in <code>Studio_examples/</code>.</p>
 
 <!-- Rule Testing -->
 <h2 id="rule-testing">Rule Testing</h2>
-<p>The <strong>Rule Testing</strong> page lets you verify that your ZPL policy behaves as expected. Access it from the left nav.</p>
+<p>The <strong>Rule Testing</strong> page verifies that your ZPL policy behaves as intended. Access it from the left nav, or use the <strong>Tests</strong> tab in the Schema panel.</p>
 
 <h3>Manual Test</h3>
-<p>Enter a <code>subject class</code>, <code>action</code>, and <code>object class</code> (and optionally per-field attributes) and click <strong>▶ Run</strong>. The result shows <strong>ALLOW</strong> or <strong>DENY</strong> with the matching rule and a full rule trace. Click <strong>+ Add</strong> to save the current test to the test suite.</p>
+<p>In the Manual Test card, select a subject class, enter an action verb, and select an object class. Use <strong>+attr</strong> under each field to add attribute filters — the key is a dropdown of inherited class attributes; the value is a dropdown when the attribute has predefined values, otherwise free text. Click <strong>▶ Run</strong> to evaluate.</p>
+<p>The result shows <strong>ALLOW</strong> or <strong>DENY</strong> with the matching rule and a full rule trace. Click <strong>+ Add to suite</strong> to save the test.</p>
 
 <h3>Generating Tests</h3>
-<p>Click <strong>⚡ Generate…</strong> to open the generator. Two options:</p>
+<p>Click <strong>⚡ Generate…</strong> to open the generator. Choose a count (positive and adversarial), then:</p>
 <ul>
-  <li><strong>Generate from rules</strong> — creates positive and adversarial tests using class-level payloads derived from each allow rule</li>
-  <li><strong>Generate using Entities</strong> — uses your declared entity instances for realistic tests, plus AI-generated adversarial near-miss cases</li>
+  <li><strong>From rules</strong> — generates class-level test cases derived from each allow rule</li>
+  <li><strong>From entities</strong> — uses declared entity instances for realistic tests, plus AI-generated adversarial near-miss cases. Adversarial cases are verified against the engine before inclusion.</li>
 </ul>
-<p>Specify how many positive and adversarial tests to generate. The system verifies each adversarial test against the engine before including it — tests that are not actually denied are discarded.</p>
 
-<h3>Running Tests</h3>
-<p>Click <strong>▶ Run All</strong> to run the full suite. Each row shows <strong>PASS</strong> or <strong>FAIL</strong>. Click a row to expand the payload detail and rule trace.</p>
+<h3>Running the Suite</h3>
+<p>Click <strong>▶ Run All</strong>. Each row shows <strong>PASS</strong> or <strong>FAIL</strong>. Click a row to expand the payload and full rule trace.</p>
+
+<!-- Policy Studio -->
+<h2 id="policy-studio">Policy Studio</h2>
+<p>Policy Studio generates a complete ZPL policy from a plain-English description of your organization and access requirements — no ZPL knowledge required to get started.</p>
+
+<h3>Writing a Description</h3>
+<p>In the <strong>Business Description</strong> field, describe:</p>
+<ul>
+  <li>Who the users are (roles, departments, levels)</li>
+  <li>What systems or services exist</li>
+  <li>Who should access what, and any explicit exclusions</li>
+</ul>
+<p>You can type a description directly, or click <strong>⬆ Upload Description</strong> to load one from a <code>.md</code> or <code>.txt</code> file. The <code>Studio_examples/</code> folder contains sample description files you can use as a starting point.</p>
+
+<h3>Generating the Policy</h3>
+<p>Click <strong>Generate Policy</strong>. The AI produces a structured policy with namespaces, classes, and rules. Results appear as expandable namespace blocks, each showing the generated ZPL.</p>
+
+<h3>Agent Rationale</h3>
+<p>After generation, click <strong>💬 Agent Rationale</strong> to see the AI's reasoning: an introduction to the policy design, rule-by-rule reasoning for key decisions, and a summary of tradeoffs made.</p>
+
+<h3>Deploying the Policy</h3>
+<p>Click <strong>Deploy to Editor</strong> to write the generated policy into your namespace tree and open the Policy Editor. The editor runs a ZPL check automatically after deployment so you can see the parsed result immediately.</p>
 
 <!-- AI Assist -->
 <h2 id="ai-assist">AI Assist</h2>
-<p>Click <strong>✨ AI Assist</strong> in the Policy Editor staging toolbar, or navigate directly via the left nav. The assistant has access to the current ZPL as context.</p>
-<p>You can ask questions about ZPL, request help authoring rules, or ask the assistant to explain what existing rules do. When the assistant returns a ZPL statement, four action buttons appear:</p>
+<p>Click <strong>✨ AI Assistant</strong> in the Policy Editor toolbar, or navigate directly. The assistant has the current ZPL as context.</p>
+<p>Ask questions, request class or rule suggestions, or ask the assistant to explain existing rules. When the assistant returns a ZPL statement, four action buttons appear:</p>
 <table>
   <tr><th>Button</th><th>Action</th></tr>
-  <tr><td><strong>Accept</strong></td><td>Immediately save the statement to the active namespace policy</td></tr>
-  <tr><td><strong>Stage</strong></td><td>Move to the Staged ZPL list for review before saving</td></tr>
+  <tr><td><strong>Accept</strong></td><td>Save the statement directly to the active namespace</td></tr>
+  <tr><td><strong>Stage</strong></td><td>Add to the Staged ZPL list for review before saving</td></tr>
   <tr><td><strong>Drop</strong></td><td>Discard the suggestion</td></tr>
-  <tr><td><strong>Edit</strong></td><td>Load into the chat input for modification before sending</td></tr>
+  <tr><td><strong>Edit</strong></td><td>Load into the input for modification</td></tr>
 </table>
-<p>The <strong>Staged ZPL</strong> panel collects statements you want to review together. Click <strong>✓ Save All</strong> to save the full staged set to the policy at once, or use the per-item Edit / Delete buttons to refine first.</p>
-<p>Click <strong>✓ Done — Back to Editor</strong> when finished.</p>
+<p>The <strong>Staged ZPL</strong> panel collects statements for batch review. Click <strong>✓ Save All</strong> to save them all at once.</p>
 
 <!-- Policy Audit -->
 <h2 id="policy-audit">Policy Audit</h2>
-<p>The <strong>Policy Audit</strong> page uses AI to review your policy and identify issues that are difficult to spot by reading ZPL directly — things like rules that cancel each other out, access grants that are broader than intended due to class inheritance, or missing protective <code>Never allow</code> guards.</p>
-<p>Navigate to <strong>Policy Audit</strong> in the left nav. The analysis covers the active namespace and all its sub-namespaces.</p>
+<p>The <strong>Policy Audit</strong> page uses AI to review your policy for issues that are difficult to spot by reading ZPL directly. The analysis covers the active namespace and all its sub-namespaces.</p>
 
 <h3>Fast vs. Deep Mode</h3>
-<p>Select the analysis depth before running:</p>
 <ul>
-  <li><strong>Fast</strong> (default) — quick analysis, results in a few seconds</li>
-  <li><strong>Deep</strong> — more thorough analysis covering subtler issues and edge cases; may take up to two minutes</li>
+  <li><strong>Fast</strong> (default) — results in a few seconds</li>
+  <li><strong>Deep</strong> — more thorough; may take up to two minutes</li>
 </ul>
 <p>Click <strong>🔍 Run Audit</strong> to start.</p>
 
 <h3>Reading the Report</h3>
-<p>Results appear with a summary at the top and a list of issues below. Each issue is color-coded by severity:</p>
+<p>A summary appears at the top with issue counts by severity. Each issue card is color-coded:</p>
 <table>
   <tr><th>Severity</th><th>Meaning</th></tr>
   <tr><td><span style="color:#ef4444;font-weight:600">HIGH</span></td><td>Security risk or unintended access bypass — review immediately</td></tr>
   <tr><td><span style="color:#f59e0b;font-weight:600">MEDIUM</span></td><td>Likely unintended behavior or unclear policy intent</td></tr>
   <tr><td><span style="color:#6b7280;font-weight:600">LOW</span></td><td>Redundant rule, cosmetic issue, or minor inconsistency</td></tr>
 </table>
-<p>Each issue card shows the relevant rule text, a <strong>Finding</strong> explaining the problem, and a <strong>Fix</strong> recommendation. Click a card to expand it. Categories with no issues are listed at the bottom under <em>No issues in:</em>.</p>
+<p>Each card shows the relevant rule text, a <strong>Finding</strong> explaining the problem, a <strong>Recommendation</strong>, and optionally a green ZPL fix block. Categories with no issues are listed at the bottom under <em>No issues in:</em>.</p>
 
 <h3>Applying a Suggested Fix</h3>
-<p>When the analyst can express the fix as a ZPL statement, a green code block with a <strong>+ Add</strong> button appears inside the card. Clicking <strong>+ Add</strong> appends the statement to the Policy Editor and immediately re-parses. Review and click <strong>Save</strong> to persist the change.</p>
-<p>Fixes that require rewriting or deleting an existing rule must be made manually in the Policy Editor.</p>
+<p>When the analyst can express a fix as a ZPL statement, a green code block with an <strong>Accept</strong> button appears. Clicking <strong>Accept</strong> appends the statement to the saved policy in the active namespace. Fixes that require rewriting or deleting an existing rule must be made manually in the Policy Editor.</p>
 
 <h3>What the Analyst Checks</h3>
 <ul>
-  <li><strong>Shadowing</strong> — <code>Never allow</code> rules that block <code>Allow</code> rules that look intentional; unreachable rules</li>
-  <li><strong>Overly broad rules</strong> — parent-class grants that unintentionally cover confidential or privileged subclasses</li>
-  <li><strong>Class inconsistencies</strong> — references to undefined classes, unknown attribute names, or mismatched values</li>
-  <li><strong>Coverage gaps</strong> — classes with no rules (accidental default-deny); missing <code>Never allow</code> for sensitive verbs</li>
-  <li><strong>Priority conflicts</strong> — rules at the same priority with overlapping subjects and objects</li>
-  <li><strong>Redundant rules</strong> — rules fully subsumed by another rule; exact duplicates</li>
-  <li><strong>Never-allow risks</strong> — guards that are too broad; missing hard blocks on destructive verbs for sensitive classes</li>
-  <li><strong>Structural issues</strong> — per-subclass blocking patterns that break when new subclasses are added; namespace scatter</li>
+  <li><strong>Shadowing</strong> — never-allow rules that block allow rules that look intentional</li>
+  <li><strong>Overly broad</strong> — parent-class grants that unintentionally cover confidential or privileged subclasses</li>
+  <li><strong>Class inconsistency</strong> — references to undefined classes, unknown attributes, or mismatched values</li>
+  <li><strong>Coverage gaps</strong> — classes with no rules (accidental default-deny)</li>
+  <li><strong>Priority conflicts</strong> — same-priority overlapping rules with non-deterministic outcomes</li>
+  <li><strong>Redundant rules</strong> — rules fully subsumed by another; exact duplicates</li>
+  <li><strong>Never-allow risks</strong> — never-allow too broad or replaceable by attribute constraints</li>
+  <li><strong>Structural issues</strong> — per-subclass blocking patterns that break when new subclasses are added</li>
 </ul>
+<div class="note">The analyst understands ZPL evaluation order: never-allow rules fire first (hard deny, no override), then allow rules are checked. It also understands that attribute values are exclusive per entity — a user with <code>role:EVP</code> cannot simultaneously match <code>role:CEO</code>.</div>
 
 <!-- Reports -->
-<h2 id="reports">Reports</h2>
-<p>After a Policy Audit run completes, click <strong>💾 Save</strong> in the audit page header to save the result as a versioned <strong>Audit Report</strong>. Reports are stored in the database and persist across sessions.</p>
-<p>Reports are titled automatically:</p>
-<pre><code>Policy Audit — &lt;namespace&gt; — &lt;date&gt; v&lt;n&gt;</code></pre>
-<p>The version number increments for each report saved for the same namespace on the same date.</p>
-<p>View saved reports by navigating to <strong>Reports</strong> in the left nav. Reports are listed newest-first with the namespace name, date, and a <em>deep</em> badge if the report came from a deep-mode analysis. Click any report to open it. Click the <strong>✕</strong> button on a report row to permanently delete it.</p>
+<h2 id="reports">Audit Reports</h2>
+<p>After a Policy Audit run, click <strong>💾 Save Report</strong> to save the result as a versioned audit report. Reports persist across sessions and are listed on the <strong>Reports</strong> page (accessible from the left nav via the hidden nav target — navigate directly or save from the Audit page).</p>
+<p>Reports are titled automatically: <code>Policy Audit — &lt;namespace&gt; — &lt;date&gt; v&lt;n&gt;</code>. Click any report to open it. Click <strong>✕</strong> to delete.</p>
 <div class="note">Reports are per-user — you only see reports you saved.</div>
+
+<!-- YAML/LDAP Viewer -->
+<h2 id="yaml-viewer">YAML/LDAP Viewer</h2>
+<p>The <strong>YAML/LDAP Viewer</strong> (under User Add-ons in the sidebar) lets you upload and browse YAML or LDIF files without importing them into the policy.</p>
+<p>Drop a file onto the viewer or click to browse. Accepts <code>.yaml</code>, <code>.yml</code>, and <code>.ldif</code> files.</p>
+<p>The viewer renders the content as a formatted document:</p>
+<ul>
+  <li><strong>Entity lists</strong> (arrays with <code>class_name</code> and <code>name</code> fields) — grouped by class with one table per class, showing name and all attribute columns</li>
+  <li><strong>Generic object lists</strong> — inferred columns from all keys, rendered as a table</li>
+  <li><strong>Dictionaries</strong> — section headers per top-level key with nested tables or lists</li>
+</ul>
+<p>The sample entity files in <code>Studio_examples/</code> (<code>Acme_entities.yaml</code>, <code>Acme_entities.ldif</code>) are designed to be viewed here before importing.</p>
+
+<!-- ZPL Config -->
+<h2 id="zpl-config">ZPL Config</h2>
+<p>The <strong>ZPL Config</strong> page lets you extend the built-in ZPL vocabulary for the active root namespace. Changes apply to all namespaces under that root.</p>
+<ul>
+  <li><strong>Built-in classes</strong> — additional base class names that the parser treats as built-ins (not auto-prefixed)</li>
+  <li><strong>Class aliases</strong> — map alternate names to canonical class names (e.g. <code>users → user</code>)</li>
+  <li><strong>Custom verbs</strong> — additional action verbs beyond the built-in set</li>
+</ul>
+<p>System-level entries (from <code>defaults/system_classes.yaml</code>) are shown read-only. Your additions appear separately and can be edited or removed.</p>
 
 <!-- Profile -->
 <h2 id="profile">Profile &amp; API Token</h2>
-<p>Click <strong>Profile</strong> at the bottom of the left nav to open the profile panel. From here you can:</p>
+<p>Click <strong>Profile</strong> at the bottom of the left nav. From here you can:</p>
 <ul>
   <li>Update your display name and email</li>
   <li>Change your password</li>
   <li>View or regenerate your <strong>Bearer token</strong> for API access</li>
 </ul>
-<p>The Bearer token can be used by external systems to call the API without a browser session:</p>
+<p>The Bearer token enables external systems to call the API without a browser session:</p>
 <pre><code>Authorization: Bearer &lt;your-token&gt;</code></pre>
 
 <!-- Admin -->
 <h2 id="admin">Admin</h2>
-<p>Users with admin privileges can access the admin interface at <code>/admin</code>. The first user created (via <code>/setup</code>) is automatically an admin.</p>
+<p>Users with admin privileges can access the admin interface at <code>/admin</code>. The first user (created via <code>/setup</code>) is automatically an admin.</p>
 <p>From the admin interface you can:</p>
 <ul>
   <li>View all users and their root namespaces</li>
   <li>Create new users with auto-created root namespaces</li>
-  <li>Grant or revoke admin privileges</li>
+  <li>Grant or revoke admin privileges (you cannot revoke your own)</li>
   <li>Reset any user's password</li>
 </ul>
 
@@ -350,10 +412,10 @@ Declare Payroll-DB as a database with tags: financial, employee.</code></pre>
 <h3>Statement Types</h3>
 <table>
   <tr><th>Type</th><th>Syntax</th></tr>
-  <tr><td>Define class</td><td><code>Define &lt;name&gt; as a &lt;base-class&gt; with &lt;attrs&gt;.</code></td></tr>
-  <tr><td>Allow rule</td><td><code>Allow &lt;subject&gt; to &lt;verb&gt; &lt;object&gt;.</code></td></tr>
-  <tr><td>Deny rule</td><td><code>Never allow &lt;subject&gt; to &lt;verb&gt; &lt;object&gt;.</code></td></tr>
-  <tr><td>Declare entity</td><td><code>Declare &lt;name&gt; as a &lt;class&gt; with &lt;attrs&gt;.</code></td></tr>
+  <tr><td>Define class</td><td><code>Define &lt;Name&gt; as a &lt;base-class&gt; with &lt;attrs&gt;.</code></td></tr>
+  <tr><td>Allow rule</td><td><code>Allow &lt;Subject&gt; to &lt;verb&gt; &lt;Object&gt;.</code></td></tr>
+  <tr><td>Never rule</td><td><code>Never allow &lt;Subject&gt; to &lt;verb&gt; &lt;Object&gt;.</code></td></tr>
+  <tr><td>Declare entity</td><td><code>Declare &lt;name&gt; as a &lt;Class&gt; with &lt;attrs&gt;.</code></td></tr>
 </table>
 
 <h3>Base Classes</h3>
@@ -361,72 +423,66 @@ Declare Payroll-DB as a database with tags: financial, employee.</code></pre>
   <tr><th>Class</th><th>Role</th></tr>
   <tr><td><code>user</code></td><td>Human actor (subject)</td></tr>
   <tr><td><code>service</code></td><td>Software system (subject or object)</td></tr>
-  <tr><td><code>endpoint</code></td><td>Device or network location (context for <code>on</code> clauses)</td></tr>
+  <tr><td><code>endpoint</code></td><td>Device or network location</td></tr>
+  <tr><td><code>server</code></td><td>Infrastructure node (used in <code>on</code> clauses)</td></tr>
 </table>
 
-<h3>Verbs</h3>
+<h3>Rule Evaluation Order</h3>
+<ol>
+  <li><strong>Never-allow rules</strong> checked first, highest priority first → match = <strong>DENY</strong> (hard, no override)</li>
+  <li><strong>Allow rules</strong> checked, highest priority first → match = <strong>ALLOW</strong></li>
+  <li>No match → <strong>DENY</strong> (default-deny)</li>
+</ol>
+
+<h3>Built-in Verbs</h3>
 <p><code>access</code>, <code>use</code>, <code>call</code>, <code>read</code>, <code>write</code>, <code>connect to</code>, <code>operate</code></p>
 
 <h3>Subject / Object Filters</h3>
 <table>
   <tr><th>Filter</th><th>Example</th></tr>
-  <tr><td>Class match</td><td><code>Allow employees to access databases.</code></td></tr>
-  <tr><td>Tag filter</td><td><code>Allow full-time employees to access databases.</code></td></tr>
-  <tr><td>Attribute value</td><td><code>Allow department:sales employees to access customer-db.</code></td></tr>
-  <tr><td>Named entity</td><td><code>Allow Alice to access Payroll-DB.</code></td></tr>
-  <tr><td>Endpoint context</td><td><code>Allow employees on managed-laptops to access databases.</code></td></tr>
+  <tr><td>Class match</td><td><code>Allow Employee to access Database.</code></td></tr>
+  <tr><td>Attribute value</td><td><code>Allow Employee with department:legal to access Database.</code></td></tr>
+  <tr><td>Value set</td><td><code>Allow Executive with role:{CEO,SVP} to access Database.</code></td></tr>
+  <tr><td>Named entity</td><td><code>Allow alice.chen to access PatentLibrary.</code></td></tr>
+  <tr><td>Server context</td><td><code>Allow LegalStaff to access Database on LegalServer.</code></td></tr>
 </table>
 
 <h3>Attribute Syntax in Define</h3>
 <table>
   <tr><th>Form</th><th>Meaning</th></tr>
-  <tr><td><code>with department</code></td><td>Required attribute</td></tr>
-  <tr><td><code>with department:engineering</code></td><td>Fixed-value attribute</td></tr>
-  <tr><td><code>optional tags full-time, part-time</code></td><td>Allowed tag values</td></tr>
+  <tr><td><code>with department</code></td><td>Required attribute (any value)</td></tr>
+  <tr><td><code>with department:legal</code></td><td>Fixed-value attribute</td></tr>
+  <tr><td><code>with role:{CEO, SVP, EVP}</code></td><td>Attribute constrained to a value set</td></tr>
+  <tr><td><code>optional role</code></td><td>Optional attribute</td></tr>
 </table>
 
 <h2 id="release-notes">Release Notes &amp; ZPL Extensions</h2>
 
-<p>ZPR Policy Playground v3 implements RFC-15.5 ZPL with the following documented extensions.</p>
+<p>ZPR Policy Builder implements RFC-15.5 ZPL with the following documented extensions.</p>
 
 <h3>Extension 1 — <code>attr:value</code> filters in Allow / Never rules</h3>
 <p><strong>RFC-15.5 baseline:</strong> rule qualifiers support bare tag words only.<br>
-<strong>This extension:</strong> <code>attr:value</code> pairs are also accepted as qualifiers before the class name in Allow and Never rules.
-The value is matched against the class's attribute at rule-evaluation time — equality for single-valued attributes, containment for multi-valued ones.</p>
-<pre><code>Never allow backup:nightly servers to access backup-services.
-Allow role:engineer employees to access code-repos.
-Never allow clearance:low users to access classified services.</code></pre>
+<strong>This extension:</strong> <code>attr:value</code> pairs (and <code>attr:{v1,v2,...}</code> sets) are accepted as qualifiers in Allow and Never rules. Values are matched at rule-evaluation time — equality for single-valued attributes.</p>
+<pre><code>Allow Executive with role:{CEO, SVP} to access ITDashboard on AdminServer.
+Never allow Executive with role:EVP  to access ITDashboard on AdminServer.</code></pre>
 
 <h3>Extension 2 — Cross-namespace dotted class references</h3>
 <p><strong>RFC-15.5 baseline:</strong> class names are single unqualified identifiers.<br>
-<strong>This extension:</strong> fully-qualified dotted names (e.g. <code>corp.employee</code>) are valid as class names and parent references in both Define and Allow/Never statements.
-The active namespace prefix is stripped on load and injected on save; cross-namespace references keep their full dotted path in the editor.</p>
-<pre><code>Define employee as a corp.employee with department:hr.
-Allow corp.contractors to access corp.hr.employee-db.</code></pre>
+<strong>This extension:</strong> fully-qualified dotted names (e.g. <code>Acme.Employee</code>) are valid as class names and parent references. The active namespace prefix is stripped on load and injected on save; cross-namespace references keep their full dotted path.</p>
+<pre><code>Allow Acme.Executive with role:{CEO,SVP} to access Admin.ITDashboard on Admin.AdminServer.</code></pre>
 
 <h3>Extension 3 — <code>aka</code> aliases and singular/plural class names</h3>
 <p><strong>RFC-15.5 baseline:</strong> class names are exact identifiers.<br>
-<strong>This extension:</strong> class definitions may declare an <code>aka</code> alias (typically a singular or plural variant).
-Both forms are accepted interchangeably throughout ZPL statements.
-Built-in roots: <code>users</code>/<code>user</code>, <code>endpoints</code>/<code>endpoint</code>, <code>services</code>/<code>service</code>, <code>servers</code>/<code>server</code>.</p>
-<pre><code>Define employee aka employees as a user.
-Allow employees to access gitlab.   # both forms valid</code></pre>
+<strong>This extension:</strong> class definitions may declare an <code>aka</code> alias. Both forms are accepted interchangeably. Built-in roots: <code>users</code>/<code>user</code>, <code>endpoints</code>/<code>endpoint</code>, <code>services</code>/<code>service</code>, <code>servers</code>/<code>server</code>.</p>
 
 <h3>Extension 4 — <code>Declare</code> statement for entity instances</h3>
-<p><strong>RFC-15.5 baseline:</strong> ZPL defines classes and rules only; named instances are referenced in rules by convention but are not declared in policy text.<br>
-<strong>This extension:</strong> a <code>Declare</code> statement explicitly instantiates a named entity of a given class, with optional attribute values.
-Declared entities are stored in ZPL alongside class definitions and rules, appear in the Entities tab of the Definitions panel, and are used by the test generator.</p>
-<pre><code>Declare Alice as a warehouse-manager with department: operations, shift: day.
-Declare Packer-1 as a packing-machine with zone: packing, status: active.
-
-# Named entities can then be referenced directly in rules:
-Allow Alice to access hr-database.
-Never allow Ted to read payroll-system.</code></pre>
-<p>Use the <strong>Entities</strong> tab in the Policy Editor staging zone to switch the input hint to entity declaration syntax.
-YAML and LDIF entity files can still be imported via the Entities tab in the Definitions panel; imported entities are automatically converted to <code>Declare</code> statements and merged into the namespace ZPL — duplicates are deduplicated on save.</p>
+<p><strong>RFC-15.5 baseline:</strong> ZPL defines classes and rules only; named instances are not declared in policy text.<br>
+<strong>This extension:</strong> a <code>Declare</code> statement instantiates a named entity of a given class with attribute values. Declared entities are stored with namespace ZPL, appear in the Entities tab, and are used by the test generator.</p>
+<pre><code>Declare alice.chen as a LegalStaff with department:legal, role:associate.
+Declare james.wu   as an Executive  with role:EVP.</code></pre>
 
 <p style="margin-top:2.5rem;font-size:0.78rem;color:var(--muted)">
-  ZPR Policy Playground &mdash; Applied Invention, LLC &mdash; <a href="https://zpr.org" target="_blank">zpr.org</a>
+  ZPR Policy Builder &mdash; Applied Invention, LLC &mdash; <a href="https://zpr.org" target="_blank">zpr.org</a>
 </p>
 
 </main>

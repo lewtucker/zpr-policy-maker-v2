@@ -1,71 +1,83 @@
-# ZPR Policy Maker
+# ZPR Policy Builder
 
-A web-based editor and tester for [ZPL (Zero-trust Policy Language)](https://zpr.org), the policy
-language defined in ZPR RFC-15.5. Built by [Applied Invention, LLC](https://appliedinvention.com).
+A browser-based editor, tester, and AI-assisted authoring tool for
+[ZPL (Zero-trust Policy Language)](https://zpr.org), the policy language defined in ZPR RFC-15.5.
 
-ZPR — Zero-trust Policy Runtime — is a framework for expressing and enforcing access control
-policies in plain English. This tool lets you author, validate, and test ZPL policies across a
-hierarchy of namespaces, with live parse feedback and AI-assisted authoring.
+ZPL lets you express access control policies in plain, structured English:
+who can access what, under what conditions, and what is explicitly denied.
+This tool lets you author, validate, test, and audit ZPL policies across a
+multi-namespace hierarchy, with live parse feedback and AI-powered assistance.
 
 ---
 
 ## Features
 
 **ZPL editor with live parse**
-Write ZPL directly in a code editor. On every parse or save, the right panel updates with the
-structured class hierarchy and rule list extracted from your policy. A canonicalized
-round-trip view of your ZPL is also available.
+Write ZPL directly in a code editor. Parse or save and the right panel updates instantly
+with structured classes, rules, and entities extracted from your policy. A canonicalized
+round-trip view of your ZPL is also available in the ZPL (full) tab.
 
 **Multi-namespace ownership tree**
-Policies are organized into namespaces arranged in an ownership tree. Each namespace has a named
-owner; sub-namespaces can be created under any node and assigned to a different user. The active
-namespace is displayed in the editor toolbar; switching context loads that namespace's ZPL
-automatically. A "Show All" view renders the combined ZPL for a namespace and all its
-descendants.
+Policies are organized into a namespace tree. Each namespace has a named owner;
+sub-namespaces can be created under any node and delegated to different users.
+Switch active context from the sidebar selector. A "Show All" view renders combined ZPL
+for a namespace and all its descendants.
 
 **Entity management**
-Define named instances of ZPL classes (e.g. "Alice" as an `employee` with `roles:engineering`)
-with typed attributes. Entities can be imported and exported as YAML or LDIF.
+Define named instances of ZPL classes using `Declare` statements
+(e.g. `Declare Alice as an Employee with department:legal`).
+Entities can be imported from YAML or LDIF files via the `↑↓` toolbar menu
+or the Entities tab panel, and exported in both formats.
 
-**Policy test suite**
-Build a test suite against your policy: manually add subject/object/verb test cases, or
-auto-generate them — either rule-based coverage or AI-generated adversarial cases. Run all tests
-at once and see pass/fail results inline.
+**Rule testing**
+Build a test suite against your policy: manually enter subject/object/verb test cases,
+generate rule-based coverage tests, or use AI to generate adversarial near-miss cases
+using your declared entity instances. Run all tests at once with full rule traces.
+
+**Policy Studio**
+Describe your organization and access requirements in plain English. The AI generates
+a complete ZPL policy — namespaces, classes, and rules — and can explain its reasoning
+via the Agent Rationale view. Deploy the generated policy directly to your namespace tree.
+
+**Policy Audit**
+An AI-powered analyst reviews the active namespace subtree for security risks, ambiguities,
+and structural issues: shadowing, overly broad class grants, coverage gaps, priority
+conflicts, redundant rules, and more. Issues include suggested ZPL fixes that can be
+accepted directly into the editor with one click.
 
 **AI Assist**
-An integrated Anthropic Claude panel helps you write and refine ZPL. Ask questions, generate
-class definitions, or get suggestions for rules based on your existing policy.
+An inline chat assistant with access to the current policy. Ask questions, generate
+class definitions, or explain what rules do. Suggestions can be accepted, staged for
+review, or discarded.
+
+**YAML/LDAP Viewer**
+Upload a `.yaml` or `.ldif` file and see it rendered as a formatted document. Entity
+lists are grouped by class with attribute tables; generic YAML is rendered as structured
+sections.
+
+**ZPL Config**
+Per-namespace configuration for built-in class extensions, custom aliases, and verb lists.
 
 **Admin interface**
-Admins can view all users, grant or revoke admin privileges, and see a namespace overview across
-the entire system.
+Admins can view all users, create accounts, grant or revoke admin privileges,
+and reset passwords. Access at `/admin`.
 
 ---
 
 ## ZPL Quick Example
 
-ZPL is an English-like policy language. A simple policy might look like:
+```zpl
+Define Employee  as a user    with employee_id, department, optional role.
+Define Executive as a user    with role:{CEO, SVP, EVP}.
+Define Database  as a service with classification:confidential.
+Define AppServer as a server  with classification:corporate, location.
 
-```
-Define employee as a user with an ID-number, roles and optional tags full-time, part-time,
-    and intern.
-Define database as a service with content and optional tags corporate, employee, financial.
-
-Never allow intern users to access services.
-Allow full-time employees to access databases.
-```
-
-Policies can include attribute filters, named instances, endpoint constraints, and denial rules:
-
-```
-Allow sales employees on managed laptops to access customer databases.
-Never allow role:intern users to access classified services.
-Allow HR employees to access Timesheet-database.
-Allow Timesheet-load-balancer to access Timesheet-database.
+Allow Employee                      to access Database  on AppServer.
+Allow Executive with role:{CEO,SVP} to access Database  on AppServer.
+Never allow Executive with role:EVP to access Database  on AppServer.
 ```
 
-The full grammar is specified in ZPR RFC-15.5, a copy of which is at
-`ZPL_Reference/ZPR_RFC-15.5.pdf` in this repository.
+The full grammar is specified in ZPR RFC-15.5 (`bnf/zpl_rfc15_5.bnf`).
 
 ---
 
@@ -74,13 +86,20 @@ The full grammar is specified in ZPR RFC-15.5, a copy of which is at
 **Requirements:** Python 3.11+
 
 ```bash
+# 1. Install dependencies
 cd src/server
 pip install -r requirements.txt
+
+# 2. Configure environment
+cp .env.example .env
+# Edit .env — set APP_PASSWORD, SECRET_KEY, and ANTHROPIC_API_KEY
+
+# 3. Run
 uvicorn server:app --reload --port 8083
 ```
 
-Open `http://localhost:8083` in a browser. On first run, you will be redirected to `/setup` to
-create the root admin account.
+Open `http://localhost:8083`. On first run you are redirected to `/setup` to create the
+root admin account. AI features require `ANTHROPIC_API_KEY` in `.env`.
 
 ---
 
@@ -98,24 +117,39 @@ create the root admin account.
 ## Project Structure
 
 ```
-src/server/          FastAPI app, ZPL parser/serializer, database layer, SPA frontend
-docs/                Design docs and test case reference
-ZPL_Reference/       ZPR RFC-15.5 PDF, example ZPL policies
-bnf/                 BNF grammar for RFC-15.5 ZPL
-OCI_references/      Oracle ZPEL reference classes and policy examples (design reference)
-scripts/             Deployment and database backup scripts
-reference/           v1 source (read-only reference; not imported)
+src/server/
+  server.py             FastAPI app — all HTTP endpoints
+  zpl_parser.py         ZPL RFC-15.5 parser
+  zpl_serializer.py     Round-trip ZPL serializer
+  zpl_engine.py         Rule evaluator (pure, no I/O)
+  namespace.py          Namespace prefix inject/strip
+  database.py           SQLite access layer
+  ai_client.py          Anthropic SDK wrapper
+  oci_translator.py     OCI ZPR policy → ZPL translator
+  prompts/              AI system prompts (policy_analyst.md, etc.)
+  static/
+    index.html          SPA frontend
+    help.html           User Guide (served at /help)
+    admin.html          Admin panel
+  defaults/
+    system_classes.yaml Built-in ZPL class hierarchy
+  tests/                pytest test suite (83 tests)
+
+Studio_examples/        Sample policies, entities (YAML + LDIF)
+docs/                   Architecture and demo notes
+scripts/                Backup / restore scripts
+bnf/                    BNF grammars for ZPL and ZPEL
 ```
 
 Detailed documentation:
 
-- `docs/ProjectSummary.md` — architecture and design overview
-- `docs/UserGuide.md` — end-user guide (also served at `/help` in the running app)
-- `ZPL_Reference/ZPR_RFC-15.5.pdf` — the ZPL language specification
+- `docs/ProjectSummary.md` — architecture overview
+- `Implementation_Guide.md` — deployment and configuration guide
+- `/help` in the running app — full user guide
 
 ---
 
 ## Links
 
 - ZPR homepage: [https://zpr.org](https://zpr.org)
-- GitHub repository: [https://github.com/lewtucker/zpr-policy-maker-v2](https://github.com/lewtucker/zpr-policy-maker-v2)
+- GitHub: [https://github.com/lewtucker/zpr-policy-maker-v2](https://github.com/lewtucker/zpr-policy-maker-v2)
