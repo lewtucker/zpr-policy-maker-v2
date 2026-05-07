@@ -41,7 +41,7 @@ _server_dir = Path(__file__).parent
 SESSION_SECRET = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
 APP_PASSWORD = os.environ.get("APP_PASSWORD")
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "demodemo")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 
 if not APP_PASSWORD:
     raise RuntimeError(

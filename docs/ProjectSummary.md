@@ -354,8 +354,8 @@ The production environment is provisioned but not yet deployed.
 
 | Item | Value |
 |------|-------|
-| URL | `https://zpr-policy2.lewtucker.net` |
-| Server | `72.62.97.102` |
+| URL | `https://<your-domain>` |
+| Server | `<your-server-ip>` |
 | Server path | `/opt/zpr-policy-maker-v2/src/server/` |
 | Systemd service | `zpr-policy-maker-v2` |
 | Port | `8082` |

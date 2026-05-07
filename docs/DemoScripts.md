@@ -5,7 +5,7 @@ Here are some notes regarding running different kinds of demos of the ZPR-Policy
 # 1. Filename conventions
 
 **Pathname: /demo**.  extensions ZPL = *.txt,  yaml = *.yaml
-Demos are stored under different user names, e.g. zpl, rfc, oci, etc.  and the password is the username followed by 12345, eg. rfc12345
+Demos are stored under different user names, e.g. zpl, rfc, oci, etc. Passwords are set locally — see `.env` / `.env.example` for the `APP_PASSWORD` used during account setup.
 If changes are made to the demo accounts, these should be deleted or the account may have to be deleted by the admin and recreated.
 
 The Example ZPL is what is loaded by default
@@ -47,4 +47,4 @@ Scenario testing works in a similar way, but is still in development. It's meant
 
 Laslty this is really meant to be a policy enforcement service for an external system. It has ZPI endpoints (see ./docs) which other services can send in requests and get back either Accept or Deny.  Here we have our own test generator service that creates a set of test cases to send to our own endpoint.  Demo Test Runner.  Take a look at the Activity log and you can see that the test runner injected each of these rules and gave back verdicts.
 
-You can each try this yourself.  Goto zpr-policy.lewtucker.net.  Make up a user name, use the password ZPR and it will setup an account for you.  You can change your password to something better to protect your account, and make up or test your own rules. You can't hurt the system, so you can delete all but the ZPL system classes and rules. This system is in development so I can't guarantee to preserve your data, but give it a try.
+You can try this yourself on a running instance. Go to the deployment URL, make up a username, and use the `APP_PASSWORD` configured in `.env` to set up an account. You can change your password afterwards and explore creating your own classes, entities, and rules.
