@@ -1290,7 +1290,11 @@
                 <div id="nps-ldap-loaded" style="display:none;margin-top:0.5rem">
                   <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:7px;padding:0.5rem 0.85rem;font-size:0.82rem;color:#14532d;display:flex;align-items:center;gap:0.5rem">
                     <span>✓ Loaded: <strong id="nps-ldap-fname"></strong></span>
-                    <button class="nps-tb-btn" style="margin-left:auto;color:#dc2626" onclick="npsLdapClear()">✕</button>
+                    <button class="nps-tb-btn" style="margin-left:auto;color:#15803d;border:1px solid #86efac;border-radius:4px;padding:0.1rem 0.5rem" onclick="npsLdapTogglePreview()">Show</button>
+                    <button class="nps-tb-btn" style="color:#dc2626" onclick="npsLdapClear()">✕</button>
+                  </div>
+                  <div id="nps-ldap-preview" style="display:none;margin-top:0.4rem">
+                    <textarea readonly style="width:100%;min-height:140px;max-height:260px;font-family:var(--font-mono);font-size:0.78rem;line-height:1.5;background:#f8fafc;color:#1e293b;border:1.5px solid #86efac;border-radius:7px;padding:0.6rem 0.85rem;resize:vertical;box-sizing:border-box;outline:none" id="nps-ldap-preview-text"></textarea>
                   </div>
                 </div>
                 <div class="nps-hint" style="margin-top:0.5rem">The AI will read your directory structure and generate ZPL classes, rules, and namespaces that match your real users, groups, and services.</div>
@@ -5779,11 +5783,21 @@ function npsLdapLoadFile(file) {
   reader.onload = e => {
     npsLdapContent = { name: file.name, text: e.target.result };
     document.getElementById('nps-ldap-fname').textContent = file.name;
+    document.getElementById('nps-ldap-preview-text').value = e.target.result;
+    document.getElementById('nps-ldap-preview').style.display = 'none';
     document.getElementById('nps-ldap-loaded').style.display = 'block';
     document.getElementById('nps-ldap-drop').style.display = 'none';
     npsDescChange();
   };
   reader.readAsText(file);
+}
+
+function npsLdapTogglePreview() {
+  const wrap = document.getElementById('nps-ldap-preview');
+  const btn  = document.querySelector('#nps-ldap-loaded .nps-tb-btn');
+  const open = wrap.style.display !== 'none';
+  wrap.style.display = open ? 'none' : 'block';
+  btn.textContent = open ? 'Show' : 'Hide';
 }
 
 function npsLdapDrop(e) {
@@ -5800,6 +5814,8 @@ function npsLdapPick(input) {
 function npsLdapClear() {
   npsLdapContent = null;
   document.getElementById('nps-ldap-loaded').style.display = 'none';
+  document.getElementById('nps-ldap-preview').style.display = 'none';
+  document.getElementById('nps-ldap-preview-text').value = '';
   document.getElementById('nps-ldap-drop').style.display = 'block';
 }
 
@@ -6076,9 +6092,18 @@ async function npsRefine() {
     });
 
     thinking.remove();
-    npsAddMsg('ai', esc(result.reply || 'Done.'));
+    // Verify the returned ZPL actually reflects the reply by showing a count
+    const verifyZpl = (result.namespaces || []).map(ns => (ns.zpl || '').trim()).filter(Boolean).join('\n\n');
+    let verifyNote = '';
+    try {
+      const parsed = await api('POST', '/api/parse', { text: verifyZpl, language: 'zpl', name: '' });
+      const rc = (parsed.policy_set?.rules || []).length;
+      const cc = (parsed.policy_set?.classes || []).length;
+      verifyNote = ` <span style="font-size:0.78rem;color:var(--muted)">(${cc} class${cc!==1?'es':''}, ${rc} rule${rc!==1?'s':''})</span>`;
+    } catch(_) {}
+    npsAddMsg('ai', esc(result.reply || 'Done.') + verifyNote);
 
-    // Update stored result and ZPL previews
+    // Update stored result and all ZPL views
     if (npsResult) npsResult.namespaces = result.namespaces;
     const allZpl = (result.namespaces || []).map(ns => (ns.zpl || '').trim()).filter(Boolean).join('\n\n');
     const zplEscaped = esc(allZpl);
@@ -6086,6 +6111,10 @@ async function npsRefine() {
     document.getElementById('nps-zpl-preview').innerHTML = zplHtml;
     document.getElementById('nps-zpl-deploy').value = allZpl;
     document.getElementById('nps-ns-preview').innerHTML  = npsBuildNsPreview(result.namespaces || []);
+    // Keep review panels in sync regardless of which tab is open
+    document.getElementById('nps-review-zpl-body').value = allZpl;
+    const reviewTableVisible = document.getElementById('nps-review-table')?.style.display !== 'none';
+    if (reviewTableVisible) npsShowReview('table');
 
   } catch(e) {
     thinking.remove();
