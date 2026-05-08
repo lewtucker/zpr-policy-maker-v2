@@ -5692,10 +5692,13 @@ function npsSetInputMode(mode) {
   if (!btn) return;
   if (mode === 'zpl') {
     btn.textContent = '✓ Check ZPL';
-    npsIntent = 'check';
+    // ZPL input mode defaults to replace — user is explicitly typing the full policy.
+    // Only switch if user hasn't already made an explicit intent choice (i.e. still on 'append').
+    if (npsIntent === 'append') npsSetIntent('replace');
   } else {
     btn.textContent = '⚡ Generate Policy';
-    if (npsIntent === 'check') npsIntent = 'append';
+    // Switching away from ZPL: restore append if intent was replace (i.e. set by mode switch, not by user).
+    if (npsIntent === 'replace') npsSetIntent('append');
   }
 }
 
@@ -5995,7 +5998,7 @@ function npsReset() {
   npsResult = null;
   npsLdapContent = null;
   npsSetIntent('append');
-  npsSetInputMode('zpl');
+  npsSetInputMode('desc');
   npsLdapClear();
 
   // Clear all input fields
@@ -6451,7 +6454,7 @@ async function npsDeploy() {
   try {
     const deployed = [];
 
-    const deployIntent = (npsIntent === 'check') ? 'replace' : (npsIntent || 'replace');
+    const deployIntent = npsIntent || 'replace';
 
     // Helper: write ZPL to whichever namespace is currently active, respecting intent.
     // For new namespaces (isNew=true) always replace (nothing to append to).
