@@ -255,48 +255,19 @@ Release Notes content lives inside the User Guide (no separate button).
 
 ## Production Infrastructure
 
-- **URL**: `https://<your-domain>` (SSL via Certbot)
-- **nginx**: proxies to port 8082
-- **Server path**: `/opt/zpr-policy-maker-v2/src/server/`
-- **Systemd service**: `zpr-policy-maker-v2`
-- **Port**: 8082
+- **URL**: `https://zpr-policy.lewtucker.net` (SSL via Certbot)
+- **Server**: `root@72.62.97.102`
+- **nginx**: proxies to port 8081
+- **Server path**: `/opt/zpr-policy-maker/src/server/`
+- **Systemd service**: `zpr-policy-maker`
+- **Port**: 8081
 
-### First Deployment Checklist
-
-```bash
-# 1. rsync code (always use full absolute paths; never overwrite .env or DB)
-rsync -av \
-  --exclude='.env' --exclude='zpr_policy.db' \
-  --exclude='__pycache__/' --exclude='.pytest_cache/' --exclude='*.pyc' --exclude='.DS_Store' \
-  /path/to/ZPR-Policy-maker-v2/src/server/ \
-    root@<your-server-ip>:/opt/zpr-policy-maker-v2/src/server/
-
-# 2. On server: create venv + install deps
-ssh root@<your-server-ip> "cd /opt/zpr-policy-maker-v2 && python3 -m venv venv && \
-    venv/bin/pip install -r src/server/requirements.txt"
-
-# 3. Write .env on server (see src/server/.env.example)
-ssh root@<your-server-ip> "cat > /opt/zpr-policy-maker-v2/src/server/.env << 'EOF'
-APP_PASSWORD=<your-app-password>
-SECRET_KEY=<random-64-char-hex>
-ANTHROPIC_API_KEY=<your-anthropic-api-key>
-EOF"
-
-# 4. Enable and start service
-ssh root@<your-server-ip> "systemctl enable --now zpr-policy-maker-v2"
-```
+> ⚠️ There is a separate `zpr-policy-maker-v2` service on port 8082 (`zpr-policy2.lewtucker.net`).
+> Do NOT deploy there. Always target `zpr-policy-maker` / `/opt/zpr-policy-maker/`.
 
 ### Subsequent Deploys
 
 ```bash
 # Use the deploy script (handles excludes automatically):
 scripts/deploy.sh
-
-# Or manually:
-rsync -av \
-  --exclude='.env' --exclude='zpr_policy.db' \
-  --exclude='__pycache__/' --exclude='.pytest_cache/' --exclude='*.pyc' --exclude='.DS_Store' \
-  /path/to/ZPR-Policy-maker-v2/src/server/ \
-    root@<your-server-ip>:/opt/zpr-policy-maker-v2/src/server/
-ssh root@<your-server-ip> "systemctl restart zpr-policy-maker-v2"
 ```
