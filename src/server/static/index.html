@@ -1639,6 +1639,13 @@ function navigate(pageId, navEl) {
   if (nav) nav.classList.add('active');
 
   // Page-specific activation
+  if (pageId === 'editor') {
+    setSchemaTab('classes');
+    if (!S.lastParsed) {
+      if (S._storedZpl) autoParse();
+      else loadNamespaceZpl();
+    }
+  }
   if (pageId === 'testing') {
     const body = document.getElementById('testing-body');
     if (body) renderTests(body);
@@ -6501,6 +6508,7 @@ async function npsDeploy() {
     btn.disabled = false;
     if (typeof loadContext === 'function') await loadContext();
     if (typeof loadSubOwners === 'function') await loadSubOwners();
+    if (typeof loadNamespaceZpl === 'function') await loadNamespaceZpl();
   } catch(e) {
     clearStatus();
     // Restore context to root on error
