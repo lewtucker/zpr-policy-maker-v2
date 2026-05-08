@@ -1,6 +1,6 @@
 {{greeting}}
 
-I'd like to invite you to try out ZPR Policy Builder, a tool for creating and testing
+I'd like to invite you to try out ZPR Policy Playground, a tool for creating and testing
 ZPL (Zero-trust Policy Language) access policies.
 
 You can access it here:
