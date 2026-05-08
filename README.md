@@ -8,6 +8,13 @@ who can access what, under what conditions, and what is explicitly denied.
 This tool lets you author, validate, test, and audit ZPL policies across a
 multi-namespace hierarchy, with live parse feedback and AI-powered assistance.
 
+ZPR Policy Builder is designed to integrate into **real-time operational systems**.
+When a service, application, or automated workflow needs to determine whether a
+proposed action should proceed, it posts a permission request to the ZPR policy engine
+(subject + action + object). The engine evaluates the request against the active ZPL
+policies and responds immediately with **allow** or **deny**. The policies you build
+and test here are the rules that govern those runtime decisions.
+
 ---
 
 ## Features
@@ -34,10 +41,14 @@ Build a test suite against your policy: manually enter subject/object/verb test 
 generate rule-based coverage tests, or use AI to generate adversarial near-miss cases
 using your declared entity instances. Run all tests at once with full rule traces.
 
-**Policy Studio**
-Describe your organization and access requirements in plain English. The AI generates
-a complete ZPL policy — namespaces, classes, and rules — and can explain its reasoning
-via the Agent Rationale view. Deploy the generated policy directly to your namespace tree.
+**Create ZPL Policy**
+The primary starting point for building a new policy — and the first page you see when
+you log in. Three input modes: type ZPL directly (the agent verifies it), describe your
+organization in plain English, or upload an LDAP/YAML directory export (`.ldif`, `.yaml`).
+The AI generates a starting set of classes, namespaces, and rules, then guides you through
+an iterative refinement loop, an AI-powered audit, and deployment to your namespace tree.
+Optionally specify a namespace structure upfront and the agent will design the policy
+layout accordingly.
 
 **Policy Audit**
 An AI-powered analyst reviews the active namespace subtree for security risks, ambiguities,
@@ -84,6 +95,20 @@ The full grammar is specified in ZPR RFC-15.5 (`bnf/zpl_rfc15_5.bnf`).
 ## Quick Start
 
 **Requirements:** Python 3.11+
+
+**With [Claude Code](https://claude.ai/code) (recommended):**
+
+```bash
+git clone https://github.com/lewtucker/zpr-policy-maker-v2.git
+cd zpr-policy-maker-v2
+claude
+```
+
+Then at the Claude prompt type `/setup`. Claude will check your Python version, install
+dependencies, generate a secret key, prompt for an app password and optional Anthropic
+API key, start the server, and walk you through creating your first account — step by step.
+
+**Manual setup:**
 
 ```bash
 # 1. Install dependencies
