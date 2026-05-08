@@ -1243,10 +1243,12 @@
               </div>
 
               <!-- Input mode selector -->
-              <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.75rem" id="nps-input-tabs">
-                <button class="nps-tab nps-tab-active" id="nps-tab-zpl"  onclick="npsSetInputMode('zpl')">⌨ Input ZPL</button>
-                <button class="nps-tab" id="nps-tab-desc" onclick="npsSetInputMode('desc')">Tell the agent about your organization</button>
-                <button class="nps-tab" id="nps-tab-yaml" onclick="npsSetInputMode('yaml')" style="margin-left:auto">📂 Upload YAML / LDAP</button>
+              <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.75rem;flex-wrap:wrap" id="nps-input-tabs">
+                <button class="nps-tab nps-tab-active" id="nps-tab-desc" onclick="npsSetInputMode('desc')">Tell the agent about your organization</button>
+                <span style="font-size:0.75rem;color:var(--muted)">— or —</span>
+                <button class="nps-tab" id="nps-tab-zpl" onclick="npsSetInputMode('zpl')">⌨ Input ZPL</button>
+                <span style="font-size:0.75rem;color:var(--muted)">— or —</span>
+                <button class="nps-tab" id="nps-tab-yaml" onclick="npsSetInputMode('yaml')">📂 Upload YAML / LDAP</button>
               </div>
 
               <div class="nps-stale" id="nps-stale1">
@@ -1255,7 +1257,7 @@
               </div>
 
               <!-- Describe to AI panel -->
-              <div id="nps-panel-desc" style="display:none">
+              <div id="nps-panel-desc">
                 <div style="margin-bottom:0.6rem">
                   <button class="nps-sub-toggle" id="nps-struct-toggle" onclick="npsToggleStruct()">▸ Specify namespace structure (optional)</button>
                   <div id="nps-struct-wrap" style="display:none;margin-top:0.4rem;margin-bottom:0.4rem">
@@ -1271,7 +1273,7 @@
               </div>
 
               <!-- Input ZPL panel -->
-              <div id="nps-panel-zpl">
+              <div id="nps-panel-zpl" style="display:none">
                 <textarea class="nps-textarea" id="nps-zpl-input" rows="8" style="font-family:var(--font-mono);font-size:0.83rem"
                   placeholder="Define Captain as a user with license_type, vessel_id.&#10;Define Bookkeeper as a user with department:finance.&#10;Define CharterSystem as a service with classification:corporate.&#10;Allow Captain to access CharterSystem.&#10;Allow Bookkeeper to access CharterSystem."
                   oninput="npsDescChange()"></textarea>
@@ -5649,7 +5651,7 @@ const NPS_TEST_DATA = [
 let npsGenerated = false;
 let npsResult = null;
 let npsIntent = 'append';
-let npsInputMode = 'zpl';
+let npsInputMode = 'desc';
 let npsLdapContent = null;
 
 function npsSetIntent(intent) {
