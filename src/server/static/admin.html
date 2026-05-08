@@ -280,18 +280,25 @@ async function bulkDeleteUsers() {
   const checked = [...document.querySelectorAll('.user-select:checked')];
   const names = checked.map(c => c.dataset.name).join(', ');
   if (!confirm(`Delete ${checked.length} user${checked.length !== 1 ? 's' : ''}?\n\n${names}\n\nThis cannot be undone.`)) return;
-  let failed = 0;
+  const rootOwners = [];
+  const otherErrors = [];
   for (const cb of checked) {
     try {
       await api('DELETE', `/api/admin/users/${cb.dataset.id}`);
     } catch(e) {
-      failed++;
-      console.error('Delete failed for', cb.dataset.name, e.message);
+      if (e.message && e.message.includes('root namespace')) {
+        rootOwners.push(cb.dataset.name);
+      } else {
+        otherErrors.push(`${cb.dataset.name}: ${e.message}`);
+      }
     }
   }
   await loadUsers();
   await loadNamespaces();
-  if (failed) alert(`${failed} deletion${failed !== 1 ? 's' : ''} failed — check console for details.`);
+  const parts = [];
+  if (rootOwners.length) parts.push(`Cannot delete root namespace owners: ${rootOwners.join(', ')}.\nDelete their namespaces first using the Namespaces tab.`);
+  if (otherErrors.length) parts.push(`Other errors:\n${otherErrors.join('\n')}`);
+  if (parts.length) alert(parts.join('\n\n'));
 }
 
 async function toggleAdmin(userId, username, checkbox) {
