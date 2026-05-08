@@ -5688,6 +5688,10 @@ function npsSetInputMode(mode) {
 }
 
 async function npsInit() {
+  // Populate deploy target namespace label
+  const nsEl = document.getElementById('nps-target-ns');
+  if (nsEl && S.context?.active_display_name) nsEl.textContent = S.context.active_display_name;
+
   // Check whether the active namespace subtree already has ZPL
   try {
     const resp = await api('GET', '/api/namespace/zpl/all');
@@ -5695,11 +5699,9 @@ async function npsInit() {
     const block = document.getElementById('nps-existing-block');
     if (block) block.style.display = hasZpl ? 'block' : 'none';
     if (!hasZpl) {
-      // No existing ZPL — default intent to 'append' (which means "create new" effectively)
       npsIntent = 'append';
     }
   } catch(e) {
-    // Non-fatal — hide the block if we can't check
     const block = document.getElementById('nps-existing-block');
     if (block) block.style.display = 'none';
   }
@@ -6254,37 +6256,76 @@ function npsReadyDeploy() {
   npsMakeActive('nps-sec4', 'Ready to deploy');
 }
 
-function npsAudit(mode) {
+async function npsAudit(mode) {
   const fastBtn = document.getElementById('nps-btn-fast');
   const deepBtn = document.getElementById('nps-btn-deep');
   const status  = document.getElementById('nps-audit-status');
+  const spin = '<span style="display:inline-block;width:0.8em;height:0.8em;border:2px solid var(--muted);border-top-color:var(--accent);border-radius:50%;animation:_tr-spin 0.6s linear infinite"></span>';
   fastBtn.disabled = true;
   deepBtn.disabled = true;
-  status.textContent = mode === 'fast' ? '⚡ Running fast audit…' : '🔍 Running deep audit…';
-  setTimeout(() => {
+  status.innerHTML = spin + ' ' + (mode === 'fast' ? 'Running fast audit…' : 'Running deep audit — this may take 20–30 seconds…');
+  document.getElementById('nps-audit-results').style.display = 'none';
+
+  const zpl = (document.getElementById('nps-zpl-deploy')?.value || '').trim() ||
+    (npsResult?.namespaces || []).map(ns => (ns.zpl || '').trim()).filter(Boolean).join('\n\n');
+
+  try {
+    const resp = await api('POST', '/api/namespace/analyze', {
+      deep: mode === 'deep',
+      zpl_override: zpl || null,
+    });
+    const result = resp.result || {};
+    const issues = [
+      ...(result.critical || []).map(i => ({...i, sev:'critical'})),
+      ...(result.warnings || []).map(i => ({...i, sev:'warn'})),
+      ...(result.info    || []).map(i => ({...i, sev:'info'})),
+    ];
+    const count = issues.length;
+    document.getElementById('nps-audit-findings').innerHTML =
+      count === 0
+        ? `<span style="color:#16a34a;font-weight:600">✓ No issues found.</span>`
+        : `Found <strong>${count} issue${count!==1?'s':''}</strong> (${mode} scan). Review below and refine if needed.`;
+    document.getElementById('nps-audit-issues').innerHTML = issues.map(iss => {
+      const color  = iss.sev==='critical' ? '#fca5a5' : iss.sev==='warn' ? '#fcd34d' : '#bae6fd';
+      const bg     = iss.sev==='critical' ? '#fff1f2' : iss.sev==='warn' ? '#fffbeb' : '#f0f9ff';
+      const tc     = iss.sev==='critical' ? '#991b1b' : iss.sev==='warn' ? '#92400e' : '#0369a1';
+      const icon   = iss.sev==='critical' ? '⛔' : iss.sev==='warn' ? '⚠' : 'ℹ';
+      const fix    = iss.suggested_fix || iss.fix || '';
+      const fixEnc = fix ? encodeURIComponent(fix) : '';
+      return `
+      <div style="border:1.5px solid ${color};border-radius:7px;padding:0.65rem 0.85rem;margin-bottom:0.5rem;background:${bg}">
+        <div style="font-size:0.82rem;font-weight:600;color:${tc};margin-bottom:0.2rem">
+          ${icon} ${esc(iss.title || iss.issue || '')}
+        </div>
+        <div style="font-size:0.79rem;color:#44403c;margin-bottom:${fix?'0.45rem':'0'}">${esc(iss.description || iss.desc || '')}</div>
+        ${fix ? `<div style="font-family:monospace;font-size:0.76rem;background:#1c1917;color:#86efac;padding:0.3rem 0.6rem;border-radius:5px;margin-bottom:0.4rem;white-space:pre-wrap">${esc(fix)}</div>
+        <button class="tool-btn" onclick="npsApplyFix(this,decodeURIComponent('${fixEnc}'))" style="font-size:0.75rem">✓ Accept fix</button>` : ''}
+      </div>`;
+    }).join('');
+    document.getElementById('nps-audit-results').style.display = 'block';
+  } catch(e) {
+    document.getElementById('nps-audit-findings').innerHTML =
+      `<span style="color:#dc2626">Audit failed: ${esc(e.message || String(e))}</span>`;
+    document.getElementById('nps-audit-results').style.display = 'block';
+  } finally {
     fastBtn.disabled = false;
     deepBtn.disabled = false;
-    status.textContent = '';
-    document.getElementById('nps-audit-findings').innerHTML =
-      `Found <strong>${NPS_AUDIT_ISSUES.length} issue${NPS_AUDIT_ISSUES.length!==1?'s':''}</strong> (${mode} scan). Review below and refine if needed.`;
-    document.getElementById('nps-audit-issues').innerHTML = NPS_AUDIT_ISSUES.map(iss => `
-      <div style="border:1.5px solid ${iss.sev==='warn'?'#fcd34d':'#bae6fd'};border-radius:7px;padding:0.65rem 0.85rem;margin-bottom:0.5rem;background:${iss.sev==='warn'?'#fffbeb':'#f0f9ff'}">
-        <div style="font-size:0.82rem;font-weight:600;color:${iss.sev==='warn'?'#92400e':'#0369a1'};margin-bottom:0.2rem">
-          ${iss.sev==='warn'?'⚠':'ℹ'} ${iss.title}
-        </div>
-        <div style="font-size:0.79rem;color:#44403c;margin-bottom:${iss.fix?'0.45rem':'0'}">${iss.desc}</div>
-        ${iss.fix ? `<div style="font-family:monospace;font-size:0.76rem;background:#1c1917;color:#86efac;padding:0.3rem 0.6rem;border-radius:5px;margin-bottom:0.4rem">${iss.fix}</div>
-        <button class="tool-btn" onclick="npsApplyFix(this,'${iss.fix}')" style="font-size:0.75rem">✓ Accept fix</button>` : ''}
-      </div>`).join('');
-    document.getElementById('nps-audit-results').style.display = 'block';
-  }, mode === 'fast' ? 1200 : 2200);
+    status.innerHTML = '';
+  }
 }
 
 function npsApplyFix(btn, fix) {
+  if (!fix) return;
+  const ta = document.getElementById('nps-zpl-deploy');
+  if (ta) {
+    const existing = (ta.value || '').trimEnd();
+    ta.value = existing ? existing + '\n' + fix : fix;
+    if (npsResult) npsResult.namespaces = [{ path: [], zpl: ta.value }];
+  }
   btn.textContent = '✓ Applied';
   btn.disabled = true;
   btn.style.color = '#16a34a';
-  npsToast('Fix appended to ZPL');
+  npsToast('Fix added to ZPL');
 }
 
 function npsRunTests() {
@@ -6352,10 +6393,12 @@ async function npsDeploy() {
   const deployEl = document.getElementById('nps-zpl-deploy');
   const zpl = (deployEl?.value || '').trim() ||
     (npsResult?.namespaces || []).map(ns => (ns.zpl || '').trim()).filter(Boolean).join('\n\n');
-  if (!zpl) { npsToast('No ZPL to deploy'); return; }
+  if (!zpl) { npsToast('No ZPL to deploy — generate a policy first'); return; }
 
   const intent = (npsIntent === 'check') ? 'replace' : (npsIntent || 'append');
-  const nsName = document.getElementById('nps-target-ns')?.textContent || 'namespace';
+  const nsName = S.context?.active_display_name || document.getElementById('nps-target-ns')?.textContent || 'namespace';
+  const nsEl = document.getElementById('nps-target-ns');
+  if (nsEl) nsEl.textContent = nsName;
 
   const spin = '<span style="display:inline-block;width:0.85em;height:0.85em;border:2px solid var(--muted);border-top-color:var(--accent);border-radius:50%;animation:_tr-spin 0.6s linear infinite;flex-shrink:0"></span>';
   const status = document.getElementById('nps-deploy-status');
@@ -6381,14 +6424,14 @@ async function npsDeploy() {
       await api('PUT', '/api/namespace/zpl', { text: zpl });
       clearStatus();
       const ds = document.getElementById('nps-deploy-success');
-      ds.innerHTML = `✓ Deployed to new namespace <strong>${esc(newName)}</strong>. Switch in the sidebar to view.`;
+      ds.innerHTML = `✓ Deployed to new namespace <strong>${esc(newName)}</strong>. <button class="tool-btn" style="font-size:0.8rem;padding:0.15rem 0.5rem" onclick="navigate('editor',document.getElementById('nav-editor'))">→ Open Policy Editor</button>`;
       ds.style.display = 'block';
     } else if (intent === 'replace') {
       showStatus(`Replacing ZPL in <strong>${esc(nsName)}</strong>… please wait`);
       await api('PUT', '/api/namespace/zpl', { text: zpl });
       clearStatus();
       const ds = document.getElementById('nps-deploy-success');
-      ds.innerHTML = `✓ <strong>${esc(nsName)}</strong> policy replaced. Open the editor to review.`;
+      ds.innerHTML = `✓ <strong>${esc(nsName)}</strong> policy replaced. <button class="tool-btn" style="font-size:0.8rem;padding:0.15rem 0.5rem" onclick="navigate('editor',document.getElementById('nav-editor'))">→ Open Policy Editor</button>`;
       ds.style.display = 'block';
     } else {
       // append
@@ -6396,11 +6439,11 @@ async function npsDeploy() {
       const existing = await api('GET', '/api/namespace/zpl');
       const existingText = (existing.text || '').trim();
       const combined = existingText ? existingText + '\n\n' + zpl : zpl;
-      showStatus(`Appending to <strong>${esc(nsName)}</strong>… please wait`);
+      showStatus(`Saving to <strong>${esc(nsName)}</strong>… please wait`);
       await api('PUT', '/api/namespace/zpl', { text: combined });
       clearStatus();
       const ds = document.getElementById('nps-deploy-success');
-      ds.innerHTML = `✓ Policy appended to <strong>${esc(nsName)}</strong>. Open the editor to review.`;
+      ds.innerHTML = `✓ Policy saved to <strong>${esc(nsName)}</strong>. <button class="tool-btn" style="font-size:0.8rem;padding:0.15rem 0.5rem" onclick="navigate('editor',document.getElementById('nav-editor'))">→ Open Policy Editor</button>`;
       ds.style.display = 'block';
     }
     npsMarkDone('nps-sec4', '✓ Deployed');
@@ -6411,7 +6454,9 @@ async function npsDeploy() {
     clearStatus();
     btn.disabled = false;
     btn.innerHTML = '🚀 Push to Deploy';
-    npsToast('Deploy failed: ' + esc(e.message || String(e)));
+    const ds = document.getElementById('nps-deploy-success');
+    ds.innerHTML = `<span style="color:#dc2626">⚠ Deploy failed: ${esc(e.message || String(e))}</span>`;
+    ds.style.display = 'block';
   }
 }
 

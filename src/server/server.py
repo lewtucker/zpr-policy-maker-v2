@@ -1431,6 +1431,7 @@ async def generate_adversarial(req: AdversarialRequest, session: dict = Depends(
 
 class AnalyzeRequest(BaseModel):
     deep: bool = False
+    zpl_override: str | None = None  # if set, analyze this text instead of reading from DB
 
 
 @app.post("/api/namespace/analyze")
@@ -1456,8 +1457,11 @@ async def analyze_namespace(req: AnalyzeRequest, session: dict = Depends(get_ses
     ancestor_zpl_map = await db.get_namespace_zpl_batch(ancestor_ids) if ancestor_ids else {}
     ancestor_combined = "\n\n".join(z.strip() for z in ancestor_zpl_map.values() if z and z.strip())
 
-    own_combined = "\n\n".join(z.strip() for z in zpl_map.values() if z and z.strip())
-    combined_zpl = "\n\n".join(filter(None, [ancestor_combined, own_combined]))
+    if req.zpl_override is not None:
+        combined_zpl = req.zpl_override.strip()
+    else:
+        own_combined = "\n\n".join(z.strip() for z in zpl_map.values() if z and z.strip())
+        combined_zpl = "\n\n".join(filter(None, [ancestor_combined, own_combined]))
 
     if not combined_zpl:
         raise HTTPException(422, "No ZPL found in this namespace or its descendants")
