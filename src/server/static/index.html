@@ -1216,7 +1216,7 @@
 
               <!-- Existing ZPL prompt — shown only when namespace has content -->
               <div id="nps-existing-block" style="display:none;margin-bottom:0.75rem">
-                <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+                <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.35rem">
                   <span style="font-size:0.79rem;color:var(--muted);font-weight:600">Existing namespace:</span>
                   <label class="nps-pill nps-pill-active" id="nps-ic-append">
                     <input type="radio" name="nps-intent" value="append" checked onchange="npsSetIntent('append')" style="display:none">
@@ -1230,7 +1230,9 @@
                     <input type="radio" name="nps-intent" value="new" onchange="npsSetIntent('new')" style="display:none">
                     New child namespace
                   </label>
-                  <button class="tool-btn" style="font-size:0.78rem;padding:0.2rem 0.55rem;color:#dc2626;border-color:#fca5a5" onclick="npsClearAll()">✕ Clear all</button>
+                </div>
+                <div>
+                  <button class="tool-btn" style="font-size:0.78rem;padding:0.2rem 0.55rem;color:#dc2626;border-color:#fca5a5" onclick="npsClearAll()">✕ Clear all sub-namespaces &amp; ZPL</button>
                 </div>
                 <div id="nps-backup-prompt" style="display:none;margin-top:0.5rem;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:7px;padding:0.45rem 0.75rem;font-size:0.79rem;color:#92400e;align-items:center;gap:0.65rem">
                   <span>⚠ Current namespace will be cleared. Download a backup first?</span>
