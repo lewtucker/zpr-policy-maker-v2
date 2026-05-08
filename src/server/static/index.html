@@ -1230,6 +1230,7 @@
                     <input type="radio" name="nps-intent" value="new" onchange="npsSetIntent('new')" style="display:none">
                     New child namespace
                   </label>
+                  <button class="tool-btn" style="font-size:0.78rem;padding:0.2rem 0.55rem;color:#dc2626;border-color:#fca5a5" onclick="npsClearAll()">✕ Clear all</button>
                 </div>
                 <div id="nps-backup-prompt" style="display:none;margin-top:0.5rem;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:7px;padding:0.45rem 0.75rem;font-size:0.79rem;color:#92400e;align-items:center;gap:0.65rem">
                   <span>⚠ Current namespace will be cleared. Download a backup first?</span>
@@ -1384,7 +1385,7 @@
         <div class="nps-section nps-pending" id="nps-sec3">
           <div class="nps-header" onclick="npsToggle('nps-sec3')">
             <div class="nps-badge">3</div>
-            <div class="nps-title">Audit &amp; Test</div>
+            <div class="nps-title">AI Audit</div>
             <div class="nps-status" id="nps-s3-status">Waiting…</div>
             <div class="nps-chevron">▶</div>
           </div>
@@ -1401,9 +1402,8 @@
             </div>
             <div class="nps-content">
               <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.85rem">
-                <button class="tool-btn" id="nps-btn-fast" onclick="npsAudit('fast')">⚡ Fast Audit</button>
-                <button class="tool-btn" id="nps-btn-deep" onclick="npsAudit('deep')">🔍 Deep Audit</button>
-                <button class="tool-btn" id="nps-btn-tests" onclick="npsRunTests()">▶ Run Tests</button>
+                <button class="tool-btn" id="nps-btn-fast" onclick="npsAudit('fast')" style="border:2px solid var(--accent);font-weight:600;color:var(--accent)">⚡ Fast Audit</button>
+                <button class="tool-btn" id="nps-btn-deep" onclick="npsAudit('deep')" style="border:2px solid var(--accent);font-weight:600;color:var(--accent)">🔍 Deep Audit</button>
                 <span id="nps-audit-status" style="font-size:0.78rem;color:var(--muted)"></span>
               </div>
               <div id="nps-audit-results" style="display:none">
@@ -1421,14 +1421,10 @@
                 <div id="nps-test-rows" style="font-size:0.82rem"></div>
               </div>
               <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-top:0.5rem">
-                <button class="tool-btn primary" onclick="npsReadyDeploy()">Deploy →</button>
+                <button class="tool-btn primary" onclick="npsReadyDeploy()">Proceed to Deploy →</button>
                 <button class="tool-btn" onclick="npsJumpTo('nps-sec2')">← Back to refine</button>
               </div>
-              <div style="margin-top:0.65rem;font-size:0.79rem;color:var(--muted)">
-                Once deployed, you can run interactive rule tests in the
-                <button class="nps-sub-toggle" style="font-size:0.79rem" onclick="navigate('testing',document.getElementById('nav-testing'))">Rule Testing page →</button>
-              </div>
-              <div class="nps-nudge" id="nps-nudge3">↓ Choose how to deploy</div>
+              <div class="nps-nudge" id="nps-nudge3">↓ Review and deploy</div>
             </div>
           </div>
         </div>
@@ -1443,10 +1439,7 @@
           </div>
           <div class="nps-body">
             <div class="nps-content">
-              <div style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:0.65rem 0.9rem;margin-bottom:0.75rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem">
-                <span style="font-size:0.82rem;color:var(--muted)">Deploying to: <strong id="nps-target-ns">Active namespace</strong></span>
-                <span style="font-size:0.77rem;color:var(--muted)">Switch namespace in the sidebar if needed.</span>
-              </div>
+              <span id="nps-target-ns" style="display:none"></span>
               <button class="nps-sub-toggle" id="nps-deploy-zpl-toggle" onclick="npsToggleDeployZpl()" style="margin-bottom:0.6rem">▸ Review ZPL before deploying</button>
               <div id="nps-deploy-zpl-wrap" style="display:none;margin-bottom:0.75rem">
                 <textarea id="nps-zpl-deploy"
@@ -5692,15 +5685,17 @@ async function npsInit() {
   const nsEl = document.getElementById('nps-target-ns');
   if (nsEl && S.context?.active_display_name) nsEl.textContent = S.context.active_display_name;
 
-  // Check whether the active namespace subtree already has ZPL
+  // Show existing block if there is any ZPL or any child namespaces
   try {
-    const resp = await api('GET', '/api/namespace/zpl/all');
-    const hasZpl = (resp.text || resp.zpl_text || '').trim().length > 0;
+    const [zplResp, tree] = await Promise.all([
+      api('GET', '/api/namespace/zpl/all'),
+      api('GET', '/api/namespaces/tree'),
+    ]);
+    const hasZpl = (zplResp.text || '').trim().length > 0;
+    const hasChildren = (tree?.children || []).length > 0;
     const block = document.getElementById('nps-existing-block');
-    if (block) block.style.display = hasZpl ? 'block' : 'none';
-    if (!hasZpl) {
-      npsIntent = 'append';
-    }
+    if (block) block.style.display = (hasZpl || hasChildren) ? 'block' : 'none';
+    if (!hasZpl && !hasChildren) npsIntent = 'append';
   } catch(e) {
     const block = document.getElementById('nps-existing-block');
     if (block) block.style.display = 'none';
@@ -5721,6 +5716,20 @@ async function npsBackupExisting() {
     npsToast('✓ Backup downloaded — ' + zpl.split('\n').length + ' lines saved');
   } catch(e) {
     npsToast('Backup failed: ' + (e.message || e));
+  }
+}
+
+async function npsClearAll() {
+  const ns = S.context?.active_display_name || 'namespace';
+  if (!confirm(`Delete all sub-namespaces and clear all ZPL from "${ns}"?\n\nThis cannot be undone.`)) return;
+  try {
+    await api('POST', '/api/restore', { namespaces: [] });
+    npsToast(`✓ All sub-namespaces and ZPL cleared from ${ns}`);
+    const block = document.getElementById('nps-existing-block');
+    if (block) block.style.display = 'none';
+    if (typeof loadContext === 'function') await loadContext();
+  } catch(e) {
+    npsToast('Clear failed: ' + (e.message || e));
   }
 }
 
@@ -6253,6 +6262,13 @@ function npsReadyDeploy() {
   npsMarkDone('nps-sec3', '✓ Done');
   const nudge = document.getElementById('nps-nudge3');
   if (nudge) nudge.style.display = 'block';
+  // Reset deploy card to pristine state
+  const ds = document.getElementById('nps-deploy-success');
+  if (ds) { ds.style.display = 'none'; ds.innerHTML = ''; }
+  const dstat = document.getElementById('nps-deploy-status');
+  if (dstat) { dstat.style.display = 'none'; dstat.innerHTML = ''; }
+  const deployBtn = document.getElementById('nps-btn-deploy');
+  if (deployBtn) { deployBtn.disabled = false; deployBtn.innerHTML = '🚀 Push to Deploy'; }
   npsMakeActive('nps-sec4', 'Ready to deploy');
 }
 
@@ -6390,23 +6406,22 @@ function npsToggleDeployZpl() {
 
 async function npsDeploy() {
   const btn = document.getElementById('nps-btn-deploy');
-  const deployEl = document.getElementById('nps-zpl-deploy');
-  const zpl = (deployEl?.value || '').trim() ||
-    (npsResult?.namespaces || []).map(ns => (ns.zpl || '').trim()).filter(Boolean).join('\n\n');
-  if (!zpl) { npsToast('No ZPL to deploy — generate a policy first'); return; }
+  const namespaces = npsResult?.namespaces || [];
+  const hasMultiNs = namespaces.length > 1 || (namespaces.length === 1 && (namespaces[0].path||[]).length > 0);
 
-  const intent = (npsIntent === 'check') ? 'replace' : (npsIntent || 'append');
-  const nsName = S.context?.active_display_name || document.getElementById('nps-target-ns')?.textContent || 'namespace';
+  // Fall back to textarea content if npsResult has no namespaces
+  const flatZpl = (document.getElementById('nps-zpl-deploy')?.value || '').trim() ||
+    namespaces.map(ns => (ns.zpl || '').trim()).filter(Boolean).join('\n\n');
+  if (!flatZpl && !hasMultiNs) { npsToast('No ZPL to deploy — generate a policy first'); return; }
+
+  const rootNsName = S.context?.active_display_name || 'namespace';
+  const rootNsId   = S.context?.active_namespace_id || S.context?.active_user_id;
   const nsEl = document.getElementById('nps-target-ns');
-  if (nsEl) nsEl.textContent = nsName;
+  if (nsEl) nsEl.textContent = rootNsName;
 
   const spin = '<span style="display:inline-block;width:0.85em;height:0.85em;border:2px solid var(--muted);border-top-color:var(--accent);border-radius:50%;animation:_tr-spin 0.6s linear infinite;flex-shrink:0"></span>';
   const status = document.getElementById('nps-deploy-status');
-
-  const showStatus = msg => {
-    status.innerHTML = spin + ' ' + msg;
-    status.style.display = 'flex';
-  };
+  const showStatus = msg => { status.innerHTML = spin + ' ' + msg; status.style.display = 'flex'; };
   const clearStatus = () => { status.style.display = 'none'; status.innerHTML = ''; };
 
   btn.disabled = true;
@@ -6414,44 +6429,75 @@ async function npsDeploy() {
   document.getElementById('nps-deploy-success').style.display = 'none';
 
   try {
-    if (intent === 'new') {
-      const newName = prompt('New sub-namespace name:', 'NewPolicy');
-      if (!newName) { btn.disabled = false; btn.innerHTML = '🚀 Push to Deploy'; clearStatus(); return; }
-      showStatus(`Creating namespace <strong>${esc(newName)}</strong>…`);
-      const created = await api('POST', '/api/namespaces', { display_name: newName });
-      showStatus(`Saving ZPL to <strong>${esc(newName)}</strong>… please wait`);
-      await api('POST', '/api/context/switch', { namespace_id: created.id });
-      await api('PUT', '/api/namespace/zpl', { text: zpl });
-      clearStatus();
-      const ds = document.getElementById('nps-deploy-success');
-      ds.innerHTML = `✓ Deployed to new namespace <strong>${esc(newName)}</strong>. <button class="tool-btn" style="font-size:0.8rem;padding:0.15rem 0.5rem" onclick="navigate('editor',document.getElementById('nav-editor'))">→ Open Policy Editor</button>`;
-      ds.style.display = 'block';
-    } else if (intent === 'replace') {
-      showStatus(`Replacing ZPL in <strong>${esc(nsName)}</strong>… please wait`);
-      await api('PUT', '/api/namespace/zpl', { text: zpl });
-      clearStatus();
-      const ds = document.getElementById('nps-deploy-success');
-      ds.innerHTML = `✓ <strong>${esc(nsName)}</strong> policy replaced. <button class="tool-btn" style="font-size:0.8rem;padding:0.15rem 0.5rem" onclick="navigate('editor',document.getElementById('nav-editor'))">→ Open Policy Editor</button>`;
-      ds.style.display = 'block';
+    const deployed = [];
+
+    if (hasMultiNs) {
+      // ── Multi-namespace deploy: each path=[] goes to root, path=["X"] creates sub-ns ──
+      // Fetch existing children once so we can reuse instead of duplicating
+      const treeResp = await api('GET', '/api/namespaces/tree');
+      const existingChildren = {};
+      for (const child of treeResp?.children || []) {
+        existingChildren[child.display_name] = child.id;
+      }
+
+      for (const ns of namespaces) {
+        const path  = ns.path || [];
+        const zpl   = (ns.zpl || '').trim();
+        if (!zpl) continue;
+
+        if (path.length === 0) {
+          showStatus(`Saving to <strong>${esc(rootNsName)}</strong>…`);
+          await api('PUT', '/api/namespace/zpl', { text: zpl });
+          deployed.push(rootNsName);
+        } else {
+          const subName = path[path.length - 1];
+          let subId = existingChildren[subName];
+          if (!subId) {
+            showStatus(`Creating namespace <strong>${esc(subName)}</strong>…`);
+            const created = await api('POST', '/api/namespaces', {
+              display_name: subName,
+              parent_id: rootNsId,
+            });
+            subId = created.id;
+            existingChildren[subName] = subId;
+          }
+          showStatus(`Saving ZPL to <strong>${esc(subName)}</strong>…`);
+          await api('POST', '/api/context/switch', { namespace_id: subId });
+          await api('PUT', '/api/namespace/zpl', { text: zpl });
+          await api('POST', '/api/context/switch', { namespace_id: rootNsId });
+          deployed.push(subName);
+        }
+      }
     } else {
-      // append
-      showStatus(`Reading existing ZPL from <strong>${esc(nsName)}</strong>…`);
-      const existing = await api('GET', '/api/namespace/zpl');
-      const existingText = (existing.text || '').trim();
-      const combined = existingText ? existingText + '\n\n' + zpl : zpl;
-      showStatus(`Saving to <strong>${esc(nsName)}</strong>… please wait`);
-      await api('PUT', '/api/namespace/zpl', { text: combined });
-      clearStatus();
-      const ds = document.getElementById('nps-deploy-success');
-      ds.innerHTML = `✓ Policy saved to <strong>${esc(nsName)}</strong>. <button class="tool-btn" style="font-size:0.8rem;padding:0.15rem 0.5rem" onclick="navigate('editor',document.getElementById('nav-editor'))">→ Open Policy Editor</button>`;
-      ds.style.display = 'block';
+      // ── Single-namespace deploy ──
+      const intent = (npsIntent === 'check') ? 'replace' : (npsIntent || 'replace');
+      if (intent === 'replace') {
+        showStatus(`Saving to <strong>${esc(rootNsName)}</strong>…`);
+        await api('PUT', '/api/namespace/zpl', { text: flatZpl });
+      } else {
+        showStatus(`Reading existing ZPL…`);
+        const existing = await api('GET', '/api/namespace/zpl');
+        const existingText = (existing.text || '').trim();
+        const combined = existingText ? existingText + '\n\n' + flatZpl : flatZpl;
+        showStatus(`Saving to <strong>${esc(rootNsName)}</strong>…`);
+        await api('PUT', '/api/namespace/zpl', { text: combined });
+      }
+      deployed.push(rootNsName);
     }
+
+    clearStatus();
+    const deployedList = deployed.map(n => `<strong>${esc(n)}</strong>`).join(', ');
+    const ds = document.getElementById('nps-deploy-success');
+    ds.innerHTML = `✓ Deployed to: ${deployedList}. <button class="tool-btn" style="font-size:0.8rem;padding:0.15rem 0.5rem" onclick="navigate('editor',document.getElementById('nav-editor'))">→ Open Policy Editor</button> <button class="tool-btn" style="font-size:0.8rem;padding:0.15rem 0.5rem" onclick="navigate('testing',document.getElementById('nav-testing'))">→ Go to Testing</button>`;
+    ds.style.display = 'block';
     npsMarkDone('nps-sec4', '✓ Deployed');
     btn.innerHTML = '✓ Done';
     btn.disabled = false;
-    if (typeof loadContext === 'function') loadContext();
+    if (typeof loadContext === 'function') await loadContext();
   } catch(e) {
     clearStatus();
+    // Restore context to root on error
+    if (rootNsId) api('POST', '/api/context/switch', { namespace_id: rootNsId }).catch(()=>{});
     btn.disabled = false;
     btn.innerHTML = '🚀 Push to Deploy';
     const ds = document.getElementById('nps-deploy-success');
@@ -6459,6 +6505,7 @@ async function npsDeploy() {
     ds.style.display = 'block';
   }
 }
+
 
 function npsToggleDd(id) {
   const el = document.getElementById(id);
