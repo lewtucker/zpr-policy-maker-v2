@@ -835,13 +835,13 @@
           style="width:100%;font-size:0.82rem;padding:0.25rem 0.4rem;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--fg);cursor:pointer">
         </select>
       </div>
-      <div class="nav-item active" id="nav-newstudio"  onclick="navigate('newstudio',this)">Create ZPL Policy</div>
-      <div class="nav-item" id="nav-editor"            onclick="navigate('editor',this)">Policy Editor</div>
-      <div class="nav-item" id="nav-testing"          onclick="navigate('testing',this)">Rule Testing</div>
-      <div class="nav-item" id="nav-audit"            onclick="navigate('audit',this)">Policy Audit</div>
-      <div class="nav-item" id="nav-nsmgr"            onclick="navigate('nsmgr',this)">Namespace Mgnt</div>
-      <div class="nav-item" id="nav-nsconfig"         onclick="navigate('nsconfig',this)">ZPL Config</div>
-      <div class="nav-item" id="nav-guide"            onclick="navigate('guide',this)">User Guide</div>
+      <div class="nav-item active" id="nav-guide"        onclick="navigate('guide',this)">User Guide</div>
+      <div class="nav-item" id="nav-newstudio"          onclick="navigate('newstudio',this)">Create ZPL Policy</div>
+      <div class="nav-item" id="nav-editor"             onclick="navigate('editor',this)">Policy Editor</div>
+      <div class="nav-item" id="nav-testing"            onclick="navigate('testing',this)">Rule Testing</div>
+      <div class="nav-item" id="nav-audit"              onclick="navigate('audit',this)">Policy Audit</div>
+      <div class="nav-item" id="nav-nsmgr"              onclick="navigate('nsmgr',this)">Namespace Mgnt</div>
+      <div class="nav-item" id="nav-nsconfig"           onclick="navigate('nsconfig',this)">ZPL Config</div>
       <div style="border-top:1px solid var(--border);margin:0.5rem 0.85rem 0.2rem;padding-top:0.4rem;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted)">User Add-ons</div>
       <div class="nav-item" id="nav-yamlview"         onclick="navigate('yamlview',this)">YAML/LDAP Viewer</div>
       <!-- hidden nav targets — navigable but not listed -->
@@ -1171,7 +1171,7 @@
     </div>
 
     <!-- ══ User Guide ══ -->
-    <div class="page" id="page-guide">
+    <div class="page active" id="page-guide">
       <iframe class="guide-iframe" src="/help" id="guide-iframe"></iframe>
     </div>
 
@@ -1200,7 +1200,7 @@
     </div>
 
     <!-- ══ New Policy Studio ══ -->
-    <div class="page active" id="page-newstudio">
+    <div class="page" id="page-newstudio">
       <div class="nps-wrap">
 
         <!-- Section 1: Input -->
@@ -1584,7 +1584,7 @@ const S = {
   analyst: null,
   parseTimer: null,
   // new layout state
-  currentPage: 'newstudio',
+  currentPage: 'guide',
   defsView: 'zpl',
   nsMode: 'full',
   _storedZpl: '',
