@@ -57,6 +57,10 @@
   .modal h3 { margin: 0 0 1rem; font-size: 1rem; }
   .modal .field { margin-bottom: 0.75rem; }
   .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
+  .modal-wide { width: min(680px, 95vw); }
+  .invite-note { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 0.6rem; }
+  .invite-body { width: 100%; min-height: 320px; font-family: var(--mono); font-size: 0.78rem; line-height: 1.6; border: 1px solid var(--border); border-radius: 0.375rem; padding: 0.65rem 0.85rem; background: var(--bg); color: var(--text); resize: vertical; box-sizing: border-box; }
+  .invite-body:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px #bfdbfe; }
   .ns-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.75rem; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
   .ns-row:last-child { border-bottom: none; }
   .ns-name { font-weight: 500; flex: 1; }
@@ -130,6 +134,7 @@
       </div>
       <div class="form-actions">
         <button class="btn btn-primary" onclick="addUser()">Create user + root namespace</button>
+        <button class="btn" id="invite-btn" onclick="openInvite()" disabled title="Fill in username and password first">✉ Invite</button>
         <span class="msg" id="add-user-msg"></span>
       </div>
     </div>
@@ -143,6 +148,19 @@
         <span id="ns-count" style="color:var(--text-dim);font-weight:400"></span>
       </div>
       <div id="ns-body"><div class="empty">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Invite email modal -->
+<div class="modal-backdrop" id="invite-modal">
+  <div class="modal modal-wide">
+    <h3>✉ Invitation Email</h3>
+    <p class="invite-note">Edit as needed, then copy and send to the recipient. The template is stored in <code>src/server/invite_email.txt</code> and can be customised by the system owner.</p>
+    <textarea class="invite-body" id="invite-body" spellcheck="false"></textarea>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeInvite()">Close</button>
+      <button class="btn btn-primary" onclick="copyInvite()" id="invite-copy-btn">Copy to clipboard</button>
     </div>
   </div>
 </div>
@@ -361,9 +379,64 @@ function renderNamespaces(nsList) {
   document.getElementById('ns-body').innerHTML = html || '<div class="empty">No namespaces found.</div>';
 }
 
+// ── Invite email ───────────────────────────────────────────────────────────
+
+function updateInviteBtn() {
+  const uname = document.getElementById('new-username').value.trim();
+  const pw    = document.getElementById('new-password').value;
+  document.getElementById('invite-btn').disabled = !(uname && pw);
+}
+
+document.getElementById('new-username').addEventListener('input', updateInviteBtn);
+document.getElementById('new-password').addEventListener('input', updateInviteBtn);
+
+async function openInvite() {
+  const uname = document.getElementById('new-username').value.trim();
+  const pw    = document.getElementById('new-password').value;
+  const email = document.getElementById('new-email').value.trim();
+
+  let tmpl = '';
+  try {
+    const res = await api('GET', '/api/admin/invite-template');
+    tmpl = res.template || '';
+  } catch(e) {
+    tmpl = '(Could not load template: ' + e.message + ')';
+  }
+
+  const emailLine = email ? '\n  Email:     ' + email + '\n' : '';
+  const composed = tmpl
+    .replace('{{greeting}}',  'Hi,')
+    .replace('{{site_url}}',  '[SITE URL]')
+    .replace('{{username}}',  uname)
+    .replace('{{password}}',  pw)
+    .replace('{{email_line}}', emailLine)
+    .replace('{{signature}}', 'Best regards,\n[Your name]');
+
+  document.getElementById('invite-body').value = composed;
+  document.getElementById('invite-copy-btn').textContent = 'Copy to clipboard';
+  document.getElementById('invite-modal').classList.add('open');
+  setTimeout(() => document.getElementById('invite-body').focus(), 50);
+}
+
+function closeInvite() {
+  document.getElementById('invite-modal').classList.remove('open');
+}
+
+async function copyInvite() {
+  const text = document.getElementById('invite-body').value;
+  try {
+    await navigator.clipboard.writeText(text);
+    const btn = document.getElementById('invite-copy-btn');
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = 'Copy to clipboard', 2000);
+  } catch(e) {
+    alert('Copy failed — please select all and copy manually.');
+  }
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReset(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeReset(); closeInvite(); } });
 
 loadUsers();
 loadNamespaces();

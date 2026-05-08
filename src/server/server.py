@@ -507,6 +507,15 @@ async def admin_list_namespaces(_: dict = Depends(get_admin_session)):
     return await db.list_all_namespaces()
 
 
+@app.get("/api/admin/invite-template")
+async def admin_invite_template(_: dict = Depends(get_admin_session)):
+    """Return the invite email template from invite_email.txt."""
+    tmpl_path = Path(__file__).parent / "invite_email.txt"
+    if tmpl_path.exists():
+        return {"template": tmpl_path.read_text()}
+    return {"template": ""}
+
+
 class MatchRequest(BaseModel):
     subject_class: str = "users"
     subject_name: str | None = None

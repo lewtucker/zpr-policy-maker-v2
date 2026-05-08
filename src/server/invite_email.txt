@@ -1,0 +1,26 @@
+{{greeting}}
+
+I'd like to invite you to try out ZPR Policy Builder, a tool for creating and testing
+ZPL (Zero-trust Policy Language) access policies.
+
+You can access it here:
+
+  {{site_url}}
+
+Your login credentials:
+
+  Username:  {{username}}
+  Password:  {{password}}
+{{email_line}}
+When you log in you'll land on the Create ZPL Policy page. The quickest way to get
+started is to describe your organization or a set of services in plain English and
+let the agent generate a starting policy — it takes about 30 seconds. You can then
+refine it conversationally, run an audit, and deploy.
+
+The full User Guide is available at:
+
+  {{site_url}}/help
+
+Please change your password after first login.
+
+{{signature}}
