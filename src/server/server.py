@@ -3335,6 +3335,77 @@ async def generate_policy(req: GeneratePolicyRequest, session: dict = Depends(ge
     return policy
 
 
+class RefinePolicyRequest(BaseModel):
+    current_zpl: str
+    message: str
+    root_display_name: str = "Org"
+    messages: list = []
+
+
+_REFINE_SYSTEM = """You are a ZPL (Zero-trust Policy Language) policy editor. You will receive an existing ZPL policy and a refinement instruction. Apply the change precisely and return the updated policy.
+
+ZPL SYNTAX REMINDER:
+- Class definition: Define ClassName as a user|service|server|endpoint with attr1, attr2.
+- Subclass: Define Manager as a Employee with role:manager.
+- Allow rule: Allow SubjectClass to action ObjectClass.
+- Never Allow: Never allow SubjectClass with attr:value to action ObjectClass.
+
+RULES:
+- Keep all existing classes and rules that are not affected by the instruction.
+- Only add, remove, or modify what the instruction asks for.
+- Preserve the existing namespace structure (dotted prefixes).
+- If the instruction references a class that doesn't exist, define it.
+
+OUTPUT FORMAT — return EXACTLY this JSON inside <REFINE> tags:
+<REFINE>
+{
+  "reply": "One or two sentences describing exactly what changed.",
+  "namespaces": [
+    { "path": [], "zpl": "..." },
+    { "path": ["Dept"], "zpl": "..." }
+  ]
+}
+</REFINE>
+
+In ZPL text, newlines must be \\n (JSON-escaped).
+"""
+
+
+@app.post("/api/policy-studio/refine")
+async def refine_policy(req: RefinePolicyRequest, session: dict = Depends(get_session)):
+    """Apply a natural-language refinement to an existing ZPL policy."""
+    if not ai_client.available():
+        raise HTTPException(503, "ANTHROPIC_API_KEY not set")
+    if not req.message.strip():
+        raise HTTPException(422, "message is required")
+
+    root_name = (req.root_display_name or "Org").strip()
+    # Build conversation history for multi-turn context
+    history = []
+    for m in (req.messages or []):
+        role = m.get("role") if isinstance(m, dict) else "user"
+        content = m.get("content", "") if isinstance(m, dict) else str(m)
+        if role in ("user", "assistant") and content:
+            history.append({"role": role, "content": content})
+
+    user_content = f"CURRENT POLICY (root namespace: {root_name}):\n{req.current_zpl}\n\nINSTRUCTION: {req.message.strip()}"
+    history.append({"role": "user", "content": user_content})
+
+    text = ai_client.complete(
+        _REFINE_SYSTEM,
+        history,
+        max_tokens=4000,
+        temperature=0.2,
+    )
+    blocks = ai_client.extract_json_blocks(text, "REFINE")
+    if not blocks:
+        raise HTTPException(422, "AI did not return a valid <REFINE> block")
+    result = blocks[0]
+    if "namespaces" not in result:
+        raise HTTPException(422, "Refined policy missing namespaces list")
+    return result
+
+
 @app.get("/v2", response_class=HTMLResponse)
 async def spa_v2(request: Request):
     if not _check_session(request):
