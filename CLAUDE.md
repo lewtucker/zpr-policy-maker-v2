@@ -264,8 +264,11 @@ Release Notes content lives inside the User Guide (no separate button).
 ### First Deployment Checklist
 
 ```bash
-# 1. rsync code (always use full absolute paths)
-rsync -av /path/to/ZPR-Policy-maker-v2/src/server/ \
+# 1. rsync code (always use full absolute paths; never overwrite .env or DB)
+rsync -av \
+  --exclude='.env' --exclude='zpr_policy.db' \
+  --exclude='__pycache__/' --exclude='.pytest_cache/' --exclude='*.pyc' --exclude='.DS_Store' \
+  /path/to/ZPR-Policy-maker-v2/src/server/ \
     root@<your-server-ip>:/opt/zpr-policy-maker-v2/src/server/
 
 # 2. On server: create venv + install deps
@@ -286,7 +289,14 @@ ssh root@<your-server-ip> "systemctl enable --now zpr-policy-maker-v2"
 ### Subsequent Deploys
 
 ```bash
-rsync -av /path/to/ZPR-Policy-maker-v2/src/server/ \
+# Use the deploy script (handles excludes automatically):
+scripts/deploy.sh
+
+# Or manually:
+rsync -av \
+  --exclude='.env' --exclude='zpr_policy.db' \
+  --exclude='__pycache__/' --exclude='.pytest_cache/' --exclude='*.pyc' --exclude='.DS_Store' \
+  /path/to/ZPR-Policy-maker-v2/src/server/ \
     root@<your-server-ip>:/opt/zpr-policy-maker-v2/src/server/
 ssh root@<your-server-ip> "systemctl restart zpr-policy-maker-v2"
 ```
