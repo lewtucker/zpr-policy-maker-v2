@@ -46,7 +46,8 @@ The primary starting point for building a new policy — and the first page you 
 you log in. Three input modes: type ZPL directly (the agent verifies it), describe your
 organization in plain English, or upload an LDAP/YAML directory export (`.ldif`, `.yaml`).
 The AI generates a starting set of classes, namespaces, and rules, then guides you through
-an iterative refinement loop, an AI-powered audit, and deployment to your namespace tree.
+an iterative refinement loop and deployment to your namespace tree. After deploying, run
+Policy Audit and Rule Testing to verify the policy before use.
 Optionally specify a namespace structure upfront and the agent will design the policy
 layout accordingly.
 
