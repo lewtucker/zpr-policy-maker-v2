@@ -149,6 +149,8 @@
       <div class="card-header">
         All Namespaces
         <span id="ns-count" style="color:var(--text-dim);font-weight:400"></span>
+        <button class="btn btn-danger" id="ns-bulk-delete-btn" onclick="bulkDeleteNamespaces()" disabled
+          style="margin-left:auto;display:none">Delete selected</button>
       </div>
       <div id="ns-body"><div class="empty">Loading…</div></div>
     </div>
@@ -401,10 +403,16 @@ function renderNamespaces(nsList) {
 
   function renderNode(node, depth) {
     const indent = depth * 20;
-    const badge = node.parent_namespace_id
-      ? `<span class="badge badge-sub">sub</span>`
-      : `<span class="badge badge-root">root</span>`;
+    const isRoot = !node.parent_namespace_id;
+    const badge = isRoot
+      ? `<span class="badge badge-root">root</span>`
+      : `<span class="badge badge-sub">sub</span>`;
+    const checkbox = isRoot
+      ? `<div style="width:1.4rem"></div>`
+      : `<input type="checkbox" class="ns-select" data-id="${node.id}" data-name="${esc(node.display_name)}"
+           onchange="updateNsBulkBtn()" style="cursor:pointer;flex-shrink:0">`;
     let html = `<div class="ns-row">
+      ${checkbox}
       <div class="ns-name" style="padding-left:${indent}px">
         ${depth > 0 ? '<span style="color:var(--text-dim);margin-right:0.3rem">└</span>' : ''}
         ${esc(node.display_name)} ${badge}
@@ -420,6 +428,32 @@ function renderNamespaces(nsList) {
 
   const html = roots.sort((a,b) => a.display_name.localeCompare(b.display_name)).map(r => renderNode(r, 0)).join('');
   document.getElementById('ns-body').innerHTML = html || '<div class="empty">No namespaces found.</div>';
+  updateNsBulkBtn();
+}
+
+function updateNsBulkBtn() {
+  const selected = document.querySelectorAll('.ns-select:checked').length;
+  const btn = document.getElementById('ns-bulk-delete-btn');
+  btn.style.display = selected ? '' : 'none';
+  btn.disabled = !selected;
+  btn.textContent = selected ? `Delete selected (${selected})` : 'Delete selected';
+}
+
+async function bulkDeleteNamespaces() {
+  const checked = [...document.querySelectorAll('.ns-select:checked')];
+  const names = checked.map(c => c.dataset.name).join(', ');
+  if (!confirm(`Delete ${checked.length} namespace${checked.length !== 1 ? 's' : ''}?\n\n${names}\n\nThis will also delete all ZPL stored in these namespaces. This cannot be undone.`)) return;
+  let failed = 0;
+  for (const cb of checked) {
+    try {
+      await api('DELETE', `/api/namespaces/${cb.dataset.id}`);
+    } catch(e) {
+      failed++;
+      console.error('Delete failed for', cb.dataset.name, e.message);
+    }
+  }
+  await loadNamespaces();
+  if (failed) alert(`${failed} deletion${failed !== 1 ? 's' : ''} failed — check console for details.`);
 }
 
 // ── Invite email ───────────────────────────────────────────────────────────
