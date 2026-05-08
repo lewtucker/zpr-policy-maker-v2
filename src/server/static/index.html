@@ -5687,19 +5687,10 @@ function npsSetInputMode(mode) {
     if (tab)   tab.classList.toggle('nps-tab-active', m === mode);
     if (panel) panel.style.display = m === mode ? '' : 'none';
   });
-  // Adjust generate button label
+  // Adjust generate button label only — intent is controlled by the pills, not by mode
   const btn = document.getElementById('nps-gen-btn');
   if (!btn) return;
-  if (mode === 'zpl') {
-    btn.textContent = '✓ Check ZPL';
-    // ZPL input mode defaults to replace — user is explicitly typing the full policy.
-    // Only switch if user hasn't already made an explicit intent choice (i.e. still on 'append').
-    if (npsIntent === 'append') npsSetIntent('replace');
-  } else {
-    btn.textContent = '⚡ Generate Policy';
-    // Switching away from ZPL: restore append if intent was replace (i.e. set by mode switch, not by user).
-    if (npsIntent === 'replace') npsSetIntent('append');
-  }
+  btn.textContent = mode === 'zpl' ? '✓ Check ZPL' : '⚡ Generate Policy';
 }
 
 async function npsInit() {
