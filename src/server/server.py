@@ -358,6 +358,7 @@ async def get_profile(session: dict = Depends(get_session)):
         "display_name": user["display_name"],
         "email": user.get("email", ""),
         "api_token": user.get("api_token"),
+        "is_admin": bool(user.get("is_admin")),
     }
 
 

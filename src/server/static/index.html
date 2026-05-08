@@ -3445,6 +3445,12 @@ function renderProfile(profile) {
       <div id="cfg-profile-msg"></div>
     </div>
 
+    ${profile.is_admin ? `
+    <div class="cfg-section">
+      <h4>Administration</h4>
+      <a href="/admin" target="_blank" class="cfg-btn" style="display:inline-block;text-decoration:none">Admin Panel →</a>
+    </div>` : ''}
+
     <div class="cfg-section">
       <h4>API Token</h4>
       <div class="cfg-row"><label>Current token</label>
