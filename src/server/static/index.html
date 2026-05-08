@@ -1831,7 +1831,15 @@ async function setDefsView(v) {
   document.getElementById('btn-zpl')?.classList.toggle('active', v === 'zpl');
   document.getElementById('btn-table')?.classList.toggle('active', v === 'table');
   document.getElementById('btn-fullns')?.classList.remove('active');
-  if (v === 'table') { renderSchemaBody(); return; }
+  if (v === 'table') {
+    if (!S.lastParsed) {
+      if (S._storedZpl) autoParse();
+      else loadNamespaceZpl();
+    } else {
+      renderSchemaBody();
+    }
+    return;
+  }
   // ZPL view always reloads short (prefix-stripped) form
   try {
     const res = await api('GET', '/api/namespace/zpl');
