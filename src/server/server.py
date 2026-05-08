@@ -3224,8 +3224,9 @@ ZPL SYNTAX REFERENCE:
 - Class definition: Define ClassName as a user|service|server|endpoint with attr1, attr2, optional attr3.
 - Subclass: Define Manager as a Employee with role:manager.
 - Multi-value attr: Define Executive as a user with role:{CEO, SVP, EVP}.
-- Allow rule: Allow SubjectClass to action ObjectClass on ServerClass.
-- Never Allow: Never allow SubjectClass with attr:value to action ObjectClass.
+- Allow rule: Allow SubjectClass to <verb> ObjectClass on ServerClass.
+- Never Allow: Never allow SubjectClass with attr:value to <verb> ObjectClass.
+  (where <verb> must be one of the ALLOWED VERBS listed at the bottom of this prompt)
 - Presence check (attr must exist): Allow Employee with employee_id: to access benefits.
 - Server-bound rules: Allow HRStaff to access HRDatabase on HRServer.
 - Entity instance: declare <Name> as a <ClassName> with key: value, key: value.
@@ -3315,6 +3316,11 @@ Use ROOT_NS. prefix for every class name — no other prefixes. No sub-namespace
   ]
 }
 
+ALLOWED VERBS — CRITICAL:
+The only verbs permitted in Allow and Never Allow rules are: ALLOWED_VERBS
+Do NOT use any other verbs (e.g. "manage", "modify", "view", "execute", "submit", "approve", "deploy", "monitor", "configure", "assign", "review").
+Every "to <verb>" in your ZPL output must use one of the allowed verbs above. If a concept needs a more specific verb, map it to the closest allowed verb.
+
 ALWAYS:
 - In ZPL text, newlines must be \\n (JSON-escaped)
 - Copy the user's description verbatim into the "description" field
@@ -3330,7 +3336,12 @@ async def generate_policy(req: GeneratePolicyRequest, session: dict = Depends(ge
     if not req.description.strip():
         raise HTTPException(422, "description is required")
     root_name = (req.root_display_name or "Org").strip()
-    system = _STUDIO_SYSTEM_TEMPLATE.replace("ROOT_NS", root_name)
+    cfg = await _get_root_config(session["login_user_id"])
+    allowed_verbs = cfg.get("builtin_verbs") or db.DEFAULT_BUILTIN_VERBS
+    verb_list = ", ".join(f'"{v}"' for v in allowed_verbs)
+    system = _STUDIO_SYSTEM_TEMPLATE.replace("ROOT_NS", root_name).replace(
+        "ALLOWED_VERBS", verb_list
+    )
     user_msg = req.description.strip()
     if req.structure_instructions.strip():
         user_msg = f"STRUCTURE OVERRIDE: {req.structure_instructions.strip()}\n\n{user_msg}"

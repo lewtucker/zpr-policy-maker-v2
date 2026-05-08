@@ -5728,6 +5728,7 @@ async function npsClearAll() {
     const block = document.getElementById('nps-existing-block');
     if (block) block.style.display = 'none';
     if (typeof loadContext === 'function') await loadContext();
+    if (typeof loadSubOwners === 'function') await loadSubOwners();
   } catch(e) {
     npsToast('Clear failed: ' + (e.message || e));
   }
@@ -6491,9 +6492,11 @@ async function npsDeploy() {
     ds.innerHTML = `✓ Deployed to: ${deployedList}. <button class="tool-btn" style="font-size:0.8rem;padding:0.15rem 0.5rem" onclick="navigate('editor',document.getElementById('nav-editor'))">→ Open Policy Editor</button> <button class="tool-btn" style="font-size:0.8rem;padding:0.15rem 0.5rem" onclick="navigate('testing',document.getElementById('nav-testing'))">→ Go to Testing</button>`;
     ds.style.display = 'block';
     npsMarkDone('nps-sec4', '✓ Deployed');
+    document.getElementById('nps-sec4').classList.add('nps-open');
     btn.innerHTML = '✓ Done';
     btn.disabled = false;
     if (typeof loadContext === 'function') await loadContext();
+    if (typeof loadSubOwners === 'function') await loadSubOwners();
   } catch(e) {
     clearStatus();
     // Restore context to root on error
