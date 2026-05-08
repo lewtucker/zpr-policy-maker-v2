@@ -1342,15 +1342,7 @@
                 <h4>Agent Rationale</h4>
                 <div id="nps-rationale"></div>
               </div>
-              <button class="nps-sub-toggle" id="nps-ns-toggle" onclick="npsToggleNs()">▸ Show namespace &amp; class hierarchy</button>
-              <div id="nps-ns-wrap" style="display:none;margin-top:0.5rem;margin-bottom:0.75rem">
-                <div id="nps-ns-preview"></div>
-              </div>
-              <div class="nps-or"><div class="nps-or-line"></div><span class="nps-or-text">or</span><div class="nps-or-line"></div></div>
-              <button class="nps-sub-toggle" id="nps-zpl-toggle" onclick="npsToggleZpl()">▸ Show generated ZPL</button>
-              <div id="nps-zpl-wrap" style="display:none;margin-top:0.5rem;margin-bottom:0.75rem">
-                <div class="nps-zpl" id="nps-zpl-preview"></div>
-              </div>
+              <div id="nps-ns-preview" style="margin-bottom:0.75rem"></div>
               <div class="nps-divider"></div>
               <label class="nps-field-label">Refine with the agent</label>
               <div class="nps-thread" id="nps-thread"></div>
@@ -1377,68 +1369,20 @@
               </div>
 
               <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
-                <button class="tool-btn primary" onclick="npsReadyAudit()">Looks good — Audit &amp; Test →</button>
+                <button class="tool-btn primary" onclick="npsReadyDeploy()">Looks good → Deploy</button>
                 <button class="tool-btn" onclick="npsReset()">↺ Start over</button>
               </div>
-              <div class="nps-nudge" id="nps-nudge2">↓ Audit and test before deploying</div>
+              <div class="nps-nudge" id="nps-nudge2">↓ Deploy when ready</div>
             </div>
           </div>
         </div>
 
-        <!-- Section 3: Audit & Test -->
+        <!-- Section 3: Deploy -->
         <div class="nps-section nps-pending" id="nps-sec3">
           <div class="nps-header" onclick="npsToggle('nps-sec3')">
             <div class="nps-badge">3</div>
-            <div class="nps-title">AI Audit</div>
-            <div class="nps-status" id="nps-s3-status">Waiting…</div>
-            <div class="nps-chevron">▶</div>
-          </div>
-          <div class="nps-body">
-            <div class="nps-toolbar">
-              <div class="nps-dd" id="nps-dd3">
-                <button class="nps-tb-btn" onclick="npsToggleDd('nps-dd3')">↑↓ ▾</button>
-                <div class="nps-dd-menu">
-                  <div class="nps-dd-item" onclick="npsToast('Download audit report — stub');npsCloseDd('nps-dd3')">⬇ Download audit report</div>
-                  <div class="nps-dd-sep"></div>
-                  <div class="nps-dd-item danger" onclick="npsResetAudit();npsCloseDd('nps-dd3')">✕ Clear</div>
-                </div>
-              </div>
-            </div>
-            <div class="nps-content">
-              <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.85rem">
-                <button class="tool-btn" id="nps-btn-fast" onclick="npsAudit('fast')" style="border:2px solid var(--accent);font-weight:600;color:var(--accent)">⚡ Fast Audit</button>
-                <button class="tool-btn" id="nps-btn-deep" onclick="npsAudit('deep')" style="border:2px solid var(--accent);font-weight:600;color:var(--accent)">🔍 Deep Audit</button>
-                <span id="nps-audit-status" style="font-size:0.78rem;color:var(--muted)"></span>
-              </div>
-              <div id="nps-audit-results" style="display:none">
-                <div class="nps-rationale" style="background:#fff7ed;border-color:#fed7aa;color:#7c2d12">
-                  <h4 style="color:#c2410c">Audit findings</h4>
-                  <div id="nps-audit-findings"></div>
-                </div>
-                <div id="nps-audit-issues"></div>
-              </div>
-              <div id="nps-test-results" style="display:none">
-                <div class="nps-rationale" style="background:#f0fdf4;border-color:#bbf7d0;color:#14532d">
-                  <h4 style="color:#15803d">Test results</h4>
-                  <div id="nps-test-summary"></div>
-                </div>
-                <div id="nps-test-rows" style="font-size:0.82rem"></div>
-              </div>
-              <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-top:0.5rem">
-                <button class="tool-btn primary" onclick="npsReadyDeploy()">Proceed to Deploy →</button>
-                <button class="tool-btn" onclick="npsJumpTo('nps-sec2')">← Back to refine</button>
-              </div>
-              <div class="nps-nudge" id="nps-nudge3">↓ Review and deploy</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Section 4: Deploy -->
-        <div class="nps-section nps-pending" id="nps-sec4">
-          <div class="nps-header" onclick="npsToggle('nps-sec4')">
-            <div class="nps-badge">4</div>
             <div class="nps-title">Deploy to namespace</div>
-            <div class="nps-status" id="nps-s4-status">Waiting…</div>
+            <div class="nps-status" id="nps-s3-status">Waiting…</div>
             <div class="nps-chevron">▶</div>
           </div>
           <div class="nps-body">
@@ -1452,7 +1396,7 @@
               </div>
               <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
                 <button class="tool-btn primary" id="nps-btn-deploy" onclick="npsDeploy()">🚀 Push to Deploy</button>
-                <button class="tool-btn" onclick="npsJumpTo('nps-sec3')">← Back to audit</button>
+                <button class="tool-btn" onclick="npsJumpTo('nps-sec2')">← Back to refine</button>
               </div>
               <div id="nps-deploy-status" style="display:none;margin-top:0.75rem;font-size:0.84rem;color:var(--muted);display:none;align-items:center;gap:0.5rem"></div>
               <div class="nps-success" id="nps-deploy-success" style="margin-top:0.75rem"></div>
@@ -5760,7 +5704,7 @@ function npsToggle(id) {
 }
 
 function npsJumpTo(id) {
-  ['nps-sec1','nps-sec2','nps-sec3','nps-sec4'].forEach(s => {
+  ['nps-sec1','nps-sec2','nps-sec3'].forEach(s => {
     const el = document.getElementById(s);
     if (el.classList.contains('nps-pending')) return;
     if (s === id) {
@@ -5919,13 +5863,8 @@ async function npsGenerate() {
         document.getElementById('nps-rationale').innerHTML =
           `<div style="font-size:1.05rem;font-weight:600;color:#15803d;margin-bottom:0.4rem">✓ Well done — your ZPL has been accepted.</div>
            <div style="font-size:0.84rem;color:var(--muted)">${esc(summary)}</div>`;
-        // Show ZPL preview from serialized round-trip
-        const zplEscaped = esc(result.serialized_zpl || desc);
-        document.getElementById('nps-zpl-preview').innerHTML = `<pre style="margin:0;white-space:pre-wrap;word-break:break-all">${zplEscaped}</pre>`;
         document.getElementById('nps-zpl-deploy').value = result.serialized_zpl || desc;
-        document.getElementById('nps-ns-preview').innerHTML  = '';
-        document.getElementById('nps-zpl-wrap').style.display = 'none';
-        document.getElementById('nps-zpl-toggle').textContent = '▸ Show ZPL';
+        document.getElementById('nps-ns-preview').innerHTML = '';
         npsMakeActive('nps-sec2', '✓ Valid');
       }
       document.getElementById('nps-thread').innerHTML = '';
@@ -5955,19 +5894,13 @@ async function npsGenerate() {
       if (r.summary) rationaleHtml += `<p style="margin:0;font-style:italic;color:var(--muted)">${esc(r.summary)}</p>`;
       document.getElementById('nps-rationale').innerHTML = rationaleHtml || '<em>No rationale returned.</em>';
 
-      // Namespace + class hierarchy
+      // Namespace + class hierarchy — always visible
       document.getElementById('nps-ns-preview').innerHTML = npsBuildNsPreview(result.namespaces || []);
-      document.getElementById('nps-ns-wrap').style.display = 'none';
-      document.getElementById('nps-ns-toggle').textContent = '▸ Show namespace & class hierarchy';
 
-      // ZPL preview (all namespaces concatenated)
+      // Set deploy ZPL (all namespaces concatenated)
       const allZpl = (result.namespaces || []).map(ns => (ns.zpl || '').trim()).filter(Boolean).join('\n\n');
-      const zplEscaped = esc(allZpl);
-      document.getElementById('nps-zpl-preview').innerHTML = `<pre style="margin:0;white-space:pre-wrap;word-break:break-all">${zplEscaped}</pre>`;
       document.getElementById('nps-zpl-deploy').value = allZpl;
       document.getElementById('nps-thread').innerHTML = '';
-      document.getElementById('nps-zpl-wrap').style.display = 'none';
-      document.getElementById('nps-zpl-toggle').textContent = '▸ Show generated ZPL';
 
       npsMarkDone('nps-sec1', '✓ Done');
       const nudge = document.getElementById('nps-nudge1');
@@ -5999,14 +5932,11 @@ function npsReset() {
   });
 
   // Clear all content areas
-  ['nps-rationale', 'nps-ns-preview', 'nps-thread', 'nps-audit-issues',
-   'nps-audit-findings', 'nps-test-summary', 'nps-test-rows',
+  ['nps-rationale', 'nps-ns-preview', 'nps-thread',
    'nps-review-table-body', 'nps-cur-stats', 'nps-cur-zpl-inner'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = '';
   });
-  const _zplPrev = document.getElementById('nps-zpl-preview');
-  if (_zplPrev) _zplPrev.innerHTML = '';
   const _zplDep = document.getElementById('nps-zpl-deploy');
   if (_zplDep) _zplDep.value = '';
   const reviewZpl = document.getElementById('nps-review-zpl-body');
@@ -6017,12 +5947,12 @@ function npsReset() {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
-  ['nps-nudge1','nps-nudge2','nps-nudge3'].forEach(id => {
+  ['nps-nudge1','nps-nudge2'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
-  ['nps-audit-results','nps-test-results','nps-review-zpl','nps-review-table',
-   'nps-zpl-wrap','nps-ns-wrap','nps-struct-wrap','nps-ldap-wrap'].forEach(id => {
+  ['nps-review-zpl','nps-review-table',
+   'nps-struct-wrap','nps-ldap-wrap'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -6038,10 +5968,10 @@ function npsReset() {
 
   // Reset section states
   npsMakeActive('nps-sec1', 'Start here');
-  ['nps-sec2','nps-sec3','nps-sec4'].forEach(id => {
+  ['nps-sec2','nps-sec3'].forEach(id => {
     document.getElementById(id).className = 'nps-section nps-pending';
   });
-  npsSetStatus(2, 'Waiting…'); npsSetStatus(3, 'Waiting…'); npsSetStatus(4, 'Waiting…');
+  npsSetStatus(2, 'Waiting…'); npsSetStatus(3, 'Waiting…');
 
   npsToast('↺ Cleared — start fresh');
 }
@@ -6076,21 +6006,6 @@ function npsBuildNsPreview(namespaces) {
   }).join('');
 }
 
-function npsToggleNs() {
-  const wrap = document.getElementById('nps-ns-wrap');
-  const btn  = document.getElementById('nps-ns-toggle');
-  const open = wrap.style.display !== 'none';
-  wrap.style.display = open ? 'none' : 'block';
-  btn.textContent = (open ? '▸ Show' : '▾ Hide') + ' namespace & class hierarchy';
-}
-
-function npsToggleZpl() {
-  const wrap = document.getElementById('nps-zpl-wrap');
-  const btn  = document.getElementById('nps-zpl-toggle');
-  const open = wrap.style.display !== 'none';
-  wrap.style.display = open ? 'none' : 'block';
-  btn.textContent = (open ? '▸ Show' : '▾ Hide') + ' generated ZPL';
-}
 
 async function npsRefine() {
   const input = document.getElementById('nps-refine');
@@ -6137,11 +6052,8 @@ async function npsRefine() {
     // Update stored result and all ZPL views
     if (npsResult) npsResult.namespaces = result.namespaces;
     const allZpl = (result.namespaces || []).map(ns => (ns.zpl || '').trim()).filter(Boolean).join('\n\n');
-    const zplEscaped = esc(allZpl);
-    const zplHtml = `<pre style="margin:0;white-space:pre-wrap;word-break:break-all">${zplEscaped}</pre>`;
-    document.getElementById('nps-zpl-preview').innerHTML = zplHtml;
     document.getElementById('nps-zpl-deploy').value = allZpl;
-    document.getElementById('nps-ns-preview').innerHTML  = npsBuildNsPreview(result.namespaces || []);
+    document.getElementById('nps-ns-preview').innerHTML = npsBuildNsPreview(result.namespaces || []);
     // Keep review panels in sync regardless of which tab is open
     document.getElementById('nps-review-zpl-body').value = allZpl;
     const reviewTableVisible = document.getElementById('nps-review-table')?.style.display !== 'none';
@@ -6239,8 +6151,6 @@ async function npsDeleteStmt(zplLine) {
   });
   // Refresh ZPL previews
   const allZpl = npsResult.namespaces.map(ns => (ns.zpl || '').trim()).filter(Boolean).join('\n\n');
-  const zplHtml = `<pre style="margin:0;white-space:pre-wrap;word-break:break-all">${esc(allZpl)}</pre>`;
-  document.getElementById('nps-zpl-preview').innerHTML = zplHtml;
   document.getElementById('nps-zpl-deploy').value = allZpl;
   // Re-render the review table
   const body = document.getElementById('nps-review-table-body');
@@ -6253,28 +6163,14 @@ async function npsDeleteStmt(zplLine) {
 }
 
 function npsZplReviewEdit(value) {
-  // Store edited ZPL as a single flat namespace so the rest of the flow sees the changes
   if (!npsResult) npsResult = {};
   npsResult.namespaces = [{ path: [], zpl: value }];
-  // Keep the deploy ZPL in sync
-  const zplHtml = `<pre style="margin:0;white-space:pre-wrap;word-break:break-all">${esc(value)}</pre>`;
-  document.getElementById('nps-zpl-preview').innerHTML = zplHtml;
   document.getElementById('nps-zpl-deploy').value = value;
 }
 
-function npsReadyAudit() {
+function npsReadyDeploy() {
   npsMarkDone('nps-sec2', '✓ Approved');
   const nudge = document.getElementById('nps-nudge2');
-  if (nudge) nudge.style.display = 'block';
-  npsMakeActive('nps-sec3', 'Run audit or tests');
-  document.getElementById('nps-audit-results').style.display = 'none';
-  document.getElementById('nps-test-results').style.display  = 'none';
-  document.getElementById('nps-audit-status').textContent = '';
-}
-
-function npsReadyDeploy() {
-  npsMarkDone('nps-sec3', '✓ Done');
-  const nudge = document.getElementById('nps-nudge3');
   if (nudge) nudge.style.display = 'block';
   // Reset deploy card to pristine state
   const ds = document.getElementById('nps-deploy-success');
@@ -6283,7 +6179,7 @@ function npsReadyDeploy() {
   if (dstat) { dstat.style.display = 'none'; dstat.innerHTML = ''; }
   const deployBtn = document.getElementById('nps-btn-deploy');
   if (deployBtn) { deployBtn.disabled = false; deployBtn.innerHTML = '🚀 Push to Deploy'; }
-  npsMakeActive('nps-sec4', 'Ready to deploy');
+  npsMakeActive('nps-sec3', 'Ready to deploy');
 }
 
 async function npsAudit(mode) {
@@ -6506,10 +6402,16 @@ async function npsDeploy() {
     clearStatus();
     const deployedList = deployed.map(n => `<strong>${esc(n)}</strong>`).join(', ');
     const ds = document.getElementById('nps-deploy-success');
-    ds.innerHTML = `✓ Deployed to: ${deployedList}. <button class="tool-btn" style="font-size:0.8rem;padding:0.15rem 0.5rem" onclick="navigate('editor',document.getElementById('nav-editor'))">→ Open Policy Editor</button> <button class="tool-btn" style="font-size:0.8rem;padding:0.15rem 0.5rem" onclick="navigate('testing',document.getElementById('nav-testing'))">→ Go to Testing</button>`;
+    ds.innerHTML = `<div style="margin-bottom:0.5rem">✓ Deployed to: ${deployedList}.</div>`
+      + `<div style="font-size:0.82rem;color:var(--muted);margin-bottom:0.5rem">Next steps:</div>`
+      + `<div style="display:flex;gap:0.5rem;flex-wrap:wrap">`
+      + `<button class="tool-btn" style="font-size:0.8rem;padding:0.15rem 0.5rem" onclick="navigate('editor',document.getElementById('nav-editor'))">→ Open Policy Editor</button>`
+      + `<button class="tool-btn" style="font-size:0.8rem;padding:0.15rem 0.5rem" onclick="navigate('audit',document.getElementById('nav-audit'))">→ Policy Audit</button>`
+      + `<button class="tool-btn" style="font-size:0.8rem;padding:0.15rem 0.5rem" onclick="navigate('testing',document.getElementById('nav-testing'))">→ Rule Testing</button>`
+      + `</div>`;
     ds.style.display = 'block';
-    npsMarkDone('nps-sec4', '✓ Deployed');
-    document.getElementById('nps-sec4').classList.add('nps-open');
+    npsMarkDone('nps-sec3', '✓ Deployed');
+    document.getElementById('nps-sec3').classList.add('nps-open');
     btn.innerHTML = '✓ Done';
     btn.disabled = false;
     if (typeof loadContext === 'function') await loadContext();
