@@ -840,7 +840,7 @@
       <div class="nav-item" id="nav-editor"             onclick="navigate('editor',this)">Policy Editor</div>
       <div class="nav-item" id="nav-testing"            onclick="navigate('testing',this)">Rule Testing</div>
       <div class="nav-item" id="nav-audit"              onclick="navigate('audit',this)">Policy Audit</div>
-      <div class="nav-item" id="nav-nsmgr"              onclick="navigate('nsmgr',this)">Namespace Mgnt</div>
+      <div class="nav-item" id="nav-nsmgr"              onclick="navigate('nsmgr',this)">Namespace Mgmt</div>
       <div class="nav-item" id="nav-nsconfig"           onclick="navigate('nsconfig',this)">ZPL Config</div>
       <div style="border-top:1px solid var(--border);margin:0.5rem 0.85rem 0.2rem;padding-top:0.4rem;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted)">User Add-ons</div>
       <div class="nav-item" id="nav-yamlview"         onclick="navigate('yamlview',this)">YAML/LDAP Viewer</div>
@@ -1217,7 +1217,6 @@
               <!-- Existing ZPL prompt — shown only when namespace has content -->
               <div id="nps-existing-block" style="display:none;margin-bottom:0.75rem">
                 <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.35rem">
-                  <span style="font-size:0.79rem;color:var(--muted);font-weight:600">Existing namespace:</span>
                   <label class="nps-pill nps-pill-active" id="nps-ic-append">
                     <input type="radio" name="nps-intent" value="append" checked onchange="npsSetIntent('append')" style="display:none">
                     Add to existing
@@ -1225,10 +1224,6 @@
                   <label class="nps-pill" id="nps-ic-replace">
                     <input type="radio" name="nps-intent" value="replace" onchange="npsSetIntent('replace')" style="display:none">
                     Backup &amp; replace
-                  </label>
-                  <label class="nps-pill" id="nps-ic-new">
-                    <input type="radio" name="nps-intent" value="new" onchange="npsSetIntent('new')" style="display:none">
-                    New child namespace
                   </label>
                 </div>
                 <div>
@@ -1266,7 +1261,7 @@
                     <div class="nps-hint">The agent will use this to structure namespaces. Leave blank to let it decide.</div>
                   </div>
                 </div>
-                <textarea class="nps-textarea" id="nps-desc" rows="5"
+                <textarea class="nps-textarea" id="nps-desc" rows="10"
                   placeholder="e.g. We are a boat chartering company. We have a captain who manages charters, and a bookkeeper who handles invoices and payments. Customers book specific vessels for day trips."
                   oninput="npsDescChange()"></textarea>
                 <div class="nps-hint">Describe who your users are, what services exist, and who should access what. The agent will generate ZPL classes, rules, and namespace structure.</div>

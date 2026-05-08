@@ -1,27 +1,30 @@
-{{greeting}}
+Hi:
 
 I'd like to invite you to try out ZPR Policy Playground, a tool for creating and testing
 ZPL (Zero-trust Policy Language) access policies.
 
 You can access it here:
 
-  {{site_url}}
+{{URL}}
 
 Your login credentials:
 
   Username:  {{username}}
   Password:  {{password}}
-{{email_line}}
+
+
+Please change your password after first login.
+
+
 When you log in you'll land on the User Guide. Read this and then go to the Create ZPL Policy page. 
 
-The quickest way to get started is either to just start typing in ZPL or to describe your organization or a set of services in plain English.  You can then ask the agent to analyse your information and generate a starting policy.
+The quickest way to get started is to go to the Create ZPL Policy page and either just start typing in ZPL or to describe your organization or a set of services in plain English.  You can then ask the agent to analyse your information and generate a starting policy.
 
-It takes about 30 seconds. You can then refine it conversationally, run an audit, and deploy.
+You can then refine it conversationally, and then deploy.  After deploying you can run an audit or generate a test suite to run.
 
 The full User Guide is available at:
 
   {{site_url}}/help
 
-Please change your password after first login.
 
 {{signature}}
