@@ -6451,6 +6451,19 @@ async function npsDeploy() {
   try {
     const deployed = [];
 
+    const deployIntent = (npsIntent === 'check') ? 'replace' : (npsIntent || 'replace');
+
+    // Helper: write ZPL to whichever namespace is currently active, respecting intent.
+    // For new namespaces (isNew=true) always replace (nothing to append to).
+    async function writeZpl(zpl, isNew = false) {
+      if (!isNew && deployIntent === 'append') {
+        const existing = await api('GET', '/api/namespace/zpl');
+        const existingText = (existing.text || '').trim();
+        zpl = existingText ? existingText + '\n\n' + zpl : zpl;
+      }
+      await api('PUT', '/api/namespace/zpl', { text: zpl });
+    }
+
     if (hasMultiNs) {
       // ── Multi-namespace deploy: each path=[] goes to root, path=["X"] creates sub-ns ──
       // Fetch existing children once so we can reuse instead of duplicating
@@ -6467,12 +6480,13 @@ async function npsDeploy() {
 
         if (path.length === 0) {
           showStatus(`Saving to <strong>${esc(rootNsName)}</strong>…`);
-          await api('PUT', '/api/namespace/zpl', { text: zpl });
+          await writeZpl(zpl, false);
           deployed.push(rootNsName);
         } else {
           const subName = path[path.length - 1];
           let subId = existingChildren[subName];
-          if (!subId) {
+          const isNew = !subId;
+          if (isNew) {
             showStatus(`Creating namespace <strong>${esc(subName)}</strong>…`);
             const created = await api('POST', '/api/namespaces', {
               display_name: subName,
@@ -6483,25 +6497,15 @@ async function npsDeploy() {
           }
           showStatus(`Saving ZPL to <strong>${esc(subName)}</strong>…`);
           await api('POST', '/api/context/switch', { namespace_id: subId });
-          await api('PUT', '/api/namespace/zpl', { text: zpl });
+          await writeZpl(zpl, isNew);
           await api('POST', '/api/context/switch', { namespace_id: rootNsId });
           deployed.push(subName);
         }
       }
     } else {
       // ── Single-namespace deploy ──
-      const intent = (npsIntent === 'check') ? 'replace' : (npsIntent || 'replace');
-      if (intent === 'replace') {
-        showStatus(`Saving to <strong>${esc(rootNsName)}</strong>…`);
-        await api('PUT', '/api/namespace/zpl', { text: flatZpl });
-      } else {
-        showStatus(`Reading existing ZPL…`);
-        const existing = await api('GET', '/api/namespace/zpl');
-        const existingText = (existing.text || '').trim();
-        const combined = existingText ? existingText + '\n\n' + flatZpl : flatZpl;
-        showStatus(`Saving to <strong>${esc(rootNsName)}</strong>…`);
-        await api('PUT', '/api/namespace/zpl', { text: combined });
-      }
+      showStatus(`Saving to <strong>${esc(rootNsName)}</strong>…`);
+      await writeZpl(flatZpl, false);
       deployed.push(rootNsName);
     }
 
