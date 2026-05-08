@@ -304,7 +304,7 @@ async def setup_submit(request: Request):
         return HTMLResponse(_setup_html(error="Username and password required."), status_code=400)
     user = await db.create_user(username, password, is_admin=True)
     dn = user.get("display_name") or user["username"]
-    root_ns = await db.get_or_create_root_namespace(user["id"], dn)
+    root_ns = await db.get_or_create_root_namespace(user["id"], "zpl")
     token = _make_session(user["id"], user["username"], dn, root_ns["id"], root_ns["display_name"])
     response = Response(status_code=302, headers={"Location": "/"})
     response.set_cookie("session", token, httponly=True, samesite="lax")
@@ -459,7 +459,7 @@ async def admin_create_user(req: AdminCreateUserRequest,
     dn = req.display_name.strip() or uname
     user = await db.create_user(uname, req.password, display_name=dn, email=req.email.strip(),
                                 is_admin=req.is_admin)
-    ns = await db.get_or_create_root_namespace(user["id"], dn)
+    ns = await db.get_or_create_root_namespace(user["id"], "zpl")
     return {"user": user, "namespace": ns}
 
 
