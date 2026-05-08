@@ -89,10 +89,13 @@
       <div class="card-header">
         All Users
         <span id="user-count" style="color:var(--text-dim);font-weight:400"></span>
+        <button class="btn btn-danger" id="bulk-delete-btn" onclick="bulkDeleteUsers()" disabled
+          style="margin-left:auto;display:none">Delete selected</button>
       </div>
       <table id="users-table">
         <thead>
           <tr>
+            <th style="width:2rem"><input type="checkbox" id="select-all" onclick="toggleSelectAll(this)" title="Select all"></th>
             <th>Username</th>
             <th>Display name</th>
             <th>Email</th>
@@ -103,7 +106,7 @@
           </tr>
         </thead>
         <tbody id="users-body">
-          <tr><td colspan="7" class="empty">Loading…</td></tr>
+          <tr><td colspan="8" class="empty">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -226,13 +229,19 @@ async function loadUsers() {
 
 function renderUsers() {
   document.getElementById('user-count').textContent = `${_users.length} user${_users.length !== 1 ? 's' : ''}`;
+  document.getElementById('select-all').checked = false;
+  updateBulkBtn();
   if (!_users.length) {
-    document.getElementById('users-body').innerHTML = '<tr><td colspan="7" class="empty">No users found.</td></tr>';
+    document.getElementById('users-body').innerHTML = '<tr><td colspan="8" class="empty">No users found.</td></tr>';
     return;
   }
   document.getElementById('users-body').innerHTML = _users.map(u => {
     const adminChecked = u.is_admin ? 'checked' : '';
     return `<tr>
+      <td style="text-align:center">
+        <input type="checkbox" class="user-select" data-id="${u.id}" data-name="${esc(u.username)}"
+          onchange="updateBulkBtn()" style="cursor:pointer">
+      </td>
       <td class="mono">${esc(u.username)}</td>
       <td>${esc(u.display_name)}</td>
       <td style="color:var(--text-dim)">${esc(u.email) || '<span style="opacity:0.4">—</span>'}</td>
@@ -247,6 +256,40 @@ function renderUsers() {
       </td>
     </tr>`;
   }).join('');
+}
+
+function toggleSelectAll(cb) {
+  document.querySelectorAll('.user-select').forEach(c => c.checked = cb.checked);
+  updateBulkBtn();
+}
+
+function updateBulkBtn() {
+  const selected = document.querySelectorAll('.user-select:checked').length;
+  const btn = document.getElementById('bulk-delete-btn');
+  btn.style.display = selected ? '' : 'none';
+  btn.disabled = !selected;
+  btn.textContent = selected ? `Delete selected (${selected})` : 'Delete selected';
+  // sync select-all state
+  const all = document.querySelectorAll('.user-select');
+  document.getElementById('select-all').checked = all.length > 0 && selected === all.length;
+}
+
+async function bulkDeleteUsers() {
+  const checked = [...document.querySelectorAll('.user-select:checked')];
+  const names = checked.map(c => c.dataset.name).join(', ');
+  if (!confirm(`Delete ${checked.length} user${checked.length !== 1 ? 's' : ''}?\n\n${names}\n\nThis cannot be undone.`)) return;
+  let failed = 0;
+  for (const cb of checked) {
+    try {
+      await api('DELETE', `/api/admin/users/${cb.dataset.id}`);
+    } catch(e) {
+      failed++;
+      console.error('Delete failed for', cb.dataset.name, e.message);
+    }
+  }
+  await loadUsers();
+  await loadNamespaces();
+  if (failed) alert(`${failed} deletion${failed !== 1 ? 's' : ''} failed — check console for details.`);
 }
 
 async function toggleAdmin(userId, username, checkbox) {
