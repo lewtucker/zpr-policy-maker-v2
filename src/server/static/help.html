@@ -94,13 +94,16 @@
 <!-- Overview -->
 <h2 id="overview">Overview</h2>
 <p>ZPR Policy Builder is a browser-based tool for authoring, testing, and auditing <strong>ZPL (Zero-trust Policy Language)</strong> policies. ZPL is defined in <a href="https://zpr.org" target="_blank">ZPR RFC-15.5</a> and provides a plain-English way to express access control rules: who can access what, under what conditions, and what is explicitly denied.</p>
+
+<p>ZPR Policy Builder is designed to integrate into <strong>real-time operational systems</strong>. When a service, application, or automated workflow needs to determine whether a proposed action should proceed, it posts a permission request to the ZPR policy engine — specifying the subject, the action, and the object. The engine evaluates the request against the active ZPL policies and responds immediately with either an <strong>allow</strong> or a <strong>deny</strong>. The policies you author and test here are the rules that govern those runtime decisions, whether the subject is a human user, a microservice, a device, or an automated agent.</p>
+
 <p>With ZPR Policy Builder you can:</p>
 <ul>
   <li>Write ZPL directly in an editor and see parsed classes, entities, and rules instantly</li>
   <li>Organize policies into a namespace tree with delegated ownership per team or system</li>
   <li>Define named entity instances using <code>Declare</code> statements, or import them from YAML or LDIF</li>
   <li>Generate and run policy test suites — including AI-generated adversarial tests using real entity instances</li>
-  <li>Use <strong>Create ZPL Policy</strong> to generate a complete policy from a description, uploaded LDAP/YAML, or hand-typed ZPL — with an iterative AI refinement loop</li>
+  <li>Use <strong>Create ZPL Policy</strong> to build a starting policy from a description, an LDAP directory file, or hand-typed ZPL — with an AI agent guiding you through verification, refinement, audit, and deploy</li>
   <li>Use the inline <strong>AI Assist</strong> chat to author, explain, or refine ZPL</li>
   <li>Run an AI-powered <strong>Policy Audit</strong> to detect security risks, shadowing, gaps, and structural issues</li>
   <li>Save audit results as versioned <strong>Audit Reports</strong></li>
@@ -286,63 +289,71 @@ role: associate</code></pre>
 
 <!-- Create ZPL Policy -->
 <h2 id="create-zpl-policy">Create ZPL Policy</h2>
-<p><strong>Create ZPL Policy</strong> is the primary starting point for building a new policy. It is a four-step guided workflow: input, AI refinement, audit &amp; test, and deploy. It opens by default when you log in.</p>
+<p><strong>Create ZPL Policy</strong> is the recommended starting point for building a policy. It is the first page you see when you log in. Whether you are an experienced ZPL author or completely new to access policy, the workflow meets you where you are and guides you through verification, refinement, audit, and deploy.</p>
 
-<h3>Step 1 — Describe, Type ZPL, or Upload</h3>
-<p>Three input modes are available at the top of Section 1:</p>
+<p>The workflow has four sections that unlock in sequence. You work through them top to bottom, and can go back or start over at any time.</p>
+
+<h3>Who this is for</h3>
 <table>
-  <tr><th>Mode</th><th>When to use</th></tr>
-  <tr><td><strong>⌨ Input ZPL</strong></td><td>You already have ZPL and want to check it for errors before deploying. Clicking <strong>✓ Check ZPL</strong> parses it and shows a pass/fail summary — no AI involved.</td></tr>
-  <tr><td><strong>Tell the agent about your organization</strong></td><td>Describe in plain English: who your users are, what systems exist, who should access what. The AI generates classes, namespaces, and rules from your description.</td></tr>
-  <tr><td><strong>📂 Upload YAML / LDAP</strong></td><td>Drop or browse for a <code>.yaml</code>, <code>.yml</code>, or <code>.ldif</code> file. The AI reads the directory structure — groups, roles, OUs, services — and generates matching ZPL classes and rules. A <strong>Show</strong> button lets you preview the loaded file before generating.</td></tr>
+  <tr><th>If you are…</th><th>Start here</th></tr>
+  <tr><td><strong>Experienced with ZPL</strong></td><td>Type or paste your ZPL directly. The agent verifies it, flags any syntax or structural errors, and hands it off to the audit and deploy steps.</td></tr>
+  <tr><td><strong>New to ZPL</strong> — but you have an LDAP or directory export</td><td>Upload a <code>.ldif</code> or <code>.yaml</code> file. The agent reads your real groups, roles, OUs, and services and builds a first-cut set of ZPL classes and access rules that reflect your actual directory structure.</td></tr>
+  <tr><td><strong>New to ZPL</strong> — starting from scratch</td><td>Describe your organization in plain English: who the users are, what systems or services exist, and who should be able to access what. The agent translates that into a working set of ZPL classes, namespaces, and rules.</td></tr>
 </table>
+
+<h3>Step 1 — Input</h3>
+<p>Select an input mode at the top of Section 1:</p>
+<ul>
+  <li><strong>⌨ Input ZPL</strong> — type or paste ZPL directly. Click <strong>✓ Check ZPL</strong> to validate; the agent reports the class and rule count and flags any errors. No AI generation is involved.</li>
+  <li><strong>Tell the agent about your organization</strong> — describe in plain English. The AI generates classes, namespaces, and rules from your description. Generation typically takes 15–30 seconds.</li>
+  <li><strong>📂 Upload YAML / LDAP</strong> — drop or browse for a <code>.yaml</code>, <code>.yml</code>, or <code>.ldif</code> file. Click <strong>Show</strong> to preview the file content. The agent analyzes the directory structure and generates matching ZPL. Generation typically takes 15–30 seconds.</li>
+</ul>
+
+<h3>Specifying a Namespace Structure</h3>
+<p>If you already have a sense of how to partition your policy — for example, by department, by service tier, or by security zone — expand <strong>Specify namespace structure</strong> before clicking Generate. Describe the intended hierarchy in plain text (e.g. "divide into HR, Engineering, and Finance sub-namespaces"). The agent will attempt to design the ZPL and namespace layout accordingly. Without this hint the agent infers a structure from your description or directory data.</p>
+<div class="note">Namespaces in ZPR are not just organizational labels — each namespace is an independently deployable policy scope with its own owner. A well-chosen namespace structure lets different teams manage their own access rules without stepping on each other. See <a href="#namespaces">Namespaces</a> for details.</div>
 
 <h3>Handling an Existing Policy</h3>
-<p>If the active namespace already has ZPL, three intent pills appear. Select one before generating:</p>
+<p>If the active namespace already contains ZPL, three intent pills appear. Select one before generating:</p>
 <table>
   <tr><th>Intent</th><th>What happens at deploy time</th></tr>
-  <tr><td><strong>Add to existing</strong></td><td>Generated ZPL is appended to the current policy</td></tr>
-  <tr><td><strong>Backup &amp; replace</strong></td><td>Existing policy is replaced. A prompt offers to download a backup first; click <strong>No thanks</strong> to skip.</td></tr>
-  <tr><td><strong>New child namespace</strong></td><td>A new sub-namespace is created and the generated ZPL is saved there</td></tr>
+  <tr><td><strong>Add to existing</strong></td><td>New ZPL is appended to the current policy — existing rules are preserved</td></tr>
+  <tr><td><strong>Backup &amp; replace</strong></td><td>Current policy is replaced entirely. A prompt offers to download a backup first; click <strong>No thanks</strong> to skip.</td></tr>
+  <tr><td><strong>New child namespace</strong></td><td>A new sub-namespace is created and the generated ZPL is saved there, leaving the parent untouched</td></tr>
 </table>
 
-<p>Optionally expand <strong>Specify namespace structure</strong> to give the AI hints about the namespace hierarchy before generating.</p>
-<p>Click <strong>⚡ Generate Policy</strong>. AI generation (describe or upload modes) typically takes 15–30 seconds — a status indicator is shown while the agent works.</p>
-
 <h3>Step 2 — Review &amp; Refine</h3>
-<p>After generation the agent's rationale explains the design decisions. Two toggles let you inspect the output:</p>
+<p>After generation the agent explains its design decisions — why it chose certain class names, how it interpreted your description, and what access patterns it inferred. Two toggles let you inspect the output directly:</p>
 <ul>
   <li><strong>▸ Show namespace &amp; class hierarchy</strong> — tree of generated namespaces and classes</li>
-  <li><strong>▸ Show generated ZPL</strong> — the raw ZPL text from the agent</li>
+  <li><strong>▸ Show generated ZPL</strong> — the raw ZPL text</li>
 </ul>
-
-<h3>Iterating with the Agent</h3>
-<p>Type a change request in the refinement input and click <strong>Refine →</strong> (or press Enter). Examples:</p>
+<p>Use the refinement thread to iterate conversationally. Type a change and click <strong>Refine →</strong> or press Enter:</p>
 <ul>
-  <li>"Add a Contractor class that can only access the wifi network"</li>
-  <li>"Never allow interns to access the payroll system"</li>
-  <li>"Rename the IT class to ITOps"</li>
+  <li><em>"Partners should be allowed to access the wifi network"</em></li>
+  <li><em>"Never allow interns to access the payroll system"</em></li>
+  <li><em>"Split the IT class into ITOps and ITSecurity with separate rules"</em></li>
 </ul>
-<p>Each AI reply shows a live class and rule count (e.g. <em>4 classes, 7 rules</em>) parsed directly from the returned ZPL — this confirms whether the change was actually applied, independent of the reply text.</p>
-<div class="note">All ZPL views are kept in sync after each refinement. The review ZPL textarea, the deploy textarea, and the namespace preview all reflect the latest agent output.</div>
+<p>Each AI reply shows a live class and rule count (e.g. <em>4 classes, 7 rules</em>) parsed from the actual returned ZPL — so you can immediately verify whether the change was applied, independent of what the reply text says.</p>
+<div class="note">All ZPL views stay in sync after every refinement. The review textarea, the deploy textarea, and the namespace preview always reflect the latest state.</div>
 
 <h3>Review ZPL / Table Tabs</h3>
-<p>Below the refinement thread, two tabs let you inspect and edit the current policy before proceeding:</p>
+<p>Below the refinement thread, two tabs let you inspect and directly edit the policy before proceeding:</p>
 <ul>
-  <li><strong>ZPL tab</strong> — editable white textarea showing the full current ZPL. Your edits update the deploy textarea automatically.</li>
-  <li><strong>Table tab</strong> — parsed classes and rules as rows with individual <strong>[x]</strong> delete buttons for removing specific statements.</li>
+  <li><strong>ZPL tab</strong> — editable white textarea showing the complete current ZPL. Your edits propagate to the deploy textarea automatically.</li>
+  <li><strong>Table tab</strong> — parsed classes and rules as rows with individual <strong>[x]</strong> delete buttons for removing specific statements without touching the rest.</li>
 </ul>
-<p>Click <strong>Looks Good →</strong> to proceed to audit, or <strong>↺ Start over</strong> to clear everything and begin again.</p>
+<p>Click <strong>Looks Good →</strong> to proceed, or <strong>↺ Start over</strong> to clear all sections and begin again.</p>
 
 <h3>Step 3 — Audit &amp; Test</h3>
-<p>Before deploying you can run a <strong>Fast Audit</strong> or <strong>Deep Audit</strong> against the generated policy. The same AI-powered analysis used in the <a href="#policy-audit">Policy Audit</a> page runs here, flagging security risks, gaps, and structural issues.</p>
-<p>Click <strong>Run Tests</strong> to verify policy behavior, or use the <strong>Rule Testing page →</strong> link for a full test suite. Click <strong>Deploy →</strong> when satisfied.</p>
+<p>Before deploying, run a <strong>Fast Audit</strong> or <strong>Deep Audit</strong> to check the generated policy for security risks, unintended access paths, shadowed rules, and structural gaps — the same AI-powered analysis available on the <a href="#policy-audit">Policy Audit</a> page. Click <strong>Run Tests</strong> to verify specific allow/deny behavior, or follow the <strong>Rule Testing page →</strong> link for a full interactive test suite.</p>
+<p>Click <strong>Deploy →</strong> when the policy looks correct.</p>
 
 <h3>Step 4 — Deploy to Namespace</h3>
-<p>The target namespace is shown at the top of Section 4. Switch it in the sidebar before deploying if needed.</p>
-<p>Click <strong>▸ Review ZPL before deploying</strong> to expand an editable ZPL textarea — this is the last chance to make manual edits before the policy is saved. Then click <strong>🚀 Push to Deploy</strong>.</p>
-<p>A step-by-step status indicator shows progress (reading existing ZPL, saving, creating namespace if needed). On success, a confirmation message appears and the namespace context is refreshed. Open the <strong>Policy Editor</strong> to review the saved policy.</p>
-<div class="note">The deploy behavior (append, replace, or create new namespace) is determined by the intent you selected in Step 1. For <em>New child namespace</em>, you are prompted for the new namespace name at deploy time.</div>
+<p>The target namespace is shown at the top of Section 4. Switch namespaces in the sidebar if you want to deploy to a different scope.</p>
+<p>Click <strong>▸ Review ZPL before deploying</strong> to expand an editable textarea for a final review. Then click <strong>🚀 Push to Deploy</strong>. A step-by-step status indicator shows what the system is doing — reading existing ZPL, saving, or creating a new namespace. On success, the namespace context is refreshed and a confirmation message appears.</p>
+<p>Open the <strong>Policy Editor</strong> to review the saved policy and make any further manual edits.</p>
+<div class="note">The deploy behavior is set by your Step 1 intent. For <strong>New child namespace</strong>, you will be prompted to name the new namespace at deploy time.</div>
 
 <!-- AI Assist -->
 <h2 id="ai-assist">AI Assist</h2>
