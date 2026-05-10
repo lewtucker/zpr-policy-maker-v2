@@ -8,6 +8,8 @@ who can access what, under what conditions, and what is explicitly denied.
 This tool lets you author, validate, test, and audit ZPL policies across a
 multi-namespace hierarchy, with live parse feedback and AI-powered assistance.
 
+For those anxious to just try it out, jump to the Quick Start section below where there are further instructions to run claude command /setup-policy-manager.
+
 ZPR Policy Builder was originally designed to integrate into **real-time operational systems**.
 When a service, application, or automated workflow needs to determine whether a
 proposed action should proceed, it posts a permission request to the ZPR policy engine
@@ -105,7 +107,7 @@ cd zpr-policy-maker-v2
 claude
 ```
 
-Then at the Claude prompt type `/setup`. Claude will check your Python version, install
+Then at the Claude prompt type `/setup-policy-manager`. Claude will check your Python version, install
 dependencies, generate a secret key, prompt for an app password and optional Anthropic
 API key, start the server, and walk you through creating your first account — step by step.
 
