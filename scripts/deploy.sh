@@ -12,7 +12,7 @@ fi
 
 SERVER="${DEPLOY_SERVER:-root@72.62.97.102}"
 REMOTE_PATH="/opt/zpr-policy-maker/src/server/"
-SERVICE="${DEPLOY_SERVICE:-zpr-policy-maker-v2}"
+SERVICE="${DEPLOY_SERVICE:-zpr-policy-maker}"
 
 echo "Deploying to $SERVER ..."
 rsync -av \
