@@ -278,19 +278,25 @@ class ZPLEngine:
                 )
 
         if spec.class_name is not None:
-            if not self.schema.has(entity.class_name):
-                return SlotMatch(
-                    False, f"{slot}: unknown entity class {entity.class_name!r}"
-                )
-            if not self.schema.has(spec.class_name):
-                return SlotMatch(
-                    False, f"{slot}: unknown rule class {spec.class_name!r}"
-                )
-            if not self.schema.is_subclass(entity.class_name, spec.class_name):
-                return SlotMatch(
-                    False,
-                    f"{slot}: class {entity.class_name!r} is not a {spec.class_name!r}",
-                )
+            entity_known = self.schema.has(entity.class_name)
+            spec_known   = self.schema.has(spec.class_name)
+            if entity_known and spec_known:
+                if not self.schema.is_subclass(entity.class_name, spec.class_name):
+                    return SlotMatch(
+                        False,
+                        f"{slot}: class {entity.class_name!r} is not a {spec.class_name!r}",
+                    )
+            elif entity_known != spec_known:
+                which = "entity" if not entity_known else "rule"
+                unknown = entity.class_name if not entity_known else spec.class_name
+                return SlotMatch(False, f"{slot}: unknown {which} class {unknown!r}")
+            else:
+                # neither in schema — fall back to exact name equality
+                if entity.class_name != spec.class_name:
+                    return SlotMatch(
+                        False,
+                        f"{slot}: class {entity.class_name!r} ≠ {spec.class_name!r}",
+                    )
 
         for attr_name, spec_value in spec.attrs.items():
             entity_value = entity.attrs.get(attr_name)
