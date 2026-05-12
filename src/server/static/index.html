@@ -1017,6 +1017,7 @@
           <button class="tool-btn" style="font-size:0.72rem;padding:0.2rem 0.5rem" onclick="analystCancelSave()">Cancel</button>
         </span>
         <button id="analyst-dl-btn" class="tool-btn" onclick="analystDownloadMd()" style="display:none" title="Download as Markdown">⬇ MD</button>
+        <button id="audit-clear-btn" class="tool-btn" onclick="analystClear()" style="display:none">Clear</button>
         <button class="tool-btn" onclick="showPrompt('policy_analyst','Policy Audit Prompt')">Prompt</button>
         <div style="margin-left:auto;display:flex;align-items:center;gap:0.4rem">
           <div class="view-toggle">
@@ -4851,6 +4852,8 @@ async function trRunAnalyst(deep = false) {
     if (saveBtn) { saveBtn.style.display = ''; saveBtn.textContent = '💾 Save'; saveBtn.disabled = false; }
     const dlBtn = document.getElementById('analyst-dl-btn');
     if (dlBtn) dlBtn.style.display = '';
+    const clearBtn = document.getElementById('audit-clear-btn');
+    if (clearBtn) clearBtn.style.display = '';
   } catch (e) {
     body.innerHTML = `<div style="padding:1rem;color:#ef4444;font-size:0.83rem">Analysis failed: ${esc(String(e.message || e))}</div>`;
     S.analyst = null;
@@ -4879,6 +4882,16 @@ function analystCancelSave() {
   document.getElementById('analyst-save-inline').style.display = 'none';
   const saveBtn = document.getElementById('analyst-save-btn');
   if (saveBtn) saveBtn.style.display = '';
+}
+
+function analystClear() {
+  const body = document.getElementById('analyst-body');
+  if (body) body.innerHTML = `<div class="empty-state" id="audit-empty-state">Run a policy audit of the <span id="audit-ns-placeholder">${S.context?.active_display_name || 'current'}</span> namespace.</div>`;
+  ['analyst-save-btn','analyst-save-inline','analyst-dl-btn','audit-clear-btn'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  S.analyst = null;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
