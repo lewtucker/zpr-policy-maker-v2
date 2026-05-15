@@ -245,20 +245,9 @@ def _check_session(request: Request) -> bool:
     return _read_session(request) is not None
 
 
-def get_session(request: Request) -> dict:
+async def get_session(request: Request) -> dict:
     """FastAPI dependency — returns session dict or raises 401.
     Accepts session cookie or Authorization: Bearer <token> header."""
-    data = _read_session(request)
-    if data is not None:
-        return data
-    auth = request.headers.get("Authorization", "")
-    if auth.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Bearer token auth requires async context — use get_session_async")
-    raise HTTPException(status_code=401, detail="Not authenticated")
-
-
-async def get_session_or_token(request: Request) -> dict:
-    """Async dependency — session cookie OR Bearer token."""
     data = _read_session(request)
     if data is not None:
         return data
@@ -282,6 +271,10 @@ async def get_session_or_token(request: Request) -> dict:
                 "active_username": ns["display_name"],
             }
     raise HTTPException(status_code=401, detail="Not authenticated")
+
+
+# Alias kept for backward compat within this file
+get_session_or_token = get_session
 
 
 # ── Setup (first-run only) ────────────────────────────────────────────────────
@@ -2092,10 +2085,8 @@ class SaveNamespaceZplRequest(BaseModel):
     text: str
 
 
-@app.put("/api/namespace/zpl")
-async def save_namespace_zpl(req: SaveNamespaceZplRequest, session: dict = Depends(get_session)):
-    text = req.text
-    ns_id = session["active_user_id"]
+async def _write_zpl_to_namespace(ns_id: str, text: str, login_user_id: str) -> None:
+    """Shared ZPL save logic: inject prefix, sync entities, invalidate cache."""
     ns_row = await db.get_namespace(ns_id)
     ns = (ns_row.get("display_name") or "").strip() if ns_row else ""
     if not ns or ns.startswith("_ns_"):
@@ -2103,11 +2094,10 @@ async def save_namespace_zpl(req: SaveNamespaceZplRequest, session: dict = Depen
     entities_to_sync: list[dict] = []
     if text.strip() and ns:
         try:
-            cfg = await _get_root_config(session["login_user_id"])
+            cfg = await _get_root_config(login_user_id)
             bc_set = set(cfg["builtin_classes"])
             ba_dict = cfg["builtin_aliases"]
             raw = zpl_parser.parse(text, builtin_aliases=ba_dict, builtin_classes=bc_set)
-            # Deduplicate entities by (name, class_name) — last occurrence wins
             seen: dict[tuple, dict] = {}
             for e in raw.get("entities", []):
                 key = (e.get("name", "").lower(), e.get("class_name", "").lower())
@@ -2115,7 +2105,6 @@ async def save_namespace_zpl(req: SaveNamespaceZplRequest, session: dict = Depen
             entities_to_sync = list(seen.values())
             ps, errors = norm.zpl_to_policy_set(raw, name="ns")
             if not errors:
-                # Build ancestor class map so cross-namespace refs use correct prefix
                 anc_ids = await _ancestor_ns_ids(ns_id)
                 anc_zpl = await db.get_namespace_zpl_batch(anc_ids) if anc_ids else {}
                 ancestor_classes: dict[str, str] = {}
@@ -2131,16 +2120,20 @@ async def save_namespace_zpl(req: SaveNamespaceZplRequest, session: dict = Depen
                 rules = _dedup_rules(pd.get("rules", []))
                 text = _zpl_from_parts(pd.get("classes", []), rules, entities_to_sync)
         except Exception:
-            pass  # store raw text if injection fails
-    await db.save_namespace_zpl(session["active_user_id"], text)
-    # Sync declared entities to DB for generate-tests compatibility
-    if entities_to_sync is not None:
+            pass
+    await db.save_namespace_zpl(ns_id, text)
+    if entities_to_sync:
         await db.delete_all_entities(ns_id)
         for e in entities_to_sync:
             await db.create_entity(ns_id, e["class_name"], e["name"], e.get("attributes", {}))
-    root_ns_id = await _get_root_ns_id(session["login_user_id"])
+    root_ns_id = await _get_root_ns_id(login_user_id)
     if root_ns_id:
         _cache_invalidate(root_ns_id)
+
+
+@app.put("/api/namespace/zpl")
+async def save_namespace_zpl(req: SaveNamespaceZplRequest, session: dict = Depends(get_session)):
+    await _write_zpl_to_namespace(session["active_user_id"], req.text, session["login_user_id"])
     return {"ok": True}
 
 
@@ -3429,6 +3422,84 @@ async def refine_policy(req: RefinePolicyRequest, session: dict = Depends(get_se
     if "namespaces" not in result:
         raise HTTPException(422, "Refined policy missing namespaces list")
     return result
+
+
+class DeployNamespaceItem(BaseModel):
+    path: list[str] = []
+    zpl: str = ""
+
+
+class DeployPolicyRequest(BaseModel):
+    namespaces: list[DeployNamespaceItem]
+    intent: str = "replace"   # "replace" | "append"
+
+
+@app.post("/api/policy-studio/deploy")
+async def deploy_policy(req: DeployPolicyRequest, session: dict = Depends(get_session)):
+    """Deploy a generated policy tree to the login user's namespace hierarchy.
+
+    intent=replace clears all existing ZPL and sub-namespaces first.
+    intent=append merges new ZPL into existing namespaces.
+    """
+    if req.intent not in ("replace", "append"):
+        raise HTTPException(422, "intent must be 'replace' or 'append'")
+
+    login_user_id = session["login_user_id"]
+    root_ns = await db.get_root_namespace(login_user_id)
+    if not root_ns:
+        raise HTTPException(404, "No root namespace found")
+    root_ns_id = root_ns["id"]
+
+    if req.intent == "replace":
+        # Clear all ZPL in the tree
+        tree = await db.get_namespace_tree(root_ns_id)
+        def _collect_ids(node: dict) -> list[str]:
+            ids = [node["id"]]
+            for child in node.get("children", []):
+                ids.extend(_collect_ids(child))
+            return ids
+        for ns_id in _collect_ids(tree):
+            await db.save_namespace_zpl(ns_id, "")
+
+    # Build a map of existing child namespaces by display_name
+    tree = await db.get_namespace_tree(root_ns_id)
+    existing_children: dict[str, str] = {
+        child["display_name"]: child["id"]
+        for child in tree.get("children", [])
+    }
+
+    deployed: list[str] = []
+    for item in req.namespaces:
+        zpl = item.zpl.strip()
+        if not zpl:
+            continue
+        if not item.path:
+            # Root namespace
+            if req.intent == "append":
+                existing_row = await db.get_namespace_zpl(root_ns_id)
+                existing_text = (existing_row or {}).get("zpl_text", "").strip()
+                if existing_text:
+                    zpl = existing_text + "\n\n" + zpl
+            await _write_zpl_to_namespace(root_ns_id, zpl, login_user_id)
+            deployed.append(root_ns["display_name"])
+        else:
+            sub_name = item.path[-1]
+            sub_id = existing_children.get(sub_name)
+            is_new = not sub_id
+            if is_new:
+                sub_ns = await db.create_namespace(sub_name, login_user_id,
+                                                   parent_namespace_id=root_ns_id)
+                sub_id = sub_ns["id"]
+                existing_children[sub_name] = sub_id
+            if req.intent == "append" and not is_new:
+                existing_row = await db.get_namespace_zpl(sub_id)
+                existing_text = (existing_row or {}).get("zpl_text", "").strip()
+                if existing_text:
+                    zpl = existing_text + "\n\n" + zpl
+            await _write_zpl_to_namespace(sub_id, zpl, login_user_id)
+            deployed.append(sub_name)
+
+    return {"deployed": deployed, "count": len(deployed)}
 
 
 @app.get("/v2", response_class=HTMLResponse)
