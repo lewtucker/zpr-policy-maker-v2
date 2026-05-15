@@ -102,11 +102,12 @@
             <th>Root namespace</th>
             <th>Admin</th>
             <th>Created</th>
+            <th>Last active</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="users-body">
-          <tr><td colspan="8" class="empty">Loading…</td></tr>
+          <tr><td colspan="9" class="empty">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -226,7 +227,7 @@ async function loadUsers() {
     _users = await api('GET', '/api/admin/users');
     renderUsers();
   } catch(e) {
-    document.getElementById('users-body').innerHTML = `<tr><td colspan="7" class="empty" style="color:#ef4444">Error: ${esc(e.message)}</td></tr>`;
+    document.getElementById('users-body').innerHTML = `<tr><td colspan="9" class="empty" style="color:#ef4444">Error: ${esc(e.message)}</td></tr>`;
   }
 }
 
@@ -235,7 +236,7 @@ function renderUsers() {
   document.getElementById('select-all').checked = false;
   updateBulkBtn();
   if (!_users.length) {
-    document.getElementById('users-body').innerHTML = '<tr><td colspan="8" class="empty">No users found.</td></tr>';
+    document.getElementById('users-body').innerHTML = '<tr><td colspan="9" class="empty">No users found.</td></tr>';
     return;
   }
   document.getElementById('users-body').innerHTML = _users.map(u => {
@@ -253,6 +254,7 @@ function renderUsers() {
         <input type="checkbox" ${adminChecked} onchange="toggleAdmin('${u.id}','${esc(u.username)}',this)" style="cursor:pointer">
       </td>
       <td style="color:var(--text-dim);font-size:0.72rem">${u.created_at ? u.created_at.slice(0,10) : '—'}</td>
+      <td style="color:var(--text-dim);font-size:0.72rem">${u.last_active ? u.last_active.slice(0,10) : '<span style="opacity:0.4">never</span>'}</td>
       <td style="text-align:right;white-space:nowrap">
         <button class="btn" onclick="openReset('${u.id}','${esc(u.username)}')">Reset pw</button>
         <button class="btn btn-danger" onclick="deleteUser('${u.id}','${esc(u.username)}')">Delete</button>

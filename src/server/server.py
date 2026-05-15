@@ -260,6 +260,7 @@ async def get_session(request: Request) -> dict:
             ns = await _login_namespace(user["id"])
             if not ns:
                 raise HTTPException(status_code=403, detail="No namespace assigned")
+            await db.touch_last_active(user["id"])
             return {
                 "authenticated": True,
                 "login_user_id": user["id"],
@@ -325,6 +326,7 @@ async def login(request: Request):
     ns = await _login_namespace(user["id"])
     if not ns:
         return HTMLResponse(_login_html(error=True), status_code=403)
+    await db.touch_last_active(user["id"])
     token = _make_session(user["id"], user["username"], dn, ns["id"], ns["display_name"])
     response = Response(status_code=302, headers={"Location": "/"})
     response.set_cookie("session", token, httponly=True, samesite="lax")

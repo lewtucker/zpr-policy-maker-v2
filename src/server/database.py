@@ -191,6 +191,17 @@ async def init_db() -> None:
             await db.execute("ALTER TABLE namespaces ADD COLUMN created_by_user_id TEXT")
             # Backfill: treat current owner as creator for existing rows
             await db.execute("UPDATE namespaces SET created_by_user_id = owner_user_id WHERE created_by_user_id IS NULL")
+        if not await _column_exists(db, "users", "last_active"):
+            await db.execute("ALTER TABLE users ADD COLUMN last_active TEXT")
+            # Backfill from namespace_zpl updated_at for existing users
+            await db.execute("""
+                UPDATE users SET last_active = (
+                    SELECT MAX(nz.updated_at)
+                    FROM namespaces ns
+                    JOIN namespace_zpl nz ON nz.namespace_id = ns.id
+                    WHERE ns.owner_user_id = users.id
+                )
+            """)
         await db.commit()
 
 
@@ -494,11 +505,18 @@ async def get_namespace_tree(root_id: str) -> dict:
     return by_id.get(root_id, {})
 
 
+async def touch_last_active(user_id: str) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    async with aiosqlite.connect(_DB_PATH) as db:
+        await db.execute("UPDATE users SET last_active = ? WHERE id = ?", (now, user_id))
+        await db.commit()
+
+
 async def list_all_users() -> list[dict]:
     async with aiosqlite.connect(_DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT id, username, display_name, email, api_token, is_admin, created_at FROM users ORDER BY created_at"
+            "SELECT id, username, display_name, email, api_token, is_admin, created_at, last_active FROM users ORDER BY created_at"
         ) as cur:
             rows = await cur.fetchall()
     return [dict(r) for r in rows]
