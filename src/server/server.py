@@ -545,7 +545,12 @@ async def match_rule(req: MatchRequest, session: dict = Depends(get_session_or_t
             }))
         except Exception:
             continue
-    schema = _build_schema(ps)
+    # Build schema from the full root tree so cross-namespace subclass relationships
+    # resolve correctly (e.g. Operations.NewEmployee extends Carwash.Employee).
+    # Rules are still scoped to the active namespace via ps above.
+    root_ns_id = await _get_root_ns_id(session["login_user_id"])
+    schema_ps = await _merged_policy_set(root_ns_id) if root_ns_id else ps
+    schema = _build_schema(schema_ps or ps)
     check = CheckRequest(
         subject=Entity(class_name=req.subject_class, name=req.subject_name, attrs=req.subject_attrs),
         object=Entity(class_name=req.object_class, name=req.object_name, attrs=req.object_attrs),
